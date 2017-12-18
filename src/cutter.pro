@@ -35,6 +35,7 @@ SOURCES += \
     main.cpp \
     cutter.cpp \
     widgets/DisassemblerGraphView.cpp \
+    widgets/PPGraphView.cpp \
     utils/RichTextPainter.cpp \
     dialogs/OptionsDialog.cpp \
     dialogs/AboutDialog.cpp \
@@ -48,7 +49,7 @@ SOURCES += \
     utils/HexHighlighter.cpp \
     utils/Highlighter.cpp \
     utils/MdHighlighter.cpp \
-    dialogs/AsmOptionsDialog.cpp \
+    dialogs/preferences/AsmOptionsWidget.cpp \
     dialogs/NewFileDialog.cpp \
     AnalThread.cpp \
     widgets/CommentsWidget.cpp \
@@ -78,18 +79,21 @@ SOURCES += \
     dialogs/SaveProjectDialog.cpp \
     utils/TempConfig.cpp \
     utils/SvgIconEngine.cpp \
+    utils/SyntaxHighlighter.cpp \
     widgets/PseudocodeWidget.cpp \
     widgets/VisualNavbar.cpp \
     widgets/GraphView.cpp \
-    widgets/PPGraphView.cpp
+    dialogs/preferences/PreferencesDialog.cpp \
+    dialogs/preferences/GeneralOptionsWidget.cpp
 
 HEADERS  += \
     cutter.h \
     widgets/DisassemblerGraphView.h \
+    widgets/PPGraphView.h \
     utils/RichTextPainter.h \
     utils/CachedFontMetrics.h \
     dialogs/AboutDialog.h \
-    dialogs/AsmOptionsDialog.h \
+    dialogs/preferences/AsmOptionsWidget.h \
     dialogs/CommentsDialog.h \
     dialogs/FlagDialog.h \
     dialogs/RenameDialog.h \
@@ -130,14 +134,16 @@ HEADERS  += \
     dialogs/SaveProjectDialog.h \
     utils/TempConfig.h \
     utils/SvgIconEngine.h \
+    utils/SyntaxHighlighter.h \
     widgets/PseudocodeWidget.h \
     widgets/VisualNavbar.h \
     widgets/GraphView.h \
-    widgets/PPGraphView.h
+    dialogs/preferences/PreferencesDialog.h \
+    dialogs/preferences/GeneralOptionsWidget.h
 
 FORMS    += \
     dialogs/AboutDialog.ui \
-    dialogs/AsmOptionsDialog.ui \
+    dialogs/preferences/AsmOptionsWidget.ui \
     dialogs/CommentsDialog.ui \
     dialogs/FlagDialog.ui \
     dialogs/RenameDialog.ui \
@@ -163,7 +169,8 @@ FORMS    += \
     widgets/SidebarWidget.ui \
     widgets/HexdumpWidget.ui \
     dialogs/SaveProjectDialog.ui \
-    widgets/PseudocodeWidget.ui
+    dialogs/preferences/PreferencesDialog.ui \
+    dialogs/preferences/GeneralOptionsWidget.ui
 
 RESOURCES += \
     resources.qrc

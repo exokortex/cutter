@@ -1,18 +1,25 @@
 #include "PseudocodeWidget.h"
-#include "ui_PseudocodeWidget.h"
+
+#include <QTextEdit>
 
 #include "utils/Configuration.h"
 #include "utils/Helpers.h"
+#include "utils/SyntaxHighlighter.h"
 #include "utils/TempConfig.h"
 
-PseudocodeWidget::PseudocodeWidget(QWidget *parent, Qt::WindowFlags flags) :
-    QDockWidget(parent, flags),
-    ui(new Ui::PseudocodeWidget)
+PseudocodeWidget::PseudocodeWidget(QWidget *parent, Qt::WindowFlags flags)
+    :   QDockWidget(parent, flags)
+    ,   textEditWidget(new QTextEdit(this))
+    ,   syntaxHighLighter( new SyntaxHighlighter(textEditWidget->document()))
 {
-    ui->setupUi(this);
+    setObjectName("PseudocodeWidget");
 
+    textEditWidget->setParent(this);
+    setWidget(textEditWidget);
     setupFonts();
     colorsUpdatedSlot();
+    textEditWidget->setReadOnly(true);
+    textEditWidget->setLineWrapMode(QTextEdit::NoWrap);
 
     connect(Config(), SIGNAL(fontsUpdated()), this, SLOT(fontsUpdated()));
     connect(Config(), SIGNAL(colorsUpdated()), this, SLOT(colorsUpdatedSlot()));
@@ -22,11 +29,9 @@ PseudocodeWidget::PseudocodeWidget(QWidget *parent, Qt::WindowFlags flags) :
     connect(Core(), SIGNAL(functionRenamed(QString, QString)), this, SLOT(refreshPseudocode()));
     connect(Core(), SIGNAL(varsChanged()), this, SLOT(refreshPseudocode()));
     connect(Core(), SIGNAL(asmOptionsChanged()), this, SLOT(refreshPseudocode()));
-    connect(Core(), &CutterCore::instructionChanged, this, [this](RVA offset) {
+    connect(Core(), &CutterCore::instructionChanged, this, [this](/*RVA offset*/) {
             refreshPseudocode();
     });
-
-
 
 
     connect(Core(), SIGNAL(seekChanged(RVA)), this, SLOT(on_seekChanged(RVA)));
@@ -62,12 +67,13 @@ void PseudocodeWidget::on_seekChanged(RVA addr)
 
 void PseudocodeWidget::refresh(RVA addr)
 {
-    QString decompiledCode = Core()->getDecompiledCode(addr);
+    const QString& decompiledCode = Core()->getDecompiledCode(addr);
     if (decompiledCode.length() == 0)
     {
-        decompiledCode = tr("Cannot decompile at") + " " + RAddressString(addr) + " " + tr("(Not a function?)");
+        textEditWidget->setText(tr("Cannot decompile at") + " " + RAddressString(addr) + " " + tr("(Not a function?)"));
+        return;
     }
-    ui->pseudocodeTextBrowser->setText(decompiledCode);
+    textEditWidget->setText(decompiledCode);
 }
 
 void PseudocodeWidget::refreshPseudocode()
@@ -86,7 +92,7 @@ void PseudocodeWidget::raisePrioritizedMemoryWidget(CutterCore::MemoryWidgetType
 void PseudocodeWidget::setupFonts()
 {
     QFont font = Config()->getFont();
-    ui->pseudocodeTextBrowser->setFont(font);
+    textEditWidget->setFont(font);
 }
 
 void PseudocodeWidget::fontsUpdated()
@@ -96,8 +102,9 @@ void PseudocodeWidget::fontsUpdated()
 
 void PseudocodeWidget::colorsUpdatedSlot()
 {
-    QString styleSheet = QString("QTextBrowser { background-color: %1; color: %2; }")
+    const QString textEditClassName(textEditWidget->metaObject()->className());
+    QString styleSheet = QString(textEditClassName + " { background-color: %1; color: %2; }")
             .arg(ConfigColor("gui.background").name())
             .arg(ConfigColor("btext").name());
-    ui->pseudocodeTextBrowser->setStyleSheet(styleSheet);
+    textEditWidget->setStyleSheet(styleSheet);
 }

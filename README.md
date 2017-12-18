@@ -35,6 +35,7 @@ cd cutter
 ```
 
 ##### Building radare2
+**/!\ WARNING /!\ This will delete your current radare2 version if any already installed.**
 ```sh
 git submodule init radare2 && git submodule update radare2
 cd radare2 && ./sys/install.sh
@@ -102,6 +103,8 @@ Cutter is developed on OS X, Linux and Windows. The first release for users will
 | + | Zoom in |
 | - | Zoom out |
 | = | Reset zoom |
+| J | Next instruction |
+| K | Previous instruction |
 
 
 ## Help

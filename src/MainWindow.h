@@ -76,6 +76,7 @@ public:
 
     void closeEvent(QCloseEvent *event) override;
     void readSettings();
+    void saveSettings();
     void setFilename(const QString &fn);
     void addOutput(const QString &msg);
     void addDebugOutput(const QString &msg);
@@ -86,6 +87,9 @@ public:
 public slots:
 
     void refreshAll();
+
+    void setPanelLock();
+    void setTabLocation();
 
     void setDarkTheme();
     void setDefaultTheme();
@@ -156,7 +160,7 @@ private slots:
 
     void on_actionRefresh_contents_triggered();
 
-    void on_actionAsmOptions_triggered();
+    void on_actionPreferences_triggered();
 
     void projectSaved(const QString &name);
 
@@ -177,7 +181,8 @@ private:
     //SideBar          *sideBar;
     Configuration   *configuration;
 
-    bool doLock;
+    bool panelLock;
+    bool tabsOnTop;
     ut64 hexdumpTopOffset;
     ut64 hexdumpBottomOffset;
     QString filename;

@@ -26,12 +26,12 @@
 /*     border: 2px solid white;*/
 }
 
-QTabBar
+QMainWindow &gt; QTabBar
 {
     qproperty-drawBase: 0;
 }
 
-QTabBar::tab {
+QMainWindow &gt; QTabBar::tab {
     border-bottom-color: #2180a9;
     border-top-left-radius: 0px;
     border-top-right-radius: 0px;
@@ -41,12 +41,12 @@ QTabBar::tab {
 	margin-top: 3px;
 }
 
-QTabBar::tab:selected {
+QMainWindow &gt; QTabBar::tab:selected {
     background: #2180a9;
     color: #FFFFFF;
 }
 
-QTabBar::tab:hover {
+QMainWindow &gt; QTabBar::tab:hover {
     background: #2180a9;      /* #3C879E; */
     color: #FFFFFF;
 }
@@ -178,9 +178,9 @@ border-top: 0px;
    <widget class="QMenu" name="menuFile">
     <property name="geometry">
      <rect>
-      <x>367</x>
-      <y>185</y>
-      <width>156</width>
+      <x>273</x>
+      <y>133</y>
+      <width>173</width>
       <height>206</height>
      </rect>
     </property>
@@ -204,13 +204,6 @@ border-top: 0px;
     <property name="tabsOnTop" stdset="0">
      <bool>false</bool>
     </property>
-    <widget class="QMenu" name="menuTheme">
-     <property name="title">
-      <string>Theme</string>
-     </property>
-     <addaction name="actionWhite_Theme"/>
-     <addaction name="actionDark_Theme"/>
-    </widget>
     <addaction name="actionRefresh_contents"/>
     <addaction name="separator"/>
     <addaction name="actionDefaut"/>
@@ -219,8 +212,7 @@ border-top: 0px;
     <addaction name="actionLock"/>
     <addaction name="actionTabs_on_Top"/>
     <addaction name="separator"/>
-    <addaction name="actionAsmOptions"/>
-    <addaction name="menuTheme"/>
+    <addaction name="actionPreferences"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
@@ -947,9 +939,9 @@ QToolButton:pressed {
     <string>Display offsets</string>
    </property>
   </action>
-  <action name="actionAsmOptions">
+  <action name="actionPreferences">
    <property name="text">
-    <string>Disassembly Options</string>
+    <string>Preferences</string>
    </property>
   </action>
   <action name="actionSaveAs">

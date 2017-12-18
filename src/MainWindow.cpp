@@ -3,7 +3,7 @@
 #include "dialogs/CommentsDialog.h"
 #include "dialogs/AboutDialog.h"
 #include "dialogs/RenameDialog.h"
-#include "dialogs/AsmOptionsDialog.h"
+#include "dialogs/preferences/PreferencesDialog.h"
 #include "utils/Helpers.h"
 
 #include <QComboBox>
@@ -85,6 +85,7 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     core(CutterCore::getInstance()),
     notepadDock(nullptr),
+    pseudocodeDock(nullptr),
     asmDock(nullptr),
     calcDock(nullptr),
     omnibar(nullptr),
@@ -100,7 +101,6 @@ MainWindow::MainWindow(QWidget *parent) :
     relocsDock(nullptr),
     commentsDock(nullptr),
     stringsDock(nullptr),
-    pseudocodeDock(nullptr),
     flagsDock(nullptr),
     dashboardDock(nullptr),
     gotoEntry(nullptr),
@@ -108,7 +108,8 @@ MainWindow::MainWindow(QWidget *parent) :
     sectionsDock(nullptr),
     consoleDock(nullptr)
 {
-    doLock = false;
+    panelLock = false;
+    tabsOnTop = false;
     configuration = new Configuration();
 }
 
@@ -322,6 +323,22 @@ void MainWindow::openNewFile(const QString &fn, int anal_level, QList<QString> a
 {
     setFilename(fn);
 
+    /* Reset config */
+    core->resetDefaultAsmOptions();
+
+    /* Prompt to load filename.r2 script */
+    QString script = QString("%1.r2").arg(this->filename);
+    if (r_file_exists(script.toStdString().data())) {
+        QMessageBox mb;
+        mb.setWindowTitle(tr("Script loading"));
+        mb.setText(tr("Do you want to load the '%1' script?").arg(script));
+        mb.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+        if (mb.exec() == QMessageBox::Yes) {
+            core->loadScript(script);
+        }
+    }
+
+    /* Show analysis options dialog */
     OptionsDialog *o = new OptionsDialog(this);
     o->setAttribute(Qt::WA_DeleteOnClose);
     o->show();
@@ -431,11 +448,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
     {
         if (saveProject(true))
         {
-            QSettings settings;
-            settings.setValue("geometry", saveGeometry());
-            settings.setValue("size", size());
-            settings.setValue("pos", pos());
-            settings.setValue("state", saveState());
+            saveSettings();
             QMainWindow::closeEvent(event);
         }
         else
@@ -445,11 +458,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
     else if (ret == QMessageBox::Discard)
     {
-        QSettings settings;
-        settings.setValue("geometry", saveGeometry());
-        settings.setValue("size", size());
-        settings.setValue("pos", pos());
-        settings.setValue("state", saveState());
+        saveSettings();
     }
     else
     {
@@ -465,6 +474,59 @@ void MainWindow::readSettings()
     QByteArray state = settings.value("state", QByteArray()).toByteArray();
     restoreState(state);
     this->responsive = settings.value("responsive").toBool();
+    panelLock = settings.value("panelLock").toBool();
+    setPanelLock();
+    tabsOnTop = settings.value("tabsOnTop").toBool();
+    setTabLocation();
+}
+
+void MainWindow::saveSettings()
+{
+    QSettings settings;
+    settings.setValue("geometry", saveGeometry());
+    settings.setValue("size", size());
+    settings.setValue("pos", pos());
+    settings.setValue("state", saveState());
+    settings.setValue("panelLock", panelLock);
+    settings.setValue("tabsOnTop", tabsOnTop);
+}
+
+void MainWindow::setPanelLock()
+{
+    if (panelLock)
+    {
+        foreach (QDockWidget *dockWidget, findChildren<QDockWidget *>())
+        {
+            dockWidget->setFeatures(QDockWidget::NoDockWidgetFeatures);
+        }
+
+        ui->actionLock->setChecked(false);
+    }
+    else
+    {
+        foreach (QDockWidget *dockWidget, findChildren<QDockWidget *>())
+        {
+            dockWidget->setFeatures(QDockWidget::AllDockWidgetFeatures);
+        }
+
+        ui->actionLock->setChecked(true);
+    }
+}
+
+void MainWindow::setTabLocation()
+{
+    if (tabsOnTop)
+    {
+        ui->centralTabWidget->setTabPosition(QTabWidget::North);
+        this->setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::North);
+        ui->actionTabs_on_Top->setChecked(true);
+    }
+    else
+    {
+        ui->centralTabWidget->setTabPosition(QTabWidget::South);
+        this->setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::South);
+        ui->actionTabs_on_Top->setChecked(false);
+    }
 }
 
 void MainWindow::setDarkTheme()
@@ -485,21 +547,8 @@ void MainWindow::refreshAll()
 
 void MainWindow::on_actionLock_triggered()
 {
-    doLock = !doLock;
-    if (doLock)
-    {
-        foreach (QDockWidget *dockWidget, findChildren<QDockWidget *>())
-        {
-            dockWidget->setFeatures(QDockWidget::NoDockWidgetFeatures);
-        }
-    }
-    else
-    {
-        foreach (QDockWidget *dockWidget, findChildren<QDockWidget *>())
-        {
-            dockWidget->setFeatures(QDockWidget::AllDockWidgetFeatures);
-        }
-    }
+    panelLock = !panelLock;
+    setPanelLock();
 }
 
 void MainWindow::lockUnlock_Docks(bool what)
@@ -543,16 +592,8 @@ void MainWindow::on_actionLockUnlock_triggered()
 
 void MainWindow::on_actionTabs_triggered()
 {
-    if (ui->centralTabWidget->tabPosition() == QTabWidget::South)
-    {
-        ui->centralTabWidget->setTabPosition(QTabWidget::North);
-        this->setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::North);
-    }
-    else
-    {
-        ui->centralTabWidget->setTabPosition(QTabWidget::South);
-        this->setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::South);
-    }
+    tabsOnTop = !tabsOnTop;
+    setTabLocation();
 }
 
 void MainWindow::on_actionEntry_points_triggered()
@@ -648,6 +689,7 @@ void MainWindow::on_actionDisasAdd_comment_triggered()
 {
     CommentsDialog *c = new CommentsDialog(this);
     c->exec();
+    delete c;
 }
 
 void MainWindow::restoreDocks()
@@ -882,9 +924,9 @@ void MainWindow::on_actionRefresh_contents_triggered()
     refreshAll();
 }
 
-void MainWindow::on_actionAsmOptions_triggered()
+void MainWindow::on_actionPreferences_triggered()
 {
-    auto dialog = new AsmOptionsDialog(this);
+    auto dialog = new PreferencesDialog(this);
     dialog->show();
 }
 
