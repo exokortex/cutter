@@ -40,6 +40,7 @@
 #include "dialogs/NewFileDialog.h"
 
 #include "widgets/DisassemblerGraphView.h"
+#include "widgets/PPGraphView.h"
 #include "widgets/FunctionsWidget.h"
 #include "widgets/SectionsWidget.h"
 #include "widgets/CommentsWidget.h"
@@ -202,6 +203,13 @@ void MainWindow::initUI()
     graphDock->setAllowedAreas(Qt::AllDockWidgetAreas);
     graphView = new DisassemblerGraphView(graphDock);
     graphDock->setWidget(graphView);
+
+    // Add pp graph view as dockable
+    ppGraphDock = new QDockWidget(tr("PPGraph"), this);
+    ppGraphDock->setObjectName("PPGraph");
+    ppGraphDock->setAllowedAreas(Qt::AllDockWidgetAreas);
+    ppGraphView = new PPGraphView(ppGraphDock);
+    ppGraphDock->setWidget(ppGraphView);
 
     // Hide centralWidget as we do not need it
     ui->centralWidget->hide();

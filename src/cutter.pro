@@ -80,7 +80,8 @@ SOURCES += \
     utils/SvgIconEngine.cpp \
     widgets/PseudocodeWidget.cpp \
     widgets/VisualNavbar.cpp \
-    widgets/GraphView.cpp
+    widgets/GraphView.cpp \
+    widgets/PPGraphView.cpp
 
 HEADERS  += \
     cutter.h \
@@ -131,7 +132,8 @@ HEADERS  += \
     utils/SvgIconEngine.h \
     widgets/PseudocodeWidget.h \
     widgets/VisualNavbar.h \
-    widgets/GraphView.h
+    widgets/GraphView.h \
+    widgets/PPGraphView.h
 
 FORMS    += \
     dialogs/AboutDialog.ui \
