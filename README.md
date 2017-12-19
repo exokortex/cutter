@@ -1,3 +1,7 @@
+# ppCutter
+
+This fork of cutter is for post processing of arm and riscv elf binaries. A more detailed description will be added later.
+
 # Cutter
 [![Build Status](https://travis-ci.org/radareorg/cutter.svg?branch=master)](https://travis-ci.org/radareorg/cutter)
 [![Build status](https://ci.appveyor.com/api/projects/status/s9rkx1dn3uy4bfdx/branch/master?svg=true)](https://ci.appveyor.com/project/radare/cutter/branch/master)
