@@ -11,7 +11,34 @@
 #include "utils/Colors.h"
 #include "utils/Configuration.h"
 #include "utils/CachedFontMetrics.h"
-#include "pp/logger.h"
+
+// #include <ElfPatcher.h>
+// #include <StateCalculators/AEE/ApeStateCalculator.h>
+// #include <StateCalculators/PureSw/PureSwUpdateStateCalculator.h>
+// #include <StateUpdateFunctions/crc/CrcStateUpdateFunction.hpp>
+// #include <StateUpdateFunctions/prince_ape/PrinceApeStateUpdateFunction.hpp>
+// #include <StateUpdateFunctions/sum/SumStateUpdateFunction.hpp>
+// #include <architecture/riscv/info.h>
+// #include <architecture/riscv/replace_instructions.h>
+// #include <architecture/thumbv7m/info.h>
+// #include <basicblock.h>
+// #include <disassemblerstate.h>
+#include <exception.h>
+#include <logger.h>
+// #include <objectdisassembler.h>
+// #include <types.h>
+// 
+// #include <backward.hpp>
+// #include <fmt/ostream.h>
+// #include <llvm-c/Target.h>
+// #include <llvm/ADT/STLExtras.h>
+// #include <llvm/Support/Casting.h>
+// #include <llvm/Support/FileSystem.h>
+// #include <llvm/Support/TargetRegistry.h>
+// #include <llvm/Support/raw_ostream.h>
+// 
+// #include <iostream>
+// #include <string>
 
 PPGraphView::PPGraphView(QWidget *parent)
     : GraphView(parent),
@@ -100,7 +127,9 @@ void PPGraphView::refreshView()
 
 void PPGraphView::loadCurrentGraph()
 {
-    Logger::get_logger("asdf");
+    // TODO remove test code
+    auto asdf = new Exception("asdf");
+    // END TODO
     QJsonDocument functionsDoc = Core()->cmdj("agj");
     QJsonArray functions = functionsDoc.array();
 

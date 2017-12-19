@@ -34,10 +34,6 @@ find_package(Radare2 REQUIRED)
 include_directories(${RADARE2_INCLUDE_DIRS})
 link_directories(${RADARE2_LIBRARY_DIRS})
 
-find_library(pp REQUIRED)
-include_directories(${pp_INCLUDE_DIRS})
-link_directories(${pp_LIBRARY_DIRS})
-
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
         OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
@@ -67,9 +63,27 @@ set(CUTTER_VERSION_FULL "${PROJECT_VERSION}${CUTTER_VERSION_SUFFIX}")
 message(STATUS "Building Cutter version ${CUTTER_VERSION_FULL}")
 add_definitions("-DAPP_VERSION=\"${CUTTER_VERSION_FULL}\"")
 
+include_directories(${PP_DIR}/src/)
+file(GLOB pp_includes ${PP_DIR}/external/*/include/)
+file(GLOB pp_includes2 ${PP_DIR}/external/*)
+
+include_directories(${PP_DIR}/external/ELFIO/)
+include_directories(${PP_DIR}/external/spdlog/include/)
+include_directories(${PP_DIR}/external/backward-cpp)
+include_directories(${PP_DIR}/external/cppformat)
+include_directories(${PP_DIR}/../libprince/include)
+include_directories(${LLVM_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIR} $<INSTALL_INTERFACE:include/pp>)
+find_library(libpp pp)
+link_directories(libpp)
+
+# TODO: remove me
+#get_cmake_property(_variableNames VARIABLES)
+#foreach (_variableName ${_variableNames})
+#    message(STATUS "${_variableName}=${${_variableName}}")
+#endforeach()
 
 add_executable(ppcutter ${UI_FILES} ${QRC_FILES} ${SOURCE_FILES} ${HEADER_FILES})
 qt5_use_modules(ppcutter Core Widgets Gui Svg)
-target_link_libraries(ppcutter ${RADARE2_LIBRARIES})
+target_link_libraries(ppcutter ${RADARE2_LIBRARIES} ${pp_LIBRARIES})
 
 install(TARGETS "ppcutter" DESTINATION "bin")
