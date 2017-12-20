@@ -6,39 +6,12 @@
 #include <QMouseEvent>
 #include <QPropertyAnimation>
 #include <QShortcut>
+#include <QToolTip>
 
 #include "cutter.h"
 #include "utils/Colors.h"
 #include "utils/Configuration.h"
 #include "utils/CachedFontMetrics.h"
-
-// #include <ElfPatcher.h>
-// #include <StateCalculators/AEE/ApeStateCalculator.h>
-// #include <StateCalculators/PureSw/PureSwUpdateStateCalculator.h>
-// #include <StateUpdateFunctions/crc/CrcStateUpdateFunction.hpp>
-// #include <StateUpdateFunctions/prince_ape/PrinceApeStateUpdateFunction.hpp>
-// #include <StateUpdateFunctions/sum/SumStateUpdateFunction.hpp>
-// #include <architecture/riscv/info.h>
-// #include <architecture/riscv/replace_instructions.h>
-// #include <architecture/thumbv7m/info.h>
-// #include <basicblock.h>
-// #include <disassemblerstate.h>
-#include <pp/exception.h>
-#include <pp/logger.h>
-// #include <objectdisassembler.h>
-// #include <types.h>
-// 
-// #include <backward.hpp>
-// #include <fmt/ostream.h>
-// #include <llvm-c/Target.h>
-// #include <llvm/ADT/STLExtras.h>
-// #include <llvm/Support/Casting.h>
-// #include <llvm/Support/FileSystem.h>
-// #include <llvm/Support/TargetRegistry.h>
-// #include <llvm/Support/raw_ostream.h>
-// 
-// #include <iostream>
-// #include <string>
 
 PPGraphView::PPGraphView(QWidget *parent)
     : GraphView(parent),
@@ -54,6 +27,7 @@ PPGraphView::PPGraphView(QWidget *parent)
     connect(Core(), SIGNAL(varsChanged()), this, SLOT(refreshView()));
     connect(Core(), SIGNAL(instructionChanged(RVA)), this, SLOT(refreshView()));
     connect(Core(), SIGNAL(functionsChanged()), this, SLOT(refreshView()));
+    connect(Core(), SIGNAL(graphOptionsChanged()), this, SLOT(refreshView()));
 
     connect(Config(), SIGNAL(colorsUpdated()), this, SLOT(colorsUpdatedSlot()));
     connect(Config(), SIGNAL(fontsUpdated()), this, SLOT(fontsUpdatedSlot()));
@@ -127,9 +101,6 @@ void PPGraphView::refreshView()
 
 void PPGraphView::loadCurrentGraph()
 {
-    // TODO remove test code
-    auto asdf = new Exception("asdf");
-    // END TODO
     QJsonDocument functionsDoc = Core()->cmdj("agj");
     QJsonArray functions = functionsDoc.array();
 
@@ -145,8 +116,13 @@ void PPGraphView::loadCurrentGraph()
     f.ready = true;
     f.entry = func["offset"].toVariant().toULongLong();
 
-    QString windowTitle = tr("PPGraph");
-    this->parentWidget()->setWindowTitle(windowTitle);
+    QString windowTitle = tr("Graph");
+    QString funcName = func["name"].toString().trimmed();
+    if (!funcName.isEmpty())
+    {
+        windowTitle += " (" + funcName + ")";
+    }
+    parentWidget()->setWindowTitle(windowTitle);
 
     RVA entry = func["offset"].toVariant().toULongLong();
 
@@ -191,7 +167,16 @@ void PPGraphView::loadCurrentGraph()
                 comment.flags = RichTextPainter::FlagColor;
                 richText.insert(richText.end(), comment);
             }
-            i.text = Text(richText);
+            bool cropped;
+            i.text = Text(RichTextPainter::cropped(richText, Config()->getGraphBlockMaxChars(), "...", &cropped));
+            if(cropped)
+            {
+                i.fullText = richText;
+            }
+            else
+            {
+                i.fullText = Text();
+            }
             db.instrs.push_back(i);
         }
         disassembly_blocks[db.entry] = db;
@@ -402,7 +387,7 @@ GraphView::EdgeConfiguration PPGraphView::edgeConfiguration(GraphView::GraphBloc
     return ec;
 }
 
-RVA PPGraphView::getInstrForMouseEvent(GraphBlock &block, QPoint* point)
+RVA PPGraphView::getAddrForMouseEvent(GraphBlock &block, QPoint *point)
 {
     DisassemblyBlock &db = disassembly_blocks[block.entry];
 
@@ -418,17 +403,39 @@ RVA PPGraphView::getInstrForMouseEvent(GraphBlock &block, QPoint* point)
         return db.entry;
     }
 
+    Instr *instr = getInstrForMouseEvent(block, point);
+    if(instr)
+    {
+        return instr->addr;
+    }
+
+    return RVA_INVALID;
+}
+
+
+PPGraphView::Instr *PPGraphView::getInstrForMouseEvent(GraphView::GraphBlock &block, QPoint *point)
+{
+    DisassemblyBlock &db = disassembly_blocks[block.entry];
+
+    // Remove header and margin
+    int off_y = (2 * charWidth) + (db.header_text.lines.size() * charHeight);
+    // Get mouse coordinate over the actual text
+    int text_point_y = point->y() - off_y;
+    int mouse_row = text_point_y / charHeight;
+
+    int cur_row = db.header_text.lines.size();
+
     for(Instr & instr : db.instrs)
     {
         if(mouse_row < cur_row + (int)instr.text.lines.size())
         {
-            return instr.addr;
+            return &instr;
         }
         cur_row += instr.text.lines.size();
     }
-    return RVA_INVALID;
-}
 
+    return nullptr;
+}
 
 // Public Slots
 
@@ -607,7 +614,7 @@ void PPGraphView::seekPrev()
 
 void PPGraphView::blockClicked(GraphView::GraphBlock &block, QMouseEvent *event, QPoint pos)
 {
-    RVA instr = getInstrForMouseEvent(block, &pos);
+    RVA instr = getAddrForMouseEvent(block, &pos);
     if(instr == RVA_INVALID)
     {
         return;
@@ -625,7 +632,7 @@ void PPGraphView::blockClicked(GraphView::GraphBlock &block, QMouseEvent *event,
 void PPGraphView::blockDoubleClicked(GraphView::GraphBlock &block, QMouseEvent *event, QPoint pos)
 {
     Q_UNUSED(event);
-    RVA instr = getInstrForMouseEvent(block, &pos);
+    RVA instr = getAddrForMouseEvent(block, &pos);
     if(instr == RVA_INVALID)
     {
         return;
@@ -638,6 +645,30 @@ void PPGraphView::blockDoubleClicked(GraphView::GraphBlock &block, QMouseEvent *
     if (refs.length() > 1) {
         qWarning() << "Too many references here. Weird behaviour expected.";
     }
+}
+
+void PPGraphView::blockHelpEvent(GraphView::GraphBlock &block, QHelpEvent *event, QPoint pos)
+{
+    Instr *instr = getInstrForMouseEvent(block, &pos);
+    if(!instr || instr->fullText.lines.empty())
+    {
+        QToolTip::hideText();
+        event->ignore();
+        return;
+    }
+
+    QToolTip::showText(event->globalPos(), instr->fullText.ToQString());
+}
+
+bool PPGraphView::helpEvent(QHelpEvent *event)
+{
+    if(!GraphView::helpEvent(event))
+    {
+        QToolTip::hideText();
+        event->ignore();
+    }
+
+    return true;
 }
 
 void PPGraphView::blockTransitionedTo(GraphView::GraphBlock *to)
