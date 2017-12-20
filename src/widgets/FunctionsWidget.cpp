@@ -70,6 +70,11 @@ int FunctionModel::columnCount(const QModelIndex &/*parent*/) const
         return ColumnCount;
 }
 
+bool FunctionModel::functionIsImport(ut64 addr) const
+{
+    return import_addresses->contains(addr);
+}
+
 
 QVariant FunctionModel::data(const QModelIndex &index, int role) const
 {
@@ -108,7 +113,7 @@ QVariant FunctionModel::data(const QModelIndex &index, int role) const
                 case 1:
                     return tr("Size: %1").arg(RSizeString(function.size));
                 case 2:
-                    return tr("Import: %1").arg(import_addresses->contains(function.offset) ? tr("true") : tr("false"));
+                    return tr("Import: %1").arg(functionIsImport(function.offset) ? tr("true") : tr("false"));
                 default:
                     return QVariant();
                 }
@@ -158,6 +163,11 @@ QVariant FunctionModel::data(const QModelIndex &index, int role) const
         }
         return QVariant();
     }
+
+    case Qt::ForegroundRole:
+        if (functionIsImport(function.offset))
+            return QVariant(ConfigColor("gui.imports"));
+        return QVariant(QColor(Qt::black));
 
     case FunctionDescriptionRole:
         return QVariant::fromValue(function);
@@ -333,13 +343,13 @@ FunctionsWidget::FunctionsWidget(MainWindow *main, QWidget *parent) :
     //ui->filterLineEdit->setVisible(false);
 
     // Ctrl-F to show/hide the filter entry
-    QShortcut *search_shortcut = new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_F), this);
-    connect(search_shortcut, SIGNAL(activated()), this, SLOT(show_filter()));
+    QShortcut *search_shortcut = new QShortcut(QKeySequence::Find, this);
+    connect(search_shortcut, &QShortcut::activated, ui->quickFilterView, &QuickFilterView::showFilter);
     search_shortcut->setContext(Qt::WidgetWithChildrenShortcut);
 
     // Esc to clear the filter entry
-    QShortcut *clear_shortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
-    connect(clear_shortcut, SIGNAL(activated()), this, SLOT(clear_filter()));
+    QShortcut *clear_shortcut = new QShortcut(QKeySequence::Cancel, this);
+    connect(clear_shortcut, &QShortcut::activated, ui->quickFilterView, &QuickFilterView::clearFilter);
     clear_shortcut->setContext(Qt::WidgetWithChildrenShortcut);
 
     QFontInfo font_info = ui->functionsTreeView->fontInfo();
@@ -348,15 +358,20 @@ FunctionsWidget::FunctionsWidget(MainWindow *main, QWidget *parent) :
 
     function_model = new FunctionModel(&functions, &import_addresses, false, default_font, highlight_font, this);
     function_proxy_model = new FunctionSortFilterProxyModel(function_model, this);
-    connect(ui->filterLineEdit, SIGNAL(textChanged(const QString &)), function_proxy_model, SLOT(setFilterWildcard(const QString &)));
     ui->functionsTreeView->setModel(function_proxy_model);
     ui->functionsTreeView->sortByColumn(FunctionModel::NameColumn, Qt::AscendingOrder);
 
     nested_function_model = new FunctionModel(&functions, &import_addresses, true, default_font, highlight_font, this);
     nested_function_proxy_model = new FunctionSortFilterProxyModel(nested_function_model, this);
-    connect(ui->filterLineEdit, SIGNAL(textChanged(const QString &)), nested_function_proxy_model, SLOT(setFilterWildcard(const QString &)));
     ui->nestedFunctionsTreeView->setModel(nested_function_proxy_model);
     ui->nestedFunctionsTreeView->sortByColumn(0, Qt::AscendingOrder);
+
+    connect(ui->quickFilterView, SIGNAL(filterTextChanged(const QString &)), function_proxy_model, SLOT(setFilterWildcard(const QString &)));
+    connect(ui->quickFilterView, SIGNAL(filterTextChanged(const QString &)), nested_function_proxy_model, SLOT(setFilterWildcard(const QString &)));
+    connect(ui->quickFilterView, &QuickFilterView::filterClosed, this, [this]()
+    {
+        getCurrentTreeView()->setFocus();
+    });
 
     setScrollMode();
 
@@ -565,32 +580,4 @@ void FunctionsWidget::resizeEvent(QResizeEvent *event)
 void FunctionsWidget::setScrollMode()
 {
     qhelpers::setVerticalScrollMode(ui->functionsTreeView);
-}
-
-void FunctionsWidget::show_filter()
-{
-    ui->filterLineEdit->setVisible(true);
-    ui->closeFilterButton->setVisible(true);
-    ui->filterLineEdit->setFocus();
-}
-
-void FunctionsWidget::clear_filter()
-{
-    if (ui->filterLineEdit->text() == "")
-    {
-        ui->filterLineEdit->setVisible(false);
-        ui->closeFilterButton->setVisible(false);
-        ui->functionsTreeView->setFocus();
-    }
-    else
-    {
-        ui->filterLineEdit->setText("");
-    }
-}
-
-void FunctionsWidget::on_closeFilterButton_clicked()
-{
-    ui->filterLineEdit->setVisible(false);
-    ui->closeFilterButton->setVisible(false);
-    ui->functionsTreeView->setFocus();
 }

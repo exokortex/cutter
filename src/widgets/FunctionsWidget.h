@@ -33,6 +33,8 @@ private:
 
     int current_index;
 
+    bool functionIsImport(ut64 addr) const;
+
 public:
     static const int FunctionDescriptionRole = Qt::UserRole;
     static const int IsImportRole = Qt::UserRole + 1;
@@ -99,12 +101,6 @@ private slots:
 
     void on_actionHorizontal_triggered();
     void on_actionVertical_triggered();
-
-    void show_filter();
-
-    void clear_filter();
-
-    void on_closeFilterButton_clicked();
 
     void showTitleContextMenu(const QPoint &pt);
 
