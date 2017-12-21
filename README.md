@@ -60,10 +60,9 @@ make
 
 - Method 2: CMake
 ```sh
-cd src
 mkdir build
 cd build
-cmake ..
+cmake ../src
 make
 ```
 
@@ -91,7 +90,6 @@ Cutter is developed on OS X, Linux and Windows. The first release for users will
 | Global shortcuts: ||
 | . | Focus console input |
 | G & S | Focus search bar |
-| : | Show commands |
 | F5 | Refresh contents |
 | Disassembly view: ||
 | Esc | Seek to previous position |

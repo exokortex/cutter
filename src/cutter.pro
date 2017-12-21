@@ -176,7 +176,8 @@ FORMS    += \
     dialogs/preferences/PreferencesDialog.ui \
     dialogs/preferences/GeneralOptionsWidget.ui \
     dialogs/preferences/GraphOptionsWidget.ui \
-    widgets/QuickFilterView.ui
+    widgets/QuickFilterView.ui \
+    widgets/PseudocodeWidget.ui
 
 RESOURCES += \
     resources.qrc

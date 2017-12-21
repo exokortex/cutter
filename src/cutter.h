@@ -199,19 +199,16 @@ public:
 
     /* Getters */
     RVA getOffset() const { return core_->offset; }
-    int getCycloComplex(ut64 addr);
-    int getFcnSize(ut64 addr);
-    int fcnCyclomaticComplexity(ut64 addr);
-    int fcnBasicBlockCount(ut64 addr);
-    int fcnEndBbs(RVA addr);
+
     static QString sanitizeStringForCommand(QString s);
     QString cmd(const QString &str);
+    QString cmdRaw(const QString &str);
     QJsonDocument cmdj(const QString &str);
     QStringList cmdList(const QString &str)     { auto l = cmd(str).split("\n"); l.removeAll(""); return l; }
 
     QList<DisassemblyLine> disassembleLines(RVA offset, int lines);
 
-    void renameFunction(QString prev_name, QString new_name);
+    void renameFunction(const QString &oldName, const QString &newName);
     void delFunction(RVA addr);
     void renameFlag(QString old_name, QString new_name);
     void delFlag(RVA addr);
@@ -281,8 +278,7 @@ public:
     QString getFileInfo();
     QStringList getStats();
     QString getSimpleGraph(QString function);
-    QString binStart;
-    QString binEnd;
+
     void getOpcodes();
     QList<QString> opcodes;
     QList<QString> regs;
@@ -346,7 +342,7 @@ public:
 signals:
     void refreshAll();
 
-    void functionRenamed(QString prev_name, QString new_name);
+    void functionRenamed(const QString &prev_name, const QString &new_name);
     void varsChanged();
     void functionsChanged();
     void flagsChanged();
