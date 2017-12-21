@@ -209,7 +209,7 @@ void MainWindow::initUI()
     ppGraphDock = new QDockWidget(tr("PPGraph"), this);
     ppGraphDock->setObjectName("PPGraph");
     ppGraphDock->setAllowedAreas(Qt::AllDockWidgetAreas);
-    ppGraphView = new PPGraphView(ppGraphDock);
+    ppGraphView = new PPGraphView(ppGraphDock, this);
     ppGraphDock->setWidget(ppGraphView);
 
     // Hide centralWidget as we do not need it

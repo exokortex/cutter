@@ -13,10 +13,35 @@
 #include "utils/Configuration.h"
 #include "utils/CachedFontMetrics.h"
 
-PPGraphView::PPGraphView(QWidget *parent)
+#include <llvm-c/Target.h>
+#include <llvm/ADT/STLExtras.h>
+#include <llvm/Support/Casting.h>
+#include <llvm/Support/FileSystem.h>
+//#include <llvm/Support/TargetRegistry.h>
+#include <llvm/Support/raw_ostream.h>
+
+#include <pp/ElfPatcher.h>
+#include <pp/StateCalculators/AEE/ApeStateCalculator.h>
+#include <pp/StateCalculators/PureSw/PureSwUpdateStateCalculator.h>
+#include <pp/StateUpdateFunctions/crc/CrcStateUpdateFunction.hpp>
+#include <pp/StateUpdateFunctions/prince_ape/PrinceApeStateUpdateFunction.hpp>
+#include <pp/StateUpdateFunctions/sum/SumStateUpdateFunction.hpp>
+#include <pp/architecture/riscv/info.h>
+#include <pp/architecture/riscv/replace_instructions.h>
+#include <pp/architecture/thumbv7m/info.h>
+#include <pp/basicblock.h>
+#include <pp/config.h>
+#include <pp/disassemblerstate.h>
+#include <pp/exception.h>
+#include <pp/logger.h>
+#include <pp/types.h>
+#include <pp/function.h>
+
+PPGraphView::PPGraphView(QWidget *parent, MainWindow *main)
     : GraphView(parent),
       mFontMetrics(nullptr),
-      mMenu(new DisassemblyContextMenu(this))
+      mMenu(new DisassemblyContextMenu(this)),
+      main(main)
 {
     highlight_token = nullptr;
     // Signals that require a refresh all
@@ -79,9 +104,89 @@ PPGraphView::PPGraphView(QWidget *parent)
     shortcuts.append(shortcut_next_instr);
     shortcuts.append(shortcut_prev_instr);
 
-
+    loadFile();
     initFont();
     colorsUpdatedSlot();
+}
+
+void PPGraphView::loadFile()
+{
+    auto logger = get_logger("PP-Graph");
+    
+    std::string inputFile = main->getFilename().toUtf8().constData();
+    std::cout << "inputFile: " << inputFile << std::endl;
+    uint64_t k0 = 0x12345678;
+    uint64_t k1 = 0x8765432100000000;
+    int rounds = 12;
+
+    auto elf = llvm::make_unique<ELFIO::elfio>();
+    if (!elf->load(inputFile))
+    {
+        std::cout << "PP: File not found" << std::endl;
+        logger->error("File \"{}\" is not found or it is not an ELF file",
+                      inputFile);
+        exit(-1);
+    }
+    std::cout << "PP: File loaded" << std::endl;
+    logger->debug("elf file \"{}\" successfully loaded", inputFile);
+
+    const ELFIO::Elf_Half machine = elf->get_machine();
+    std::unique_ptr<StateCalculator> stateCalc;
+
+    if (machine == EM_ARM) {
+        std::cout << "PP: identified ELF as ARM" << std::endl;
+
+        LLVMInitializeARMTargetInfo();
+        LLVMInitializeARMTargetMC();
+        LLVMInitializeARMDisassembler();
+
+        objDis = llvm::make_unique<ObjectDisassembler>(
+            llvm::make_unique<Architecture::Thumb::Info>());
+        state = llvm::make_unique<DisassemblerState>(objDis->getInfo());
+
+        std::unique_ptr<StateUpdateFunction> updateFunc;
+        if (false) // cli.m0_)
+          updateFunc =
+              llvm::make_unique<SumStateUpdateFunction<false, true>>(*state);
+        else
+          updateFunc =
+              llvm::make_unique<CrcStateUpdateFunction<Crc32c<32>, true, true>>(
+                  *state);
+
+        stateCalc = llvm::make_unique<PureSwUpdateStateCalculator>(
+            *state, std::move(updateFunc));
+        stateCalc->definePreState(objDis->getInfo().sanitize(elf->get_entry()),
+                                  CryptoState{4});
+    } else if (machine == EM_RISCV) {
+        std::cout << "PP: processing ELF as RISCV" << std::endl;
+
+        LLVMInitializeRISCVTargetInfo();
+        LLVMInitializeRISCVTargetMC();
+        LLVMInitializeRISCVDisassembler();
+
+        objDis = llvm::make_unique<ObjectDisassembler>(
+            llvm::make_unique<Architecture::Riscv::Info>());
+        state = llvm::make_unique<DisassemblerState>(objDis->getInfo());
+        stateCalc = llvm::make_unique<ApeStateCalculator>(
+            *state, llvm::make_unique<PrinceApeStateUpdateFunction>(
+                        *state, k0, k1, rounds));
+    }
+
+    if (!objDis || !state || !stateCalc) {
+        std::cout << "PP: Architecture of the elf file is not supported" << std::endl;
+        return;
+    }
+
+    if (state->loadElf(inputFile))
+        return;
+
+    try {
+        while (objDis->disassemble(*state));
+        stateCalc->prepare();
+        state->cleanupState();
+    } catch (const Exception &e) {
+        std::cout << "PP: Aborted disassembling due to exception" << e.what() << std::endl;
+    }
 }
 
 PPGraphView::~PPGraphView()
@@ -101,6 +206,7 @@ void PPGraphView::refreshView()
 
 void PPGraphView::loadCurrentGraph()
 {
+
     QJsonDocument functionsDoc = Core()->cmdj("agj");
     QJsonArray functions = functionsDoc.array();
 
@@ -116,18 +222,110 @@ void PPGraphView::loadCurrentGraph()
     f.ready = true;
     f.entry = func["offset"].toVariant().toULongLong();
 
-    QString windowTitle = tr("Graph");
+    std::cout << "PP: f.entry " << f.entry << std::endl;
+
+    ::Function *ppFunction = NULL;
+    int entryPointIdx = 0;
+
+    for (auto &&ppFunc : state->functions) {
+        int epi = 0;
+        for (auto &ePoint : ppFunc.getEntryPoints()) {
+            std::cout << "PP: function <" << ePoint.name << "> @ " << ePoint.address << std::endl;
+            if (f.entry == ePoint.address) {
+                ppFunction = &ppFunc;
+                entryPointIdx = epi;
+                std::cout << "PP: found!!" << std::endl;
+            }
+            epi++;
+        }
+    }
+
+    if (ppFunction) {
+        for (auto it = ppFunction->begin(); it != ppFunction->end(); ++it)
+        {
+            const ::Fragment* frag = *it;
+            std::cout << "PP: fragment " << frag->getStartAddress() << std::endl;
+            const BasicBlock *bb = llvm::dyn_cast_or_null<BasicBlock>(frag);
+            std::cout << "PP: BasicBlock " << frag->getStartAddress() << std::endl;
+
+            if (!bb)
+                continue;
+
+
+            // get address of first instruction (= address of block)
+            RVA block_entry = (bb->inst_begin())->address;
+
+
+            DisassemblyBlock db;
+            GraphBlock gb;
+            gb.entry = block_entry;
+            db.entry = block_entry;
+            db.true_path = RVA_INVALID;
+            db.false_path = RVA_INVALID;
+
+            for (auto sit = bb->succ_begin(); sit != bb->succ_end(); ++sit) {
+                const BasicBlock *succ = *sit;
+                // get address of first instruction (= address of block)
+                RVA addr = (succ->inst_begin())->address;
+                gb.exits.push_back(addr);
+            }
+
+            for (auto dii = bb->inst_begin(); dii != bb->inst_end(); ++dii) {
+                const DecodedInstruction di = *dii;
+                std::cout << "PP: instr " << di.type << std::endl;
+
+                Instr i;
+                i.addr = di.address;
+                // Skip last byte, otherwise it will overlap with next instruction
+                i.size = di.instruction.size();
+
+                RichTextPainter::List richText;
+
+                RichTextPainter::CustomRichText_t assembly;
+                assembly.highlight = false;
+                assembly.flags = RichTextPainter::FlagColor;
+                std::string asmString = objDis->getInfo().printInstrunction(di.instruction);
+                assembly.text = QString::fromUtf8(asmString.c_str());
+                QString colorName = Colors::getColor(0);
+                assembly.textColor = ConfigColor(colorName);
+                richText.push_back(assembly);
+
+                bool cropped;
+                i.text = Text(RichTextPainter::cropped(richText, Config()->getGraphBlockMaxChars(), "...", &cropped));
+                if(cropped)
+                {
+                    i.fullText = richText;
+                }
+                else
+                {
+                    i.fullText = Text();
+                }
+                db.instrs.push_back(i);
+            }
+
+
+            disassembly_blocks[db.entry] = db;
+            prepareGraphNode(gb);
+            f.blocks.push_back(db);
+
+            addBlock(gb);
+        }
+    }
+
+    QString windowTitle = tr("PP-Graph");
     QString funcName = func["name"].toString().trimmed();
-    if (!funcName.isEmpty())
+    if (ppFunction != NULL)
     {
-        windowTitle += " (" + funcName + ")";
+        std::string ppFunctionName = ppFunction->getEntryPoints()[entryPointIdx].name;
+        QString qname = QString::fromUtf8(ppFunctionName.c_str());
+        windowTitle += " (" + qname + ")";
     }
     parentWidget()->setWindowTitle(windowTitle);
 
     RVA entry = func["offset"].toVariant().toULongLong();
 
     setEntry(entry);
-    for (QJsonValueRef blockRef : func["blocks"].toArray()) {
+    /*for (QJsonValueRef blockRef : func["blocks"].toArray()) {
         QJsonObject block = blockRef.toObject();
         RVA block_entry = block["offset"].toVariant().toULongLong();
         RVA block_fail = block["fail"].toVariant().toULongLong();
@@ -184,7 +382,7 @@ void PPGraphView::loadCurrentGraph()
         f.blocks.push_back(db);
 
         addBlock(gb);
-    }
+    }*/
 
     anal.functions[f.entry] = f;
     anal.status = "Ready.";

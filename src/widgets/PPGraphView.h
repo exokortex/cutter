@@ -11,6 +11,10 @@
 #include "menus/DisassemblyContextMenu.h"
 #include "utils/RichTextPainter.h"
 
+#include <pp/types.h>
+#include <pp/objectdisassembler.h>
+#include "MainWindow.h"
+
 class PPGraphView : public GraphView
 {
     Q_OBJECT
@@ -137,7 +141,7 @@ class PPGraphView : public GraphView
     };
 
 public:
-    PPGraphView(QWidget *parent);
+    PPGraphView(QWidget *parent, MainWindow *main);
     ~PPGraphView();
     std::unordered_map<ut64, DisassemblyBlock> disassembly_blocks;
     virtual void drawBlock(QPainter & p, GraphView::GraphBlock &block) override;
@@ -184,6 +188,10 @@ private:
 
     DisassemblyContextMenu* mMenu;
 
+    MainWindow *main;
+    std::unique_ptr<DisassemblerState> state;
+    std::unique_ptr<ObjectDisassembler> objDis;
+
     void initFont();
     void prepareGraphNode(GraphBlock &block);
     RVA getAddrForMouseEvent(GraphBlock &block, QPoint *point);
@@ -191,6 +199,7 @@ private:
     DisassemblyBlock *blockForAddress(RVA addr);
     void seek(RVA addr, bool update_viewport=true);
     void seekInstruction(bool previous_instr);
+    void loadFile();
 
     QList<QShortcut*> shortcuts;
 
