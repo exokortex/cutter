@@ -285,8 +285,12 @@ void PPGraphView::loadCurrentGraph()
                 assembly.highlight = false;
                 assembly.flags = RichTextPainter::FlagColor;
                 std::string asmString = objDis->getInfo().printInstrunction(di.instruction);
+                char buff[100];
+                snprintf(buff, sizeof(buff), "%08x", di.address);
+                std::string saddr = buff;
+                asmString = "0x" +saddr+": "+asmString;
                 assembly.text = QString::fromUtf8(asmString.c_str());
-                QString colorName = Colors::getColor(0);
+                QString colorName = "mov"; // Colors::getColor(1);
                 assembly.textColor = ConfigColor(colorName);
                 richText.push_back(assembly);
 
