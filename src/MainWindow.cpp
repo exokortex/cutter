@@ -211,23 +211,23 @@ void MainWindow::initUI()
     ppGraphDock->setAllowedAreas(Qt::AllDockWidgetAreas);
     ppGraphView = new PPGraphView(ppGraphDock, this);
     ppGraphDock->setWidget(ppGraphView);
+    //dockWidgets.push_back(ppGraphDock);
 
     // Hide centralWidget as we do not need it
     ui->centralWidget->hide();
 
-    connect(graphDock, &QDockWidget::visibilityChanged, graphDock, [](bool visibility)
+    connect(graphDock, &QDockWidget::visibilityChanged, graphDock, [ = ](bool visibility)
     {
         if (visibility)
         {
             Core()->setMemoryWidgetPriority(CutterCore::MemoryWidgetType::Graph);
         }
     });
-    connect(Core(), &CutterCore::raisePrioritizedMemoryWidget, graphDock, [ = ](CutterCore::MemoryWidgetType type)
+    connect(ppGraphDock, &QDockWidget::visibilityChanged, ppGraphDock, [ = ](bool visibility)
     {
-        if (type == CutterCore::MemoryWidgetType::Graph)
+        if (visibility)
         {
-            graphDock->raise();
-            graphView->setFocus();
+            Core()->setMemoryWidgetPriority(CutterCore::MemoryWidgetType::Graph);
         }
     });
     dockWidgets.push_back(graphDock);

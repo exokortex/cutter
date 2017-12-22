@@ -206,7 +206,6 @@ void PPGraphView::refreshView()
 
 void PPGraphView::loadCurrentGraph()
 {
-
     QJsonDocument functionsDoc = Core()->cmdj("agj");
     QJsonArray functions = functionsDoc.array();
 
@@ -240,82 +239,101 @@ void PPGraphView::loadCurrentGraph()
         }
     }
 
-    if (ppFunction) {
-        for (auto it = ppFunction->begin(); it != ppFunction->end(); ++it)
-        {
-            const ::Fragment* frag = *it;
-            std::cout << "PP: fragment " << frag->getStartAddress() << std::endl;
-            const BasicBlock *bb = llvm::dyn_cast_or_null<BasicBlock>(frag);
-            std::cout << "PP: BasicBlock " << frag->getStartAddress() << std::endl;
-
-            if (!bb)
-                continue;
-
-
-            // get address of first instruction (= address of block)
-            RVA block_entry = (bb->inst_begin())->address;
-
-
-            DisassemblyBlock db;
-            GraphBlock gb;
-            gb.entry = block_entry;
-            db.entry = block_entry;
-            db.true_path = RVA_INVALID;
-            db.false_path = RVA_INVALID;
-
-            for (auto sit = bb->succ_begin(); sit != bb->succ_end(); ++sit) {
-                const BasicBlock *succ = *sit;
-                // get address of first instruction (= address of block)
-                RVA addr = (succ->inst_begin())->address;
-                gb.exits.push_back(addr);
-            }
-
-            for (auto dii = bb->inst_begin(); dii != bb->inst_end(); ++dii) {
-                const DecodedInstruction di = *dii;
-                std::cout << "PP: instr " << di.type << std::endl;
-
-                Instr i;
-                i.addr = di.address;
-                // Skip last byte, otherwise it will overlap with next instruction
-                i.size = di.instruction.size();
-
-                RichTextPainter::List richText;
-
-                RichTextPainter::CustomRichText_t assembly;
-                assembly.highlight = false;
-                assembly.flags = RichTextPainter::FlagColor;
-                std::string asmString = objDis->getInfo().printInstrunction(di.instruction);
-                char buff[100];
-                snprintf(buff, sizeof(buff), "%08x", di.address);
-                std::string saddr = buff;
-                asmString = "0x" +saddr+": "+asmString;
-                assembly.text = QString::fromUtf8(asmString.c_str());
-                QString colorName = "mov"; // Colors::getColor(1);
-                assembly.textColor = ConfigColor(colorName);
-                richText.push_back(assembly);
-
-                bool cropped;
-                i.text = Text(RichTextPainter::cropped(richText, Config()->getGraphBlockMaxChars(), "...", &cropped));
-                if(cropped)
-                {
-                    i.fullText = richText;
-                }
-                else
-                {
-                    i.fullText = Text();
-                }
-                db.instrs.push_back(i);
-            }
-
-
-            disassembly_blocks[db.entry] = db;
-            prepareGraphNode(gb);
-            f.blocks.push_back(db);
-
-            addBlock(gb);
-        }
+    if (!ppFunction) {
+        return;
     }
+    for (auto it = ppFunction->begin(); it != ppFunction->end(); ++it)
+    {
+        const ::Fragment* frag = *it;
+        std::cout << "PP: fragment " << frag->getStartAddress() << std::endl;
+        const BasicBlock *bb = llvm::dyn_cast_or_null<BasicBlock>(frag);
+        std::cout << "PP: BasicBlock " << frag->getStartAddress() << std::endl;
 
+        if (!bb)
+            continue;
+
+
+        // get address of first instruction (= address of block)
+        RVA block_entry = (bb->inst_begin())->address;
+
+
+        DisassemblyBlock db;
+        GraphBlock gb;
+        gb.entry = block_entry;
+        db.entry = block_entry;
+        db.true_path = RVA_INVALID;
+        db.false_path = RVA_INVALID;
+
+        // mark block if it is the entry of the function
+        if (ppFunction->getEntryPoints()[entryPointIdx].address == block_entry)
+        {
+            RichTextPainter::List rtpl;
+            RichTextPainter::CustomRichText_t title;
+            title.highlight = true;
+            title.flags = RichTextPainter::FlagColor;
+            std::string titles = "Entry Point: " + ppFunction->getEntryPoints()[entryPointIdx].name;
+            title.text = QString::fromUtf8(titles.c_str());
+            title.textColor = ConfigColor("fname");
+            rtpl.push_back(title);
+            db.header_text = rtpl;
+        }
+
+        for (auto sit = bb->succ_begin(); sit != bb->succ_end(); ++sit) {
+            const BasicBlock *succ = *sit;
+            // get address of first instruction (= address of block)
+            RVA addr = (succ->inst_begin())->address;
+            gb.exits.push_back(addr);
+        }
+
+        for (auto dii = bb->inst_begin(); dii != bb->inst_end(); ++dii) {
+            const DecodedInstruction di = *dii;
+            std::cout << "PP: instr " << di.type << std::endl;
+
+            Instr i;
+            i.addr = di.address;
+            // Skip last byte, otherwise it will overlap with next instruction
+            i.size = di.instruction.size() - 1;
+
+            RichTextPainter::List richText;
+
+            RichTextPainter::CustomRichText_t assembly;
+            assembly.highlight = false;
+            assembly.flags = RichTextPainter::FlagColor;
+            std::string asmString = objDis->getInfo().printInstrunction(di.instruction);
+            char buff[100];
+            snprintf(buff, sizeof(buff), "%08x", di.address);
+            std::string saddr = buff;
+            asmString = saddr+": "+asmString;
+            assembly.text = QString::fromUtf8(asmString.c_str());
+
+            QString colorName = "mov";  // Colors::getColor(1);
+            if (di.isTerminator(*state) == CERTAIN) {
+                colorName = "jmp";
+            }
+            assembly.textColor = ConfigColor(colorName);
+            richText.push_back(assembly);
+
+            bool cropped;
+            i.text = Text(RichTextPainter::cropped(richText, Config()->getGraphBlockMaxChars(), "...", &cropped));
+            if(cropped)
+            {
+                i.fullText = richText;
+            }
+            else
+            {
+                i.fullText = Text();
+            }
+            db.instrs.push_back(i);
+        }
+
+
+        disassembly_blocks[db.entry] = db;
+        prepareGraphNode(gb);
+        f.blocks.push_back(db);
+
+        addBlock(gb);
+    }
+    
     QString windowTitle = tr("PP-Graph");
     QString funcName = func["name"].toString().trimmed();
     if (ppFunction != NULL)
