@@ -1,6 +1,6 @@
 # ppCutter
 
-This fork of cutter is for post processing of arm and riscv elf binaries. A more detailed description will be added later.
+This fork of cutter is for post processing of ARM and RISCV elf binaries using a custom disassembler that has not yet been released publicly.
 
 # Cutter
 [![Build Status](https://travis-ci.org/radareorg/cutter.svg?branch=master)](https://travis-ci.org/radareorg/cutter)
