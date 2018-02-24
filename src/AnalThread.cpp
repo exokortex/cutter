@@ -3,6 +3,7 @@
 #include "AnalThread.h"
 #include "MainWindow.h"
 #include "dialogs/OptionsDialog.h"
+#include <QJsonArray>
 
 AnalThread::AnalThread(OptionsDialog *parent) :
     QThread(parent),
@@ -45,10 +46,10 @@ void AnalThread::run()
 
     core->setCPU(optionsDialog->getSelectedArch(), optionsDialog->getSelectedCPU(), optionsDialog->getSelectedBits());
 
-    bool rw = false;
-    bool load_bininfo = ui->binCheckBox->isChecked();
+    bool rw = ui->writeCheckBox->isChecked();
+    bool loadBinInfo = !ui->binCheckBox->isChecked();
 
-    if (load_bininfo)
+    if (loadBinInfo)
     {
         if (!va)
         {
@@ -60,6 +61,7 @@ void AnalThread::run()
     }
     else
     {
+        Core()->setConfig("file.info", "false");
         va = false;
         loadaddr = mapaddr = 0;
     }
@@ -78,7 +80,11 @@ void AnalThread::run()
 
     core->setConfig("bin.demangle", ui->demangleCheckBox->isChecked());
 
-    core->loadFile(main->getFilename(), loadaddr, mapaddr, rw, va, binidx, load_bininfo, forceBinPlugin);
+    QJsonArray openedFiles = Core()->getOpenedFiles();
+    if (!openedFiles.size())
+    {
+        core->loadFile(main->getFilename(), loadaddr, mapaddr, rw, va, binidx, loadBinInfo, forceBinPlugin);
+    }
     emit updateProgress("Analysis in progress.");
 
     QString os = optionsDialog->getSelectedOS();
@@ -90,6 +96,11 @@ void AnalThread::run()
     if (ui->pdbCheckBox->isChecked())
     {
         core->loadPDB(ui->pdbLineEdit->text());
+    }
+
+    if (optionsDialog->getSelectedEndianness() != OptionsDialog::Endianness::Auto)
+    {
+        core->setEndianness(optionsDialog->getSelectedEndianness() == OptionsDialog::Endianness::Big);
     }
 
     // use prj.simple as default as long as regular projects are broken

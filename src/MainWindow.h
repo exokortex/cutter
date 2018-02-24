@@ -8,6 +8,7 @@
 #include "widgets/SidebarWidget.h"
 #include "widgets/HexdumpWidget.h"
 #include "widgets/PseudocodeWidget.h"
+#include "dialogs/NewFileDialog.h"
 #include "utils/Configuration.h"
 
 #include <QMainWindow>
@@ -37,6 +38,8 @@ class ConsoleWidget;
 class EntrypointWidget;
 class DisassemblerGraphView;
 class PPGraphView;
+class ClassesWidget;
+class ResourcesWidget;
 
 class QDockWidget;
 
@@ -56,7 +59,10 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
-    void openNewFile(const QString &fn, int anal_level = -1, QList<QString> advanced = QList<QString>());
+    void openNewFile(const QString &fn, int analLevel = -1, QList<QString> advancedOptions = QList<QString>());
+    void displayNewFileDialog();
+    void closeNewFileDialog();
+    void displayAnalysisOptionsDialog(int analLevel, QList<QString> advancedOptions);
     void openProject(const QString &project_name);
 
     void initUI();
@@ -81,7 +87,6 @@ public:
     void addOutput(const QString &msg);
     void addDebugOutput(const QString &msg);
     void sendToNotepad(const QString &txt);
-    void toggleTheme();
     void refreshOmniBar(const QStringList &flags);
 
 public slots:
@@ -91,9 +96,6 @@ public slots:
     void setPanelLock();
     void setTabLocation();
 
-    void setDarkTheme();
-    void setDefaultTheme();
-
     void on_actionLock_triggered();
 
     void on_actionLockUnlock_triggered();
@@ -101,8 +103,6 @@ public slots:
     void on_actionTabs_triggered();
 
     void lockUnlock_Docks(bool what);
-
-    void on_actionDark_Theme_triggered();
 
     void on_actionRun_Script_triggered();
 
@@ -117,7 +117,7 @@ private slots:
 
     void on_actionDisasAdd_comment_triggered();
 
-    void on_actionDefaut_triggered();
+    void on_actionDefault_triggered();
 
     void on_actionFunctionsRename_triggered();
 
@@ -129,9 +129,7 @@ private slots:
     void on_actionUndoSeek_triggered();
     void on_actionRedoSeek_triggered();
 
-    void on_actionWhite_Theme_triggered();
-
-    void on_actionLoad_triggered();
+    void on_actionOpen_triggered();
 
     void on_actionForward_triggered();
 
@@ -145,10 +143,13 @@ private slots:
 
     void on_actionPreferences_triggered();
 
+    void on_actionAnalyze_triggered();
+
+    void on_actionImportPDB_triggered();
+
     void projectSaved(const QString &name);
 
 private:
-    CutterCore       *core;
     Notepad          *notepadDock;
     DisassemblyWidget  *disassemblyDock;
     SidebarWidget    *sidebarDock;
@@ -156,41 +157,55 @@ private:
     PseudocodeWidget *pseudocodeDock;
     QDockWidget      *graphDock;
     DisassemblerGraphView *graphView;
-    QDockWidget      *ppGraphDock;
-    PPGraphView      *ppGraphView;
     QDockWidget      *asmDock;
     QDockWidget      *calcDock;
     Omnibar          *omnibar;
     //SideBar          *sideBar;
     Configuration   *configuration;
 
+    CutterCore *core;
     bool panelLock;
     bool tabsOnTop;
     ut64 hexdumpTopOffset;
     ut64 hexdumpBottomOffset;
     QString filename;
     std::unique_ptr<Ui::MainWindow> ui;
-    Highlighter      *highlighter;
+    Highlighter *highlighter;
     AsciiHighlighter *hex_highlighter;
-    VisualNavbar      *visualNavbar;
-    EntrypointWidget *entrypointDock;
-    FunctionsWidget  *functionsDock;
-    ImportsWidget    *importsDock;
-    ExportsWidget    *exportsDock;
-    SymbolsWidget    *symbolsDock;
-    RelocsWidget     *relocsDock;
-    CommentsWidget   *commentsDock;
-    StringsWidget    *stringsDock;
-    FlagsWidget      *flagsDock;
-    Dashboard        *dashboardDock;
-    QLineEdit        *gotoEntry;
-    SdbDock          *sdbDock;
-    //QAction          *sidebar_action;
-    SectionsDock     *sectionsDock;
-    ConsoleWidget    *consoleDock;
+    VisualNavbar *visualNavbar;
+    Omnibar *omnibar;
+    Configuration *configuration;
 
     QList<QDockWidget *> dockWidgets;
     QMap<QAction *, QDockWidget *> dockWidgetActions;
+    Notepad            *notepadDock = nullptr;
+    DisassemblyWidget  *disassemblyDock = nullptr;
+    SidebarWidget      *sidebarDock = nullptr;
+    HexdumpWidget      *hexdumpDock = nullptr;
+    PseudocodeWidget   *pseudocodeDock = nullptr;
+    QDockWidget        *graphDock = nullptr;
+    EntrypointWidget   *entrypointDock = nullptr;
+    FunctionsWidget    *functionsDock = nullptr;
+    ImportsWidget      *importsDock = nullptr;
+    ExportsWidget      *exportsDock = nullptr;
+    SymbolsWidget      *symbolsDock = nullptr;
+    RelocsWidget       *relocsDock = nullptr;
+    CommentsWidget     *commentsDock = nullptr;
+    StringsWidget      *stringsDock = nullptr;
+    FlagsWidget        *flagsDock = nullptr;
+    Dashboard          *dashboardDock = nullptr;
+    QLineEdit          *gotoEntry = nullptr;
+    SdbDock            *sdbDock = nullptr;
+    SectionsDock       *sectionsDock = nullptr;
+    ConsoleWidget      *consoleDock = nullptr;
+    ClassesWidget      *classesDock = nullptr;
+    ResourcesWidget    *resourcesDock = nullptr;
+    DisassemblerGraphView *graphView = nullptr;
+    QDockWidget        *ppGraphDock = nullptr;
+    PPGraphView        *ppGraphView = nullptr;
+    QDockWidget        *asmDock = nullptr;
+    QDockWidget        *calcDock = nullptr;
+    NewFileDialog      *newFileDialog = nullptr;
 
     void toggleDockWidget(QDockWidget *dock_widget, bool show);
 

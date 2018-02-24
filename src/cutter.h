@@ -30,7 +30,7 @@
 #define __question(x) (QMessageBox::Yes==QMessageBox::question (this, "Alert", QString(x), QMessageBox::Yes| QMessageBox::No))
 
 #define APPNAME "Cutter"
-#define CUTTER_VERSION "1.0"
+#define CUTTER_VERSION "1.2"
 
 #define Core() (CutterCore::getInstance())
 
@@ -117,6 +117,9 @@ struct StringDescription
 {
     RVA vaddr;
     QString string;
+    QString type;
+    ut32 length;
+    ut32 size;
 };
 
 struct FlagspaceDescription
@@ -174,6 +177,37 @@ struct DisassemblyLine
     QString text;
 };
 
+struct ClassMethodDescription
+{
+    QString name;
+    RVA addr;
+};
+
+struct ClassFieldDescription
+{
+    QString name;
+    RVA addr;
+};
+
+struct ClassDescription
+{
+    QString name;
+    RVA addr;
+    ut64 index;
+    QList<ClassMethodDescription> methods;
+    QList<ClassFieldDescription> fields;
+};
+
+struct ResourcesDescription
+{
+    int name;
+    RVA vaddr;
+    ut64 index;
+    QString type;
+    ut64 size;
+    QString lang;
+};
+
 Q_DECLARE_METATYPE(FunctionDescription)
 Q_DECLARE_METATYPE(ImportDescription)
 Q_DECLARE_METATYPE(ExportDescription)
@@ -186,6 +220,13 @@ Q_DECLARE_METATYPE(FlagDescription)
 Q_DECLARE_METATYPE(XrefDescription)
 Q_DECLARE_METATYPE(EntrypointDescription)
 Q_DECLARE_METATYPE(RBinPluginDescription)
+Q_DECLARE_METATYPE(ClassMethodDescription)
+Q_DECLARE_METATYPE(ClassFieldDescription)
+Q_DECLARE_METATYPE(ClassDescription)
+Q_DECLARE_METATYPE(const ClassDescription *)
+Q_DECLARE_METATYPE(const ClassMethodDescription *)
+Q_DECLARE_METATYPE(const ClassFieldDescription *)
+Q_DECLARE_METATYPE(ResourcesDescription)
 
 class CutterCore: public QObject
 {
@@ -213,12 +254,15 @@ public:
     void renameFlag(QString old_name, QString new_name);
     void delFlag(RVA addr);
 
+    void editInstruction(RVA addr, const QString &inst);
+    void editBytes(RVA addr, const QString &inst);
+
     void setComment(RVA addr, const QString &cmt);
     void delComment(RVA addr);
 
     void setImmediateBase(const QString &r2BaseName, RVA offset = RVA_INVALID);
+    void setCurrentBits(int bits, RVA offset = RVA_INVALID);
 
-    void setOptions(QString key);
     bool loadFile(QString path, uint64_t loadaddr = 0LL, uint64_t mapaddr = 0LL, bool rw = false, int va = 0, int idx = 0, bool loadbin = false, const QString &forceBinPlugin = nullptr);
     bool tryFile(QString path, bool rw);
     void analyze(int level, QList<QString> advanced);
@@ -256,6 +300,7 @@ public:
     QString disassembleSingleInstruction(RVA addr);
     void setDefaultCPU();
     void setCPU(QString arch, QString cpu, int bits, bool temporary = false);
+    void setEndianness(bool big);
     RAnalFunction *functionAt(ut64 addr);
     QString cmdFunctionAt(QString addr);
     QString cmdFunctionAt(RVA addr);
@@ -275,7 +320,7 @@ public:
     RVA getOffsetJump(RVA addr);
     QString getDecompiledCode(RVA addr);
     QString getDecompiledCode(QString addr);
-    QString getFileInfo();
+    QJsonDocument getFileInfo();
     QStringList getStats();
     QString getSimpleGraph(QString function);
 
@@ -313,6 +358,8 @@ public:
     QList<FlagDescription> getAllFlags(QString flagspace = NULL);
     QList<SectionDescription> getAllSections();
     QList<EntrypointDescription> getAllEntrypoint();
+    QList<ClassDescription> getAllClasses();
+    QList<ResourcesDescription> getAllResources();
 
     QList<XrefDescription> getXRefs(RVA addr, bool to, bool whole_function, const QString &filterType = QString::null);
 
@@ -332,6 +379,7 @@ public:
 
     void loadScript(const QString &scriptname);
     QString getVersionInformation();
+    QJsonArray getOpenedFiles();
 
     RCoreLocked core() const;
 

@@ -2,6 +2,8 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QFontDatabase>
+#include <QFile>
+#include <QApplication>
 
 Configuration* Configuration::mPtr = nullptr;
 
@@ -117,7 +119,18 @@ void Configuration::loadDefaultTheme()
     setColor("gui.alt_background", QColor(245, 250, 255));
     // Custom
     setColor("gui.imports", colorA);
+    setColor("gui.main", color2);
+    setColor("gui.navbar.err", QColor(255, 0, 0));
+    setColor("gui.navbar.code", QColor(104, 229, 69));
+    setColor("gui.navbar.str", QColor(69, 104, 229));
+    setColor("gui.navbar.sym", QColor(229, 150, 69));
+    setColor("gui.navbar.empty", QColor(100, 100, 100));
 
+    /* Load Qt Theme */
+    qApp->setStyleSheet("");
+
+    /* Images */
+    logoFile = QString(":/img/cutter_plain.svg");
 }
 
 void Configuration::loadDarkTheme()
@@ -204,11 +217,43 @@ void Configuration::loadDarkTheme()
     setColor("gui.alt_background", QColor(58, 100, 128));
     // Custom
     setColor("gui.imports", colorA);
+    setColor("gui.main", color2);
+    setColor("gui.navbar.err", QColor(255, 0, 0));
+    setColor("gui.navbar.code", QColor(104, 229, 69));
+    setColor("gui.navbar.str", QColor(69, 104, 229));
+    setColor("gui.navbar.sym", QColor(229, 150, 69));
+    setColor("gui.navbar.empty", QColor(100, 100, 100));
+
+    /* Load Qt Theme */
+    QFile f(":qdarkstyle/style.qss");
+    if (!f.exists())
+    {
+        qWarning() << "Can't find dark theme stylesheet.";
+    }
+    else
+    {
+        f.open(QFile::ReadOnly | QFile::Text);
+        QTextStream ts(&f);
+        QString stylesheet = ts.readAll();
+#ifdef Q_OS_MACX
+        // see https://github.com/ColinDuquesnoy/QDarkStyleSheet/issues/22#issuecomment-96179529
+        stylesheet += "QDockWidget::title"
+                "{"
+                "    background-color: #31363b;"
+                "    text-align: center;"
+                "    height: 12px;"
+                "}";
+#endif
+        qApp->setStyleSheet(stylesheet);
+    }
+
+    /* Images */
+    logoFile = QString(":/img/cutter_white_plain.svg");
 }
 
 const QFont Configuration::getFont() const
 {
-    QFont font = s.value("font", QFontDatabase::systemFont(QFontDatabase::FixedFont)).value<QFont>();
+    QFont font = s.value("font", QFont("Inconsolata", 12)).value<QFont>();
     return font;
 }
 
@@ -236,6 +281,11 @@ const QColor Configuration::getColor(const QString &name) const
     } else {
         return s.value("colors.other").value<QColor>();
     }
+}
+
+QString Configuration::getLogoFile()
+{
+    return logoFile;
 }
 
 /**

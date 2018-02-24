@@ -27,7 +27,7 @@ You can download the latest release [here](https://github.com/radareorg/cutter/r
 #### Requirements
 
 Cutter is based on Qt so you will need to have it installed.
-- Download: [Qt Open Source](https://info.qt.io/download-qt-for-application-development)
+- Download: [Qt Open Source](https://www.qt.io/download-qt-for-application-development)
 - Add Qt 5.9.1: http://doc.qt.io/qtcreator/creator-project-qmake.html
     
 #### Building
@@ -66,9 +66,9 @@ cmake ../src
 make
 ```
 
-Then run cutter: `./cutter` or `./build/cutter`
+Then run cutter: `./Cutter` or `./build/Cutter`
 
-Note: If radare2 is not installed system-wide (`./sys/user.sh` installation for instance) you might want to use  `LD_LIBRARY_PATH=$HOME/bin/prefix/radare2/lib ./cutter` to run cutter.
+Note: If radare2 is not installed system-wide (`./sys/user.sh` installation for instance) you might want to use  `LD_LIBRARY_PATH=$HOME/bin/prefix/radare2/lib ./Cutter` to run cutter.
 
 
 ## Troubleshooting

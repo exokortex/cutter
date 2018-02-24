@@ -1,14 +1,17 @@
 #include "utils/Helpers.h"
 
+#include <cmath>
 #include <QPlainTextEdit>
 #include <QTextEdit>
 #include <QFileInfo>
+#include <QtCore>
 #include <QCryptographicHash>
 #include <QTreeWidget>
 #include <QString>
 #include <QAbstractItemView>
 #include <QAbstractButton>
 #include <QDockWidget>
+
 
 
 static QAbstractItemView::ScrollMode scrollMode()
@@ -20,18 +23,36 @@ static QAbstractItemView::ScrollMode scrollMode()
 
 namespace qhelpers
 {
-    void adjustColumns(QTreeWidget *tw, int columnCount, int padding)
+
+    QString formatBytecount(const long bytecount)
     {
-        const int count = columnCount == 0 ? tw->columnCount() : columnCount;
-        for (int i = 0; i != count; ++i)
+        if (bytecount == 0)
+            return "0";
+        const int exp = log(bytecount) / log(1000);
+        constexpr char suffixes[] = {' ', 'k', 'M', 'G', 'T', 'P', 'E'};
+
+        QString str;
+        QTextStream stream(&str);
+        stream << qSetRealNumberPrecision(3) << bytecount / pow(1000, exp)
+               << ' ' << suffixes[exp] << 'B';
+        return stream.readAll();
+    }
+    void adjustColumns(QTreeView *tv, int columnCount, int padding)
+    {
+        for (int i = 0; i != columnCount; ++i)
         {
-            tw->resizeColumnToContents(i);
+            tv->resizeColumnToContents(i);
             if (padding > 0)
             {
-                int width = tw->columnWidth(i);
-                tw->setColumnWidth(i, width + padding);
+                int width = tv->columnWidth(i);
+                tv->setColumnWidth(i, width + padding);
             }
         }
+    }
+
+    void adjustColumns(QTreeWidget *tw, int padding)
+    {
+        adjustColumns(tw, tw->columnCount(), padding);
     }
 
     QTreeWidgetItem *appendRow(QTreeWidget *tw, const QString &str, const QString &str2,
@@ -116,6 +137,15 @@ namespace qhelpers
         widget->setMaximumHeight(max);
     }
 
+    int getMaxFullyDisplayedLines(QTextEdit *textEdit)
+    {
+        QFontMetrics fontMetrics(textEdit->document()->defaultFont());
+        return (textEdit->height()
+                - (textEdit->contentsMargins().top()
+                   + textEdit->contentsMargins().bottom()
+                   + (int)(textEdit->document()->documentMargin() * 2)))
+               / fontMetrics.lineSpacing();
+    }
 
     int getMaxFullyDisplayedLines(QPlainTextEdit *plainTextEdit)
     {

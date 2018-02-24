@@ -13,15 +13,17 @@
 #include <QString>
 #include <QResource>
 #include <QShortcut>
+#include <QJsonObject>
 
-FunctionModel::FunctionModel(QList<FunctionDescription> *functions, QSet<RVA> *import_addresses, bool nested, QFont default_font, QFont highlight_font, QObject *parent)
+FunctionModel::FunctionModel(QList<FunctionDescription> *functions, QSet<RVA> *importAddresses, ut64 *mainAdress, bool nested, QFont default_font, QFont highlight_font, QObject *parent)
     : QAbstractItemModel(parent),
       functions(functions),
-      import_addresses(import_addresses),
-      highlight_font(highlight_font),
-      default_font(default_font),
+      importAddresses(importAddresses),
+      mainAdress(mainAdress),
+      highlightFont(highlight_font),
+      defaultFont(default_font),
       nested(nested),
-      current_index(-1)
+      currentIndex(-1)
 
 {
     connect(Core(), SIGNAL(seekChanged(RVA)), this, SLOT(seekChanged(RVA)));
@@ -72,9 +74,13 @@ int FunctionModel::columnCount(const QModelIndex &/*parent*/) const
 
 bool FunctionModel::functionIsImport(ut64 addr) const
 {
-    return import_addresses->contains(addr);
+    return importAddresses->contains(addr);
 }
 
+bool FunctionModel::functionIsMain(ut64 addr) const
+{
+    return *mainAdress == addr;
+}
 
 QVariant FunctionModel::data(const QModelIndex &index, int role) const
 {
@@ -137,15 +143,15 @@ QVariant FunctionModel::data(const QModelIndex &index, int role) const
         }
 
     case Qt::DecorationRole:
-        if (import_addresses->contains(function.offset) &&
+        if (importAddresses->contains(function.offset) &&
                 (nested ? false : index.column() == ImportColumn))
             return QIcon(":/img/icons/import_light.svg");
         return QVariant();
 
     case Qt::FontRole:
-        if (current_index == function_index)
-            return highlight_font;
-        return default_font;
+        if (currentIndex == function_index)
+            return highlightFont;
+        return defaultFont;
 
     case Qt::ToolTipRole:
     {
@@ -167,13 +173,15 @@ QVariant FunctionModel::data(const QModelIndex &index, int role) const
     case Qt::ForegroundRole:
         if (functionIsImport(function.offset))
             return QVariant(ConfigColor("gui.imports"));
-        return QVariant(QColor(Qt::black));
+        if (functionIsMain(function.offset))
+            return QVariant(ConfigColor("gui.main"));
+        return QVariant(this->property("color"));
 
     case FunctionDescriptionRole:
         return QVariant::fromValue(function);
 
     case IsImportRole:
-        return import_addresses->contains(function.offset);
+        return importAddresses->contains(function.offset);
 
     default:
         return QVariant();
@@ -255,9 +263,9 @@ bool FunctionModel::updateCurrentIndex()
         }
     }
 
-    bool changed = current_index != index;
+    bool changed = currentIndex != index;
 
-    current_index = index;
+    currentIndex = index;
 
     return changed;
 }
@@ -274,9 +282,6 @@ void FunctionModel::functionRenamed(const QString &prev_name, const QString &new
         }
     }
 }
-
-
-
 
 FunctionSortFilterProxyModel::FunctionSortFilterProxyModel(FunctionModel *source_model, QObject *parent)
     : QSortFilterProxyModel(parent)
@@ -364,12 +369,12 @@ FunctionsWidget::FunctionsWidget(MainWindow *main, QWidget *parent) :
     QFont default_font = QFont(font_info.family(), font_info.pointSize());
     QFont highlight_font = QFont(font_info.family(), font_info.pointSize(), QFont::Bold);
 
-    function_model = new FunctionModel(&functions, &import_addresses, false, default_font, highlight_font, this);
-    function_proxy_model = new FunctionSortFilterProxyModel(function_model, this);
-    ui->functionsTreeView->setModel(function_proxy_model);
+    functionModel = new FunctionModel(&functions, &importAddresses, &mainAdress, false, default_font, highlight_font, this);
+    functionProxyModel = new FunctionSortFilterProxyModel(functionModel, this);
+    ui->functionsTreeView->setModel(functionProxyModel);
     ui->functionsTreeView->sortByColumn(FunctionModel::NameColumn, Qt::AscendingOrder);
 
-    connect(ui->quickFilterView, SIGNAL(filterTextChanged(const QString &)), function_proxy_model, SLOT(setFilterWildcard(const QString &)));
+    connect(ui->quickFilterView, SIGNAL(filterTextChanged(const QString &)), functionProxyModel, SLOT(setFilterWildcard(const QString &)));
     connect(ui->quickFilterView, SIGNAL(filterClosed()), ui->functionsTreeView, SLOT(setFocus()));
 
     setScrollMode();
@@ -378,7 +383,7 @@ FunctionsWidget::FunctionsWidget(MainWindow *main, QWidget *parent) :
     connect(ui->functionsTreeView, SIGNAL(customContextMenuRequested(const QPoint &)),
             this, SLOT(showFunctionsContextMenu(const QPoint &)));
 
-    connect(ui->functionsTreeView, SIGNAL(doubleClicked(const QModelIndex &)), this, SLOT(functionsTreeView_doubleClicked(const QModelIndex &)));
+    connect(ui->functionsTreeView, SIGNAL(doubleClicked(const QModelIndex &)), this, SLOT(onFunctionsDoubleClicked(const QModelIndex &)));
 
     // Use a custom context menu on the dock title bar
     //this->title_bar = this->titleBarWidget();
@@ -395,15 +400,17 @@ FunctionsWidget::~FunctionsWidget() {}
 
 void FunctionsWidget::refreshTree()
 {
-    function_model->beginReloadFunctions();
+    functionModel->beginReloadFunctions();
 
     functions = CutterCore::getInstance()->getAllFunctions();
 
-    import_addresses.clear();
+    importAddresses.clear();
     foreach (ImportDescription import, CutterCore::getInstance()->getAllImports())
-        import_addresses.insert(import.plt);
+        importAddresses.insert(import.plt);
 
-    function_model->endReloadFunctions();
+    mainAdress = (ut64)CutterCore::getInstance()->cmdj("iMj").object()["vaddr"].toInt();
+
+    functionModel->endReloadFunctions();
 
     // resize offset and size columns
     ui->functionsTreeView->resizeColumnToContents(0);
@@ -411,10 +418,10 @@ void FunctionsWidget::refreshTree()
     ui->functionsTreeView->resizeColumnToContents(2);
 }
 
-void FunctionsWidget::functionsTreeView_doubleClicked(const QModelIndex &index)
+void FunctionsWidget::onFunctionsDoubleClicked(const QModelIndex &index)
 {
     FunctionDescription function = index.data(FunctionModel::FunctionDescriptionRole).value<FunctionDescription>();
-    CutterCore::getInstance()->seek(function.offset);
+    Core()->seek(function.offset);
 }
 
 void FunctionsWidget::showFunctionsContextMenu(const QPoint &pt)
@@ -468,17 +475,10 @@ void FunctionsWidget::on_actionFunctionsRename_triggered()
     {
         // Get new function name
         QString new_name = r->getName();
+
         // Rename function in r2 core
         CutterCore::getInstance()->renameFunction(function.name, new_name);
 
-        // Scroll to show the new name in functions tree widget
-        //
-        // QAbstractItemView::EnsureVisible
-        // QAbstractItemView::PositionAtTop
-        // QAbstractItemView::PositionAtBottom
-        // QAbstractItemView::PositionAtCenter
-        //
-        //ui->functionsTreeWidget->scrollToItem(selected_rows.first(), QAbstractItemView::PositionAtTop);
         // Seek to new renamed function
         CutterCore::getInstance()->seek(function.offset);
     }
@@ -507,7 +507,7 @@ void FunctionsWidget::showTitleContextMenu(const QPoint &pt)
     menu->addAction(ui->actionHorizontal);
     menu->addAction(ui->actionVertical);
 
-    if (!function_model->isNested())
+    if (!functionModel->isNested())
     {
         ui->actionHorizontal->setChecked(true);
         ui->actionVertical->setChecked(false);
@@ -526,13 +526,13 @@ void FunctionsWidget::showTitleContextMenu(const QPoint &pt)
 
 void FunctionsWidget::on_actionHorizontal_triggered()
 {
-    function_model->setNested(false);
+    functionModel->setNested(false);
     ui->functionsTreeView->setIndentation(8);
 }
 
 void FunctionsWidget::on_actionVertical_triggered()
 {
-    function_model->setNested(true);
+    functionModel->setNested(true);
     ui->functionsTreeView->setIndentation(20);
 }
 

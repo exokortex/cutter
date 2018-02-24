@@ -225,9 +225,9 @@
          <property name="geometry">
           <rect>
            <x>0</x>
-           <y>0</y>
+           <y>-379</y>
            <width>564</width>
-           <height>805</height>
+           <height>786</height>
           </rect>
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_5">
@@ -436,12 +436,22 @@
                 <enum>QLayout::SetMinimumSize</enum>
                </property>
                <item>
-                <widget class="QCheckBox" name="binCheckBox">
+                <widget class="QCheckBox" name="writeCheckBox">
                  <property name="text">
-                  <string>Load bin information</string>
+                  <string>Load in write mode (-w)</string>
                  </property>
                  <property name="checked">
-                  <bool>true</bool>
+                  <bool>false</bool>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QCheckBox" name="binCheckBox">
+                 <property name="text">
+                  <string>Do not load bin information (-n)</string>
+                 </property>
+                 <property name="checked">
+                  <bool>false</bool>
                  </property>
                 </widget>
                </item>
@@ -601,6 +611,13 @@
                     </item>
                    </widget>
                   </item>
+                 </layout>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_5">
+                  <property name="topMargin">
+                   <number>0</number>
+                  </property>
                   <item>
                    <widget class="QLabel" name="bitsLabel">
                     <property name="sizePolicy">
@@ -639,6 +656,44 @@
                     <item>
                      <property name="text">
                       <string>64</string>
+                     </property>
+                    </item>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="endiannessLabel">
+                    <property name="sizePolicy">
+                     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                     </sizepolicy>
+                    </property>
+                    <property name="text">
+                     <string>Endianness: </string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QComboBox" name="endiannessComboBox">
+                    <property name="editable">
+                     <bool>false</bool>
+                    </property>
+                    <property name="currentText">
+                     <string notr="true">Auto</string>
+                    </property>
+                    <item>
+                     <property name="text">
+                      <string>Auto</string>
+                     </property>
+                    </item>
+                    <item>
+                     <property name="text">
+                      <string>Little</string>
+                     </property>
+                    </item>
+                    <item>
+                     <property name="text">
+                      <string>Big</string>
                      </property>
                     </item>
                    </widget>

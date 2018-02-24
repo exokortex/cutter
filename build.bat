@@ -1,43 +1,38 @@
-@echo off
+@ECHO off
+SETLOCAL ENABLEDELAYEDEXPANSION
 
-echo Setting path
-if "%OLDPATH%"=="" set OLDPATH=%PATH%
-if "%QT32PATH%"=="" set QT32PATH=C:\Qt\5.9.2\msvc2015
-if "%QT64PATH%"=="" set QT64PATH=C:\Qt\5.9.2\msvc2015_64
-if "%VSVARSALLPATH%"=="" set VSVARSALLPATH=C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat
+IF NOT DEFINED QT32PATH SET QT32PATH=C:\Qt\5.9.2\msvc2015
+IF NOT DEFINED QT64PATH SET QT64PATH=C:\Qt\5.9.2\msvc2015_64
+IF NOT DEFINED VSVARSALLPATH SET VSVARSALLPATH=C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat
 
-if "%1"=="32" (
-    set "PATH=%QT32PATH%\bin;%PATH%"
-    call "%VSVARSALLPATH%" x86
-    set MSBUILDPLATFORM=Win32
-) else if "%1"=="64" (
-    set "PATH=%QT64PATH%\bin;%PATH%"
-    call "%VSVARSALLPATH%" x64
-    set MSBUILDPLATFORM=x64
-) else (
-    echo Usage: build.bat 32/64
-    goto restorepath
+IF "%1" == "32" (
+    SET "PATH=%QT32PATH%\bin;%PATH%"
+    CALL "%VSVARSALLPATH%" x86
+    SET MSBUILDPLATFORM=Win32
+) ELSE IF "%1" == "64" (
+    SET "PATH=%QT64PATH%\bin;%PATH%"
+    CALL "%VSVARSALLPATH%" x64
+    SET MSBUILDPLATFORM=x64
+) ELSE (
+    ECHO Usage: %0 {32^|64}
+    EXIT /B 1
 )
+SET BITS=%1
 
-echo Preparing directory
-rmdir /s /q build%1
-mkdir build%1
-cd build%1
+ECHO Preparing directory
+RMDIR /S /Q build%BITS%
+MKDIR build%BITS%
+CD build%BITS%
 
-echo Building cutter
+ECHO Building cutter
 qmake ..\src\cutter.pro -config release -tp vc
-if not %ERRORLEVEL%==0 exit
+IF !ERRORLEVEL! NEQ 0 EXIT /B 1
 msbuild /m cutter.vcxproj /p:Configuration=Release;Platform=%MSBUILDPLATFORM%
-if not %ERRORLEVEL%==0 exit
+IF !ERRORLEVEL! NEQ 0 EXIT /B 1
 
-echo Deploying cutter
-mkdir cutter%1
-move release\cutter.exe cutter%1\cutter.exe
-xcopy /s ..\dist%1 cutter%1\
-windeployqt cutter%1\cutter.exe
-cd ..
-
-:restorepath
-echo Restoring path
-set PATH=%OLDPATH%
-set OLDPATH=
+ECHO Deploying cutter
+MKDIR cutter%BITS%
+MOVE release\cutter.exe cutter%BITS%\cutter.exe
+XCOPY /S ..\dist%BITS% cutter%BITS%\
+windeployqt cutter%BITS%\cutter.exe
+CD ..

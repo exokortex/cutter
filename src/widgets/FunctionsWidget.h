@@ -24,16 +24,19 @@ class FunctionModel : public QAbstractItemModel
 
 private:
     QList<FunctionDescription> *functions;
-    QSet<RVA> *import_addresses;
+    QSet<RVA> *importAddresses;
+    ut64 *mainAdress;
 
 
-    QFont highlight_font;
-    QFont default_font;
+    QFont highlightFont;
+    QFont defaultFont;
     bool nested;
 
-    int current_index;
+    int currentIndex;
 
     bool functionIsImport(ut64 addr) const;
+
+    bool functionIsMain(ut64 addr) const;
 
 public:
     static const int FunctionDescriptionRole = Qt::UserRole;
@@ -41,7 +44,7 @@ public:
 
     enum Column { NameColumn = 0, SizeColumn, ImportColumn, OffsetColumn, ColumnCount };
 
-    FunctionModel(QList<FunctionDescription> *functions, QSet<RVA> *import_addresses, bool nested, QFont default_font, QFont highlight_font, QObject *parent = 0);
+    FunctionModel(QList<FunctionDescription> *functions, QSet<RVA> *importAddresses, ut64 *mainAdress, bool nested, QFont defaultFont, QFont highlightFont, QObject *parent = 0);
 
     QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const;
     QModelIndex parent(const QModelIndex &index) const;
@@ -92,7 +95,7 @@ public:
     ~FunctionsWidget();
 
 private slots:
-    void functionsTreeView_doubleClicked(const QModelIndex &index);
+    void onFunctionsDoubleClicked(const QModelIndex &index);
     void showFunctionsContextMenu(const QPoint &pt);
 
     void on_actionDisasAdd_comment_triggered();
@@ -115,10 +118,11 @@ private:
     MainWindow      *main;
 
     QList<FunctionDescription> functions;
-    QSet<RVA> import_addresses;
+    QSet<RVA> importAddresses;
+    ut64 mainAdress;
 
-    FunctionModel *function_model;
-    FunctionSortFilterProxyModel *function_proxy_model;
+    FunctionModel *functionModel;
+    FunctionSortFilterProxyModel *functionProxyModel;
 
     void setScrollMode();
 };

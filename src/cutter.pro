@@ -1,9 +1,9 @@
 TEMPLATE = app
 
-TARGET = cutter
+TARGET = Cutter
 
 # The application version
-VERSION = 1.0
+VERSION = 1.2
 
 ICON = img/cutter.icns
 
@@ -24,6 +24,7 @@ win32 {
 
 macx {
     QMAKE_CXXFLAGS = -mmacosx-version-min=10.7 -std=gnu0x -stdlib=libc++
+    QMAKE_INFO_PLIST = apple/Info.plist
 }
 
 
@@ -40,6 +41,7 @@ SOURCES += \
     dialogs/OptionsDialog.cpp \
     dialogs/AboutDialog.cpp \
     dialogs/CommentsDialog.cpp \
+    dialogs/EditInstructionDialog.cpp \
     dialogs/FlagDialog.cpp \
     dialogs/RenameDialog.cpp \
     dialogs/XrefsDialog.cpp \
@@ -86,7 +88,10 @@ SOURCES += \
     dialogs/preferences/PreferencesDialog.cpp \
     dialogs/preferences/GeneralOptionsWidget.cpp \
     dialogs/preferences/GraphOptionsWidget.cpp \
-    widgets/QuickFilterView.cpp
+    widgets/QuickFilterView.cpp \
+    widgets/ClassesWidget.cpp \
+    widgets/ResourcesWidget.cpp \
+    CutterApplication.cpp
 
 HEADERS  += \
     cutter.h \
@@ -97,6 +102,7 @@ HEADERS  += \
     dialogs/AboutDialog.h \
     dialogs/preferences/AsmOptionsWidget.h \
     dialogs/CommentsDialog.h \
+    dialogs/EditInstructionDialog.h \
     dialogs/FlagDialog.h \
     dialogs/RenameDialog.h \
     dialogs/XrefsDialog.h \
@@ -143,12 +149,16 @@ HEADERS  += \
     dialogs/preferences/PreferencesDialog.h \
     dialogs/preferences/GeneralOptionsWidget.h \
     dialogs/preferences/GraphOptionsWidget.h \
-    widgets/QuickFilterView.h
+    widgets/QuickFilterView.h \
+    widgets/ClassesWidget.h \
+    widgets/ResourcesWidget.h \
+    CutterApplication.h
 
 FORMS    += \
     dialogs/AboutDialog.ui \
     dialogs/preferences/AsmOptionsWidget.ui \
     dialogs/CommentsDialog.ui \
+    dialogs/EditInstructionDialog.ui \
     dialogs/FlagDialog.ui \
     dialogs/RenameDialog.ui \
     dialogs/XrefsDialog.ui \
@@ -177,10 +187,13 @@ FORMS    += \
     dialogs/preferences/GeneralOptionsWidget.ui \
     dialogs/preferences/GraphOptionsWidget.ui \
     widgets/QuickFilterView.ui \
-    widgets/PseudocodeWidget.ui
+    widgets/PseudocodeWidget.ui \
+    widgets/ClassesWidget.ui
 
 RESOURCES += \
-    resources.qrc
+    resources.qrc \
+    themes/qdarkstyle/style.qrc
+
 
 DISTFILES += cutter.astylerc
 

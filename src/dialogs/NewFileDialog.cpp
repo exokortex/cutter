@@ -3,6 +3,7 @@
 #include "dialogs/NewFileDialog.h"
 #include "dialogs/AboutDialog.h"
 #include "ui_NewfileDialog.h"
+#include "utils/Helpers.h"
 
 #include <QFileDialog>
 #include <QtGui>
@@ -49,18 +50,6 @@ static QIcon getIconFor(const QString& str, int pos)
     return QIcon(pixmap);
 }
 
-static QString formatBytecount(const long bytecount)
-{
-    const int exp = log(bytecount) / log(1000);
-    constexpr char suffixes[] = {' ', 'k', 'M', 'G', 'T', 'P', 'E'};
-
-    QString str;
-    QTextStream stream(&str);
-    stream << qSetRealNumberPrecision(3) << bytecount / pow(1000, exp)
-           << ' ' << suffixes[exp] << 'B';
-    return stream.readAll();
-}
-
 NewFileDialog::NewFileDialog(QWidget *parent) :
         QDialog(parent),
         ui(new Ui::NewFileDialog)
@@ -70,9 +59,7 @@ NewFileDialog::NewFileDialog(QWidget *parent) :
     setAcceptDrops(true);
     ui->recentsListWidget->addAction(ui->actionRemove_item);
     ui->recentsListWidget->addAction(ui->actionClear_all);
-
-    QString logoFile = (palette().window().color().value() < 127) ? ":/img/cutter_white_plain.svg" : ":/img/cutter_plain.svg";
-    ui->logoSvgWidget->load(logoFile);
+    ui->logoSvgWidget->load(Config()->getLogoFile());
 
     fillRecentFilesList();
     bool projectsExist = fillProjectsList();
@@ -171,11 +158,6 @@ void NewFileDialog::on_projectsListWidget_itemDoubleClicked(QListWidgetItem *ite
     loadProject(item->data(Qt::UserRole).toString());
 }
 
-void NewFileDialog::on_cancelButton_clicked()
-{
-    close();
-}
-
 void NewFileDialog::on_aboutButton_clicked()
 {
 	AboutDialog *a = new AboutDialog(this);
@@ -264,7 +246,7 @@ bool NewFileDialog::fillRecentFilesList()
         {
             QListWidgetItem *item = new QListWidgetItem(
                     getIconFor(name, i++),
-                    file + "\nCreated: " + info.created().toString() + "\nSize: " + formatBytecount(info.size())
+                    file + "\nCreated: " + info.created().toString() + "\nSize: " + qhelpers::formatBytecount(info.size())
             );
             //":/img/icons/target.svg"), name );
             item->setData(Qt::UserRole, file);
@@ -305,32 +287,29 @@ bool NewFileDialog::fillProjectsList()
 
 void NewFileDialog::loadFile(const QString &filename)
 {
-    // Check that there is a file selected
-    QFileInfo checkfile(filename);
-    if (!checkfile.exists() || !checkfile.isFile())
+    if(!Core()->tryFile(filename, false))
     {
         QMessageBox msgBox(this);
-        msgBox.setText(tr("Select a new program or a previous one\nbefore continuing"));
+        msgBox.setText(tr("Select a new program or a previous one before continuing."));
         msgBox.exec();
+        return;
     }
-    else
-    {
-        // Add file to recent file list
-        QSettings settings;
-        QStringList files = settings.value("recentFileList").toStringList();
-        files.removeAll(filename);
-        files.prepend(filename);
-        while (files.size() > MaxRecentFiles)
-            files.removeLast();
 
-        settings.setValue("recentFileList", files);
+    // Add file to recent file list
+    QSettings settings;
+    QStringList files = settings.value("recentFileList").toStringList();
+    files.removeAll(filename);
+    files.prepend(filename);
+    while (files.size() > MaxRecentFiles)
+        files.removeLast();
 
-        // Close dialog and open MainWindow/OptionsDialog
-        MainWindow *main = new MainWindow();
-        main->openNewFile(filename);
+    settings.setValue("recentFileList", files);
 
-        close();
-    }
+    // Close dialog and open MainWindow/OptionsDialog
+    MainWindow *main = new MainWindow();
+    main->openNewFile(filename);
+
+    close();
 }
 
 void NewFileDialog::loadProject(const QString &project)

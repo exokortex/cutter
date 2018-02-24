@@ -11,7 +11,6 @@
 #include <QFileInfo>
 #include <QFileDialog>
 
-// TODO Get rid of MainWindow
 OptionsDialog::OptionsDialog(MainWindow *main):
     QDialog(0), // parent may not be main
     analThread(this),
@@ -25,10 +24,7 @@ OptionsDialog::OptionsDialog(MainWindow *main):
     ui->progressBar->setVisible(0);
     ui->statusLabel->setVisible(0);
     ui->elapsedLabel->setVisible(0);
-
-    QString logoFile = (palette().window().color().value() < 127) ? ":/img/cutter_white_plain.svg" : ":/img/cutter_plain.svg";
-    ui->logoSvgWidget->load(logoFile);
-
+    ui->logoSvgWidget->load(Config()->getLogoFile());
     ui->analSlider->setValue(defaultAnalLevel);
 
     // Fill the plugins combo
@@ -67,8 +63,6 @@ OptionsDialog::OptionsDialog(MainWindow *main):
     connect(ui->cancelButton, SIGNAL(clicked()), this, SLOT(reject()));
 
     ui->programLineEdit->setText(main->getFilename());
-    QFileInfo fi(this->main->getFilename());
-    this->core->tryFile(fi.filePath(), fi.isWritable());
 }
 
 OptionsDialog::~OptionsDialog() {}
@@ -122,6 +116,19 @@ int OptionsDialog::getSelectedBits()
     return 0;
 }
 
+OptionsDialog::Endianness OptionsDialog::getSelectedEndianness()
+{
+    switch(ui->endiannessComboBox->currentIndex())
+    {
+    case 1:
+        return Endianness::Little;
+    case 2:
+        return Endianness::Big;
+    default:
+        return Endianness::Auto;
+    }
+}
+
 QString OptionsDialog::getSelectedOS()
 {
     QVariant os = ui->kernelComboBox->currentData();
@@ -140,7 +147,6 @@ void OptionsDialog::setupAndStartAnalysis(int level, QList<QString> advanced)
     ui->elapsedLabel->setVisible(true);
 
     ui->statusLabel->setText(tr("Starting analysis"));
-    //ui->progressBar->setValue(5);
 
     main->initUI();
 
@@ -153,8 +159,7 @@ void OptionsDialog::setupAndStartAnalysis(int level, QList<QString> advanced)
     updateProgressTimer();
     connect(&analTimer, SIGNAL(timeout()), this, SLOT(updateProgressTimer()));
 
-    // Threads stuff
-    // connect signal/slot
+    // Threads stuff, connect signal/slot
     connect(&analThread, &AnalThread::updateProgress, this, &OptionsDialog::updateProgress);
     analThread.start(main, level, advanced);
 }

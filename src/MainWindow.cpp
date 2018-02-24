@@ -6,6 +6,7 @@
 #include "dialogs/preferences/PreferencesDialog.h"
 #include "utils/Helpers.h"
 
+#include <QApplication>
 #include <QComboBox>
 #include <QCompleter>
 #include <QDebug>
@@ -33,12 +34,14 @@
 #include <QToolButton>
 #include <QToolTip>
 #include <QTreeWidgetItem>
+#include <QSvgRenderer>
 
 #include "utils/Highlighter.h"
 #include "utils/HexAsciiHighlighter.h"
 #include "utils/Helpers.h"
-#include "dialogs/NewFileDialog.h"
+#include "utils/SvgIconEngine.h"
 
+#include "dialogs/NewFileDialog.h"
 #include "widgets/DisassemblerGraphView.h"
 #include "widgets/PPGraphView.h"
 #include "widgets/FunctionsWidget.h"
@@ -61,6 +64,8 @@
 #include "dialogs/OptionsDialog.h"
 #include "widgets/EntrypointWidget.h"
 #include "dialogs/SaveProjectDialog.h"
+#include "widgets/ClassesWidget.h"
+#include "widgets/ResourcesWidget.h"
 
 // graphics
 #include <QGraphicsEllipseItem>
@@ -84,29 +89,7 @@ static void registerCustomFonts()
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     core(CutterCore::getInstance()),
-    notepadDock(nullptr),
-    pseudocodeDock(nullptr),
-    asmDock(nullptr),
-    calcDock(nullptr),
-    omnibar(nullptr),
-    ui(new Ui::MainWindow),
-    highlighter(nullptr),
-    hex_highlighter(nullptr),
-    visualNavbar(nullptr),
-    entrypointDock(nullptr),
-    functionsDock(nullptr),
-    importsDock(nullptr),
-    exportsDock(nullptr),
-    symbolsDock(nullptr),
-    relocsDock(nullptr),
-    commentsDock(nullptr),
-    stringsDock(nullptr),
-    flagsDock(nullptr),
-    dashboardDock(nullptr),
-    gotoEntry(nullptr),
-    sdbDock(nullptr),
-    sectionsDock(nullptr),
-    consoleDock(nullptr)
+    ui(new Ui::MainWindow)
 {
     panelLock = false;
     tabsOnTop = false;
@@ -116,9 +99,6 @@ MainWindow::MainWindow(QWidget *parent) :
 MainWindow::~MainWindow()
 {
 }
-
-#include <QSvgRenderer>
-#include "utils/SvgIconEngine.h"
 
 void MainWindow::initUI()
 {
@@ -138,11 +118,11 @@ void MainWindow::initUI()
     spacer4->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
     spacer4->setMinimumSize(10, 10);
     ui->mainToolBar->insertWidget(ui->actionForward, spacer4);
-    ui->actionForward->setIcon(QIcon(new SvgIconEngine(QString(":/img/icons/arrow_right.svg"), palette().buttonText().color())));
+    ui->actionForward->setIcon(QIcon(new SvgIconEngine(QString(":/img/icons/arrow_right.svg"))));
 
     // Popup menu on theme toolbar button
     QToolButton *backButton = new QToolButton(this);
-    backButton->setIcon(QIcon(new SvgIconEngine(QString(":/img/icons/arrow_left.svg"), palette().buttonText().color())));
+    backButton->setIcon(QIcon(new SvgIconEngine(QString(":/img/icons/arrow_left.svg"))));
     //backButton->setPopupMode(QToolButton::DelayedPopup);
     ui->mainToolBar->insertWidget(ui->actionForward, backButton);
     connect(backButton, SIGNAL(clicked()), this, SLOT(backButton_clicked()));
@@ -180,7 +160,7 @@ void MainWindow::initUI()
     /*
      * Dock Widgets
      */
-    dockWidgets.reserve(14);
+    dockWidgets.reserve(20);
 
 #define ADD_DOCK(cls, dockMember, action) \
 { \
@@ -249,10 +229,10 @@ void MainWindow::initUI()
     ADD_DOCK(Notepad, notepadDock, ui->actionNotepad);
     ADD_DOCK(Dashboard, dashboardDock, ui->actionDashboard);
     ADD_DOCK(SdbDock, sdbDock, ui->actionSDBBrowser);
-#undef ADD_DOCK
+    ADD_DOCK(ClassesWidget, classesDock, ui->actionClasses);
+    ADD_DOCK(ResourcesWidget, resourcesDock, ui->actionResources);
 
-    // Set up dock widgets default layout
-    resetToDefaultLayout();
+#undef ADD_DOCK
 
     // Restore saved settings
     this->readSettings();
@@ -263,10 +243,9 @@ void MainWindow::initUI()
     setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
     //setCorner( Qt::BottomRightCorner, Qt::RightDockWidgetArea );
 
-    // Show dashboard by default
-    this->dashboardDock->raise();
+    // Set up dock widgets default layout
+    resetToDefaultLayout();
 
-    //qDebug() << "FOLDER: " << QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
     /*
      *  Some global shortcuts
      */
@@ -286,7 +265,7 @@ void MainWindow::initUI()
     connect(core, SIGNAL(projectSaved(const QString &)), this, SLOT(projectSaved(const QString &)));
 }
 
-void MainWindow::openNewFile(const QString &fn, int anal_level, QList<QString> advanced)
+void MainWindow::openNewFile(const QString &fn, int analLevel, QList<QString> advancedOptions)
 {
     setFilename(fn);
 
@@ -306,13 +285,34 @@ void MainWindow::openNewFile(const QString &fn, int anal_level, QList<QString> a
     }
 
     /* Show analysis options dialog */
+    displayAnalysisOptionsDialog(analLevel, advancedOptions);
+}
+
+void MainWindow::displayNewFileDialog()
+{
+    NewFileDialog *n = new NewFileDialog();
+    newFileDialog = n;
+    n->setAttribute(Qt::WA_DeleteOnClose);
+    n->show();
+}
+
+void MainWindow::closeNewFileDialog()
+{
+    if (newFileDialog) {
+        newFileDialog->close();
+    }
+    newFileDialog = nullptr;
+}
+
+void MainWindow::displayAnalysisOptionsDialog(int analLevel, QList<QString> advancedOptions)
+{
     OptionsDialog *o = new OptionsDialog(this);
     o->setAttribute(Qt::WA_DeleteOnClose);
     o->show();
 
-    if (anal_level >= 0)
+    if (analLevel >= 0)
     {
-        o->setupAndStartAnalysis(anal_level, advanced);
+        o->setupAndStartAnalysis(analLevel, advancedOptions);
     }
 }
 
@@ -374,19 +374,6 @@ bool MainWindow::saveProjectAs(bool quit)
     int result = dialog.exec();
 
     return !quit || result != SaveProjectDialog::Rejected;
-
-}
-
-void MainWindow::toggleTheme()
-{
-    if (QSettings().value("dark").toBool())
-    {
-        setDefaultTheme();
-    }
-    else
-    {
-        setDarkTheme();
-    }
 }
 
 void MainWindow::refreshOmniBar(const QStringList &flags)
@@ -493,26 +480,9 @@ void MainWindow::setTabLocation()
     }
 }
 
-void MainWindow::setDarkTheme()
-{
-    Config()->setDarkTheme(true);
-}
-
-void MainWindow::setDefaultTheme()
-{
-    Config()->setDarkTheme(false);
-}
-
-
 void MainWindow::refreshAll()
 {
     Core()->triggerRefreshAll();
-}
-
-void MainWindow::on_actionLock_triggered()
-{
-    panelLock = !panelLock;
-    setPanelLock();
 }
 
 void MainWindow::lockUnlock_Docks(bool what)
@@ -534,43 +504,6 @@ void MainWindow::lockUnlock_Docks(bool what)
 
 }
 
-void MainWindow::on_actionLockUnlock_triggered()
-{
-    if (ui->actionLockUnlock->isChecked())
-    {
-        foreach (QDockWidget *dockWidget, findChildren<QDockWidget *>())
-        {
-            dockWidget->setFeatures(QDockWidget::NoDockWidgetFeatures);
-        }
-        ui->actionLockUnlock->setIcon(QIcon(":/lock"));
-    }
-    else
-    {
-        foreach (QDockWidget *dockWidget, findChildren<QDockWidget *>())
-        {
-            dockWidget->setFeatures(QDockWidget::AllDockWidgetFeatures);
-        }
-        ui->actionLockUnlock->setIcon(QIcon(":/unlock"));
-    }
-}
-
-void MainWindow::on_actionTabs_triggered()
-{
-    tabsOnTop = !tabsOnTop;
-    setTabLocation();
-}
-
-void MainWindow::on_actionAbout_triggered()
-{
-    AboutDialog *a = new AboutDialog(this);
-    a->open();
-}
-
-void MainWindow::on_actionRefresh_Panels_triggered()
-{
-    this->refreshAll();
-}
-
 void MainWindow::toggleDockWidget(QDockWidget *dock_widget, bool show)
 {
     if (!show)
@@ -589,18 +522,6 @@ void MainWindow::backButton_clicked()
     core->seekPrev();
 }
 
-void MainWindow::on_actionForward_triggered()
-{
-    core->seekNext();
-}
-
-void MainWindow::on_actionDisasAdd_comment_triggered()
-{
-    CommentsDialog *c = new CommentsDialog(this);
-    c->exec();
-    delete c;
-}
-
 void MainWindow::restoreDocks()
 {
     // In the upper half the functions are the first widget
@@ -616,7 +537,7 @@ void MainWindow::restoreDocks()
     // Console | Sections
     splitDockWidget(consoleDock, sectionsDock, Qt::Horizontal);
 
-    // tabs for center (must be applied after splitDockWidget())
+    // Tabs for center (must be applied after splitDockWidget())
     tabifyDockWidget(sectionsDock, commentsDock);
     tabifyDockWidget(dashboardDock, disassemblyDock);
     tabifyDockWidget(dashboardDock, graphDock);
@@ -630,8 +551,8 @@ void MainWindow::restoreDocks()
     tabifyDockWidget(dashboardDock, exportsDock);
     tabifyDockWidget(dashboardDock, symbolsDock);
     tabifyDockWidget(dashboardDock, notepadDock);
-
-    dashboardDock->raise();
+    tabifyDockWidget(dashboardDock, classesDock);
+    tabifyDockWidget(dashboardDock, resourcesDock);
 
     updateDockActionsChecked();
 }
@@ -641,7 +562,7 @@ void MainWindow::hideAllDocks()
 {
     for (auto w : dockWidgets)
     {
-        w->hide();
+        removeDockWidget(w);
     }
 
     updateDockActionsChecked();
@@ -687,10 +608,9 @@ void MainWindow::showDefaultDocks()
 
 void MainWindow::resetToDefaultLayout()
 {
-    restoreDocks();
     hideAllDocks();
+    restoreDocks();
     showDefaultDocks();
-
     dashboardDock->raise();
 
     // ugly workaround to set the default widths of functions and sidebar docks
@@ -706,22 +626,9 @@ void MainWindow::resetToDefaultLayout()
     Core()->setMemoryWidgetPriority(CutterCore::MemoryWidgetType::Disassembly);
 }
 
-void MainWindow::on_actionDefaut_triggered()
-{
-    resetToDefaultLayout();
-}
-
 void MainWindow::sendToNotepad(const QString &txt)
 {
     core->setNotes(core->getNotes() + "```\n" + txt + "\n```");
-}
-
-void MainWindow::on_actionFunctionsRename_triggered()
-{
-    RenameDialog *r = new RenameDialog(this);
-    // Get function based on click position
-    //r->setFunctionName(fcn_name);
-    r->open();
 }
 
 void MainWindow::addOutput(const QString &msg)
@@ -735,9 +642,48 @@ void MainWindow::addDebugOutput(const QString &msg)
     consoleDock->addDebugOutput(msg);
 }
 
+void MainWindow::on_actionLock_triggered()
+{
+    panelLock = !panelLock;
+    setPanelLock();
+}
+
+void MainWindow::on_actionLockUnlock_triggered()
+{
+    if (ui->actionLockUnlock->isChecked())
+    {
+        foreach (QDockWidget *dockWidget, findChildren<QDockWidget *>())
+        {
+            dockWidget->setFeatures(QDockWidget::NoDockWidgetFeatures);
+        }
+        ui->actionLockUnlock->setIcon(QIcon(":/lock"));
+    }
+    else
+    {
+        foreach (QDockWidget *dockWidget, findChildren<QDockWidget *>())
+        {
+            dockWidget->setFeatures(QDockWidget::AllDockWidgetFeatures);
+        }
+        ui->actionLockUnlock->setIcon(QIcon(":/unlock"));
+    }
+}
+
+void MainWindow::on_actionFunctionsRename_triggered()
+{
+    RenameDialog *r = new RenameDialog(this);
+    // Get function based on click position
+    //r->setFunctionName(fcn_name);
+    r->open();
+}
+
+void MainWindow::on_actionDefault_triggered()
+{
+    resetToDefaultLayout();
+}
+
 void MainWindow::on_actionNew_triggered()
 {
-    on_actionLoad_triggered();
+    on_actionOpen_triggered();
 }
 
 void MainWindow::on_actionSave_triggered()
@@ -774,17 +720,7 @@ void MainWindow::on_actionRun_Script_triggered()
     this->core->cmd(". " + fileName);
 }
 
-void MainWindow::on_actionDark_Theme_triggered()
-{
-    this->setDarkTheme();
-}
-
-void MainWindow::on_actionWhite_Theme_triggered()
-{
-    this->setDefaultTheme();
-}
-
-void MainWindow::on_actionLoad_triggered()
+void MainWindow::on_actionOpen_triggered()
 {
     QProcess process(this);
     process.setEnvironment(QProcess::systemEnvironment());
@@ -821,6 +757,18 @@ void MainWindow::on_actionQuit_triggered()
     close();
 }
 
+void MainWindow::on_actionForward_triggered()
+{
+    core->seekNext();
+}
+
+void MainWindow::on_actionDisasAdd_comment_triggered()
+{
+    CommentsDialog *c = new CommentsDialog(this);
+    c->exec();
+    delete c;
+}
+
 void MainWindow::on_actionRefresh_contents_triggered()
 {
     refreshAll();
@@ -832,7 +780,49 @@ void MainWindow::on_actionPreferences_triggered()
     dialog->show();
 }
 
+void MainWindow::on_actionTabs_triggered()
+{
+    tabsOnTop = !tabsOnTop;
+    setTabLocation();
+}
+
+void MainWindow::on_actionAbout_triggered()
+{
+    AboutDialog *a = new AboutDialog(this);
+    a->open();
+}
+
+void MainWindow::on_actionRefresh_Panels_triggered()
+{
+    this->refreshAll();
+}
+
+void MainWindow::on_actionAnalyze_triggered()
+{
+    displayAnalysisOptionsDialog(-1, QList<QString>());
+}
+
+void MainWindow::on_actionImportPDB_triggered()
+{
+    QFileDialog dialog(this);
+    dialog.setWindowTitle(tr("Select PDB file"));
+    dialog.setNameFilters({ tr("PDB file (*.pdb)"), tr("All files (*)") });
+
+    if (!dialog.exec())
+    {
+        return;
+    }
+
+    QString pdbFile = dialog.selectedFiles().first();
+
+    if (!pdbFile.isEmpty())
+    {
+        Core()->loadPDB(pdbFile);
+        addOutput(tr("%1 loaded.").arg(pdbFile));
+    }
+}
+
 void MainWindow::projectSaved(const QString &name)
 {
-    this->addOutput(tr("Project saved: ") + name);
+    addOutput(tr("Project saved: ") + name);
 }
