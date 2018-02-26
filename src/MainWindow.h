@@ -150,19 +150,6 @@ private slots:
     void projectSaved(const QString &name);
 
 private:
-    Notepad          *notepadDock;
-    DisassemblyWidget  *disassemblyDock;
-    SidebarWidget    *sidebarDock;
-    HexdumpWidget    *hexdumpDock;
-    PseudocodeWidget *pseudocodeDock;
-    QDockWidget      *graphDock;
-    DisassemblerGraphView *graphView;
-    QDockWidget      *asmDock;
-    QDockWidget      *calcDock;
-    Omnibar          *omnibar;
-    //SideBar          *sideBar;
-    Configuration   *configuration;
-
     CutterCore *core;
     bool panelLock;
     bool tabsOnTop;
