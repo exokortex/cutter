@@ -192,7 +192,6 @@ void MainWindow::initUI()
     ppGraphDock->setAllowedAreas(Qt::AllDockWidgetAreas);
     ppGraphView = new PPGraphView(ppGraphDock, this);
     ppGraphDock->setWidget(ppGraphView);
-    //dockWidgets.push_back(ppGraphDock);
 
     // Hide centralWidget as we do not need it
     ui->centralWidget->hide();
@@ -212,6 +211,7 @@ void MainWindow::initUI()
         }
     });
     dockWidgets.push_back(graphDock);
+    dockWidgets.push_back(ppGraphDock);
     connect(ui->actionGraph, &QAction::triggered, this, [this](bool checked)
     {
         toggleDockWidget(graphDock, checked);
@@ -543,6 +543,7 @@ void MainWindow::restoreDocks()
     tabifyDockWidget(sectionsDock, commentsDock);
     tabifyDockWidget(dashboardDock, disassemblyDock);
     tabifyDockWidget(dashboardDock, graphDock);
+    tabifyDockWidget(dashboardDock, ppGraphDock);
     tabifyDockWidget(dashboardDock, hexdumpDock);
     tabifyDockWidget(dashboardDock, pseudocodeDock);
     tabifyDockWidget(dashboardDock, entrypointDock);
@@ -591,6 +592,7 @@ void MainWindow::showDefaultDocks()
                                                 symbolsDock,
                                                 notepadDock,
                                                 graphDock,
+                                                ppGraphDock,
                                                 disassemblyDock,
                                                 sidebarDock,
                                                 hexdumpDock,
