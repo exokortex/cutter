@@ -40,6 +40,7 @@ class DisassemblerGraphView;
 class PPGraphView;
 class ClassesWidget;
 class ResourcesWidget;
+class VTablesWidget;
 
 class QDockWidget;
 
@@ -187,6 +188,7 @@ private:
     ConsoleWidget      *consoleDock = nullptr;
     ClassesWidget      *classesDock = nullptr;
     ResourcesWidget    *resourcesDock = nullptr;
+    VTablesWidget      *vTablesDock = nullptr;
     DisassemblerGraphView *graphView = nullptr;
     QDockWidget        *ppGraphDock = nullptr;
     PPGraphView        *ppGraphView = nullptr;

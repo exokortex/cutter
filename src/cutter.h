@@ -208,6 +208,12 @@ struct ResourcesDescription
     QString lang;
 };
 
+struct VTableDescription
+{
+    RVA addr;
+    QList<ClassMethodDescription> methods;
+};
+
 Q_DECLARE_METATYPE(FunctionDescription)
 Q_DECLARE_METATYPE(ImportDescription)
 Q_DECLARE_METATYPE(ExportDescription)
@@ -227,6 +233,7 @@ Q_DECLARE_METATYPE(const ClassDescription *)
 Q_DECLARE_METATYPE(const ClassMethodDescription *)
 Q_DECLARE_METATYPE(const ClassFieldDescription *)
 Q_DECLARE_METATYPE(ResourcesDescription)
+Q_DECLARE_METATYPE(VTableDescription)
 
 class CutterCore: public QObject
 {
@@ -263,7 +270,7 @@ public:
     void setImmediateBase(const QString &r2BaseName, RVA offset = RVA_INVALID);
     void setCurrentBits(int bits, RVA offset = RVA_INVALID);
 
-    bool loadFile(QString path, uint64_t loadaddr = 0LL, uint64_t mapaddr = 0LL, bool rw = false, int va = 0, int idx = 0, bool loadbin = false, const QString &forceBinPlugin = nullptr);
+    bool loadFile(QString path, uint64_t loadaddr = 0LL, uint64_t mapaddr = 0LL, int perms = R_IO_READ, int va = 0, int idx = 0, bool loadbin = false, const QString &forceBinPlugin = nullptr);
     bool tryFile(QString path, bool rw);
     void analyze(int level, QList<QString> advanced);
 
@@ -360,6 +367,7 @@ public:
     QList<EntrypointDescription> getAllEntrypoint();
     QList<ClassDescription> getAllClasses();
     QList<ResourcesDescription> getAllResources();
+    QList<VTableDescription> getAllVTables();
 
     QList<XrefDescription> getXRefs(RVA addr, bool to, bool whole_function, const QString &filterType = QString::null);
 
@@ -380,6 +388,8 @@ public:
     void loadScript(const QString &scriptname);
     QString getVersionInformation();
     QJsonArray getOpenedFiles();
+
+    QList<QString> getColorThemes();
 
     RCoreLocked core() const;
 

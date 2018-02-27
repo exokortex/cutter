@@ -209,7 +209,7 @@ QJsonDocument CutterCore::cmdj(const QString &str)
     return doc;
 }
 
-bool CutterCore::loadFile(QString path, uint64_t loadaddr, uint64_t mapaddr, bool rw, int va, int idx, bool loadbin, const QString &forceBinPlugin)
+bool CutterCore::loadFile(QString path, uint64_t loadaddr, uint64_t mapaddr, int perms, int va, int idx, bool loadbin, const QString &forceBinPlugin)
 {
     Q_UNUSED(loadaddr);
     Q_UNUSED(idx);
@@ -219,7 +219,7 @@ bool CutterCore::loadFile(QString path, uint64_t loadaddr, uint64_t mapaddr, boo
     if (va == 0 || va == 2)
         r_config_set_i(core_->config, "io.va", va);
 
-    f = r_core_file_open(core_, path.toUtf8().constData(), rw ? R_IO_RW : R_IO_READ, mapaddr);
+    f = r_core_file_open(core_, path.toUtf8().constData(), perms, mapaddr);
     if (!f)
     {
         eprintf("r_core_file_open failed\n");
@@ -326,13 +326,13 @@ void CutterCore::delFlag(RVA addr)
 
 void CutterCore::editInstruction(RVA addr, const QString &inst)
 {
-    cmd("wa " + inst);
+    cmd("wa " + inst + " @ " + RAddressString(addr));
     emit instructionChanged(addr);
 }
 
 void CutterCore::editBytes(RVA addr, const QString &bytes)
 {
-    cmd("wx " + bytes);
+    cmd("wx " + bytes + " @ " + RAddressString(addr));
     emit instructionChanged(addr);
 }
 
@@ -824,8 +824,7 @@ void CutterCore::setSettings()
     setConfig("http.sandbox", false);
 
     // Colors
-    setConfig("scr.color", false);
-    setConfig("scr.truecolor", false);
+    setConfig("scr.color", COLOR_MODE_DISABLED);
 }
 
 QList<RVA> CutterCore::getSeekHistory()
@@ -1253,6 +1252,36 @@ QList<ResourcesDescription> CutterCore::getAllResources()
     return ret;
 }
 
+QList<VTableDescription> CutterCore::getAllVTables()
+{
+    CORE_LOCK();
+    QList<VTableDescription> ret;
+
+    QJsonArray vTablesArray = cmdj("avj").array();
+    for(QJsonValueRef vTableValue : vTablesArray)
+    {
+        QJsonObject vTableObject = vTableValue.toObject();
+
+        VTableDescription res;
+        res.addr = vTableObject["offset"].toVariant().toULongLong();
+        QJsonArray methodArray = vTableObject["methods"].toArray();
+
+        for(QJsonValueRef methodValue : methodArray)
+        {
+            QJsonObject methodObject = methodValue.toObject();
+
+            ClassMethodDescription method;
+            method.addr = methodObject["offset"].toVariant().toULongLong();
+            method.name = methodObject["name"].toString();
+
+            res.methods << method;
+        }
+
+        ret << res;
+    }
+    return ret;
+}
+
 QList<XrefDescription> CutterCore::getXRefs(RVA addr, bool to, bool whole_function, const QString &filterType)
 {
     QList<XrefDescription> ret = QList<XrefDescription>();
@@ -1416,4 +1445,13 @@ QJsonArray CutterCore::getOpenedFiles()
 {
     QJsonDocument files = cmdj("oj");
     return files.array();
+}
+
+QList<QString> CutterCore::getColorThemes()
+{
+    QList<QString> r;
+    QJsonDocument themes = cmdj("ecoj");
+    for (auto s : themes.array())
+        r << s.toString();
+    return r;
 }

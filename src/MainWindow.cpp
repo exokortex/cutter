@@ -66,6 +66,7 @@
 #include "dialogs/SaveProjectDialog.h"
 #include "widgets/ClassesWidget.h"
 #include "widgets/ResourcesWidget.h"
+#include "widgets/VTablesWidget.h"
 
 // graphics
 #include <QGraphicsEllipseItem>
@@ -88,12 +89,12 @@ static void registerCustomFonts()
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
-    core(CutterCore::getInstance()),
+    core(Core()),
     ui(new Ui::MainWindow)
 {
     panelLock = false;
     tabsOnTop = false;
-    configuration = new Configuration();
+    configuration = Config();
 }
 
 MainWindow::~MainWindow()
@@ -231,6 +232,7 @@ void MainWindow::initUI()
     ADD_DOCK(SdbDock, sdbDock, ui->actionSDBBrowser);
     ADD_DOCK(ClassesWidget, classesDock, ui->actionClasses);
     ADD_DOCK(ResourcesWidget, resourcesDock, ui->actionResources);
+    ADD_DOCK(VTablesWidget, vTablesDock, ui->actionVTables);
 
 #undef ADD_DOCK
 
@@ -553,6 +555,7 @@ void MainWindow::restoreDocks()
     tabifyDockWidget(dashboardDock, notepadDock);
     tabifyDockWidget(dashboardDock, classesDock);
     tabifyDockWidget(dashboardDock, resourcesDock);
+    tabifyDockWidget(dashboardDock, vTablesDock);
 
     updateDockActionsChecked();
 }
