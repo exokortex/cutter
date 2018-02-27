@@ -319,35 +319,29 @@ void PPGraphView::loadCurrentGraph()
             // Skip last byte, otherwise it will overlap with next instruction
             i.size = di.instruction.size() - 1;
 
-            RichTextPainter::List richText;
-
-            RichTextPainter::CustomRichText_t assembly;
-            assembly.highlight = false;
-            assembly.flags = RichTextPainter::FlagColor;
-            std::string asmString = objDis->getInfo().printInstrunction(di.instruction);
-            char buff[100];
-            snprintf(buff, sizeof(buff), "%08x", di.address);
-            std::string saddr = buff;
-            asmString = saddr+": "+asmString;
-            assembly.text = QString::fromUtf8(asmString.c_str());
-
-            QString colorName = "mov";  // Colors::getColor(1);
+            QString color = "#000000";
             if (di.isTerminator(*state) == CERTAIN) {
-                colorName = "jmp";
+                color = "#2080d0";
             }
-            assembly.textColor = ConfigColor(colorName);
-            richText.push_back(assembly);
+            std::string asmString = objDis->getInfo().printInstrunction(di.instruction);
+            QString asmQString = QString::fromUtf8(asmString.c_str());
+            QString disas = QString("<font color='#000000'>%1</font>&nbsp;&nbsp;<font color='%3'>%2")
+              .arg(di.address, 8, 16, QChar('0'))
+              .arg(asmQString)
+              .arg(color);
+
+            QTextDocument textDoc;
+            textDoc.setHtml(disas);
+
+            RichTextPainter::List richText = RichTextPainter::fromTextDocument(textDoc);
 
             bool cropped;
-            i.text = Text(RichTextPainter::cropped(richText, Config()->getGraphBlockMaxChars(), "...", &cropped));
+            int blockLength = Config()->getGraphBlockMaxChars() + Core()->getConfigb("asm.bytes") * 24 + Core()->getConfigb("asm.emu") * 10;
+            i.text = Text(RichTextPainter::cropped(richText, blockLength, "...", &cropped));
             if(cropped)
-            {
                 i.fullText = richText;
-            }
             else
-            {
                 i.fullText = Text();
-            }
             db.instrs.push_back(i);
         }
 
