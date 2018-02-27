@@ -131,7 +131,7 @@ PPGraphView::PPGraphView(QWidget *parent, MainWindow *main)
 void PPGraphView::loadFile()
 {
     auto logger = get_logger("PP-Graph");
-    
+
     std::string inputFile = main->getFilename().toUtf8().constData();
     std::cout << "inputFile: " << inputFile << std::endl;
     uint64_t k0 = 0x12345678;
@@ -227,7 +227,7 @@ void PPGraphView::loadCurrentGraph()
 {
     TempConfig tempConfig;
     tempConfig.set("scr.html", true)
-            .set("scr.color", true)
+            .set("scr.color", COLOR_MODE_16M)
             .set("asm.bbline", false)
             .set("asm.lines", false)
             .set("asm.fcnlines", false);
@@ -358,7 +358,7 @@ void PPGraphView::loadCurrentGraph()
 
         addBlock(gb);
     }
-    
+
     QString windowTitle = tr("PP-Graph");
     QString funcName = func["name"].toString().trimmed();
     if (ppFunction != NULL)
