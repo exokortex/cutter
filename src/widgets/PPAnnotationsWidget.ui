@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string notr="true">Comments</string>
+   <string notr="true">Annotations</string>
   </property>
   <widget class="QWidget" name="dockWidgetContents">
    <layout class="QHBoxLayout" name="horizontalLayout">
