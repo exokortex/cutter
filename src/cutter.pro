@@ -55,6 +55,7 @@ SOURCES += \
     dialogs/NewFileDialog.cpp \
     AnalThread.cpp \
     widgets/CommentsWidget.cpp \
+    widgets/PPAnnotationsWidget.cpp \
     widgets/ConsoleWidget.cpp \
     widgets/Dashboard.cpp \
     widgets/EntrypointWidget.cpp \
@@ -117,6 +118,7 @@ HEADERS  += \
     dialogs/NewFileDialog.h \
     AnalThread.h \
     widgets/CommentsWidget.h \
+    widgets/PPAnnotationsWidget.h \
     widgets/ConsoleWidget.h \
     widgets/Dashboard.h \
     widgets/EntrypointWidget.h \
@@ -168,6 +170,7 @@ FORMS    += \
     dialogs/OptionsDialog.ui \
     MainWindow.ui \
     widgets/CommentsWidget.ui \
+    widgets/PPAnnotationsWidget.ui \
     widgets/ConsoleWidget.ui \
     widgets/Dashboard.ui \
     widgets/EntrypointWidget.ui \

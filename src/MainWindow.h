@@ -27,6 +27,7 @@ class ExportsWidget;
 class SymbolsWidget;
 class RelocsWidget;
 class CommentsWidget;
+class PPAnnotationsWidget;
 class StringsWidget;
 class FlagsWidget;
 class Dashboard;
@@ -179,6 +180,7 @@ private:
     SymbolsWidget      *symbolsDock = nullptr;
     RelocsWidget       *relocsDock = nullptr;
     CommentsWidget     *commentsDock = nullptr;
+    PPAnnotationsWidget *ppAnnotationsDock = nullptr;
     StringsWidget      *stringsDock = nullptr;
     FlagsWidget        *flagsDock = nullptr;
     Dashboard          *dashboardDock = nullptr;

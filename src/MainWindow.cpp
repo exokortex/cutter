@@ -47,6 +47,7 @@
 #include "widgets/FunctionsWidget.h"
 #include "widgets/SectionsWidget.h"
 #include "widgets/CommentsWidget.h"
+#include "widgets/PPAnnotationsWidget.h"
 #include "widgets/ImportsWidget.h"
 #include "widgets/ExportsWidget.h"
 #include "widgets/SymbolsWidget.h"
@@ -225,6 +226,7 @@ void MainWindow::initUI()
     ADD_DOCK(SymbolsWidget, symbolsDock, ui->actionSymbols);
     ADD_DOCK(RelocsWidget, relocsDock, ui->actionRelocs);
     ADD_DOCK(CommentsWidget, commentsDock, ui->actionComments);
+    ADD_DOCK(PPAnnotationsWidget, ppAnnotationsDock, ui->actionComments);
     ADD_DOCK(StringsWidget, stringsDock, ui->actionStrings);
     ADD_DOCK(FlagsWidget, flagsDock, ui->actionFlags);
     ADD_DOCK(Notepad, notepadDock, ui->actionNotepad);
@@ -541,6 +543,7 @@ void MainWindow::restoreDocks()
 
     // Tabs for center (must be applied after splitDockWidget())
     tabifyDockWidget(sectionsDock, commentsDock);
+    tabifyDockWidget(sectionsDock, ppAnnotationsDock);
     tabifyDockWidget(dashboardDock, disassemblyDock);
     tabifyDockWidget(dashboardDock, graphDock);
     tabifyDockWidget(dashboardDock, ppGraphDock);
@@ -586,6 +589,7 @@ void MainWindow::showDefaultDocks()
                                                 entrypointDock,
                                                 functionsDock,
                                                 commentsDock,
+                                                ppAnnotationsDock,
                                                 stringsDock,
                                                 consoleDock,
                                                 importsDock,
