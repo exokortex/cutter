@@ -7,11 +7,15 @@
 #include <QPropertyAnimation>
 #include <QShortcut>
 #include <QToolTip>
+#include <QTextDocument>
+#include <QFileDialog>
+#include <QFile>
 
 #include "cutter.h"
 #include "utils/Colors.h"
 #include "utils/Configuration.h"
 #include "utils/CachedFontMetrics.h"
+#include "utils/TempConfig.h"
 
 #include <llvm-c/Target.h>
 #include <llvm/ADT/STLExtras.h>
@@ -53,6 +57,7 @@ PPGraphView::PPGraphView(QWidget *parent, MainWindow *main)
     connect(Core(), SIGNAL(instructionChanged(RVA)), this, SLOT(refreshView()));
     connect(Core(), SIGNAL(functionsChanged()), this, SLOT(refreshView()));
     connect(Core(), SIGNAL(graphOptionsChanged()), this, SLOT(refreshView()));
+    connect(Core(), SIGNAL(asmOptionsChanged()), this, SLOT(refreshView()));
 
     connect(Config(), SIGNAL(colorsUpdated()), this, SLOT(colorsUpdatedSlot()));
     connect(Config(), SIGNAL(fontsUpdated()), this, SLOT(fontsUpdatedSlot()));
@@ -96,6 +101,12 @@ PPGraphView::PPGraphView(QWidget *parent, MainWindow *main)
     QShortcut *shortcut_prev_instr = new QShortcut(QKeySequence(Qt::Key_K), this);
     shortcut_prev_instr->setContext(Qt::WidgetShortcut);
     connect(shortcut_prev_instr, SIGNAL(activated()), this, SLOT(prevInstr()));
+    QShortcut *shortcut_next_instr_arrow = new QShortcut(QKeySequence::MoveToNextLine, this);
+    shortcut_next_instr_arrow->setContext(Qt::WidgetShortcut);
+    connect(shortcut_next_instr_arrow, SIGNAL(activated()), this, SLOT(nextInstr()));
+    QShortcut *shortcut_prev_instr_arrow = new QShortcut(QKeySequence::MoveToPreviousLine, this);
+    shortcut_prev_instr_arrow->setContext(Qt::WidgetShortcut);
+    connect(shortcut_prev_instr_arrow, SIGNAL(activated()), this, SLOT(prevInstr()));
     shortcuts.append(shortcut_disassembly);
     shortcuts.append(shortcut_escape);
     shortcuts.append(shortcut_zoom_in);
@@ -103,6 +114,14 @@ PPGraphView::PPGraphView(QWidget *parent, MainWindow *main)
     shortcuts.append(shortcut_zoom_reset);
     shortcuts.append(shortcut_next_instr);
     shortcuts.append(shortcut_prev_instr);
+    shortcuts.append(shortcut_next_instr_arrow);
+    shortcuts.append(shortcut_prev_instr_arrow);
+
+    //Export Graph menu
+    mMenu->addSeparator();
+    actionExportGraph.setText(tr("Export Graph"));
+    mMenu->addAction(&actionExportGraph);
+    connect(&actionExportGraph, SIGNAL(triggered(bool)), this, SLOT(on_actionExportGraph_triggered()));
 
     loadFile();
     initFont();
@@ -206,7 +225,13 @@ void PPGraphView::refreshView()
 
 void PPGraphView::loadCurrentGraph()
 {
-    QJsonDocument functionsDoc = Core()->cmdj("agj");
+    TempConfig tempConfig;
+    tempConfig.set("scr.html", true)
+            .set("scr.color", true)
+            .set("asm.bbline", false)
+            .set("asm.lines", false)
+            .set("asm.fcnlines", false);
+    QJsonDocument functionsDoc = Core()->cmdj("agJ");
     QJsonArray functions = functionsDoc.array();
 
     disassembly_blocks.clear();
@@ -350,6 +375,7 @@ void PPGraphView::loadCurrentGraph()
     /*for (QJsonValueRef blockRef : func["blocks"].toArray()) {
         QJsonObject block = blockRef.toObject();
         RVA block_entry = block["offset"].toVariant().toULongLong();
+        RVA block_size = block["size"].toVariant().toULongLong();
         RVA block_fail = block["fail"].toVariant().toULongLong();
         RVA block_jump = block["jump"].toVariant().toULongLong();
 
@@ -372,31 +398,44 @@ void PPGraphView::loadCurrentGraph()
             }
             gb.exits.push_back(block_jump);
         }
-        for (QJsonValueRef opRef : block["ops"].toArray()) {
-            QJsonObject op = opRef.toObject();
+        QJsonArray opArray = block["ops"].toArray();
+        for (int opIndex=0; opIndex<opArray.size(); opIndex++)
+        {
+            QJsonObject op = opArray[opIndex].toObject();
             Instr i;
             i.addr = op["offset"].toVariant().toULongLong();
-            // Skip last byte, otherwise it will overlap with next instruction
-            i.size = op["size"].toVariant().toULongLong() - 1;
-            RichTextPainter::List richText;
-            Colors::colorizeAssembly(richText, op["opcode"].toString(), op["type_num"].toVariant().toULongLong());
-            if (op["comment"].toString().length()) {
-                RichTextPainter::CustomRichText_t comment;
-                comment.text = QString(" ; %1").arg(QByteArray::fromBase64(op["comment"].toString().toLocal8Bit()).data());
-                comment.textColor = mCommentColor;
-                comment.flags = RichTextPainter::FlagColor;
-                richText.insert(richText.end(), comment);
-            }
-            bool cropped;
-            i.text = Text(RichTextPainter::cropped(richText, Config()->getGraphBlockMaxChars(), "...", &cropped));
-            if(cropped)
+
+            if (opIndex < opArray.size() - 1)
             {
-                i.fullText = richText;
+                // get instruction size from distance to next instruction ...
+                RVA nextOffset = opArray[opIndex+1].toObject()["offset"].toVariant().toULongLong();
+                i.size = nextOffset - i.addr;
             }
             else
             {
-                i.fullText = Text();
+                // or to the end of the block.
+                i.size = (block_entry + block_size) - i.addr;
             }
+
+            // Skip last byte, otherwise it will overlap with next instruction
+            i.size -= 1;
+
+            QString disas;
+            disas = op["text"].toString();
+
+			QTextDocument textDoc;
+			textDoc.setHtml(disas);
+
+            RichTextPainter::List richText = RichTextPainter::fromTextDocument(textDoc);
+            //Colors::colorizeAssembly(richText, textDoc.toPlainText(), 0);
+
+            bool cropped;
+            int blockLength = Config()->getGraphBlockMaxChars() + Core()->getConfigb("asm.bytes") * 24 + Core()->getConfigb("asm.emu") * 10;
+            i.text = Text(RichTextPainter::cropped(richText, blockLength, "...", &cropped));
+            if(cropped)
+                i.fullText = richText;
+            else
+                i.fullText = Text();
             db.instrs.push_back(i);
         }
         disassembly_blocks[db.entry] = db;
@@ -899,4 +938,17 @@ void PPGraphView::blockTransitionedTo(GraphView::GraphBlock *to)
         return;
     }
     seek(to->entry);
+}
+
+void PPGraphView::on_actionExportGraph_triggered()
+{
+    QString fileName = QFileDialog::getSaveFileName(this,
+        tr("Export Graph"), "", tr("Dot file (*.dot)"));
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)){
+        qWarning() << "Can't open file";
+        return;
+    }
+    QTextStream fileOut(&file);
+    fileOut << Core()->cmd("ag -");
 }
