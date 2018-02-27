@@ -701,7 +701,7 @@ void PPGraphView::colorsUpdatedSlot()
     backgroundColor = ConfigColor("gui.background");
     disassemblySelectionColor = ConfigColor("highlight");
 
-    jmpColor = ConfigColor("graph.trufae");
+    jmpColor = QColor(0, 0, 0); //ConfigColor("graph.trufae");
     brtrueColor = ConfigColor("graph.true");
     brfalseColor = ConfigColor("graph.false");
 
