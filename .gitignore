@@ -79,3 +79,5 @@ ninja.exe
 
 #Mesonbuild
 src/subprojects/
+
+*.h.gch
