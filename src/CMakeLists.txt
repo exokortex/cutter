@@ -82,3 +82,5 @@ find_package(pp REQUIRED)
 target_link_libraries(ppcutter pp::pp)
 
 install(TARGETS "ppcutter" DESTINATION "bin")
+
+target_include_directories(ppcutter PRIVATE "../external/rapidjson/include"})

@@ -1,3 +1,6 @@
 [submodule "radare2"]
 	path = radare2
 	url = https://github.com/radare/radare2
+[submodule "external/rapidjson"]
+	path = external/rapidjson
+	url = https://github.com/Tencent/rapidjson/
