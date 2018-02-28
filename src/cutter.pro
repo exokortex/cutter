@@ -56,6 +56,7 @@ unix|macx {
 SOURCES += \
     main.cpp \
     cutter.cpp \
+    PPCutterCore.cpp \
     widgets/DisassemblerGraphView.cpp \
     widgets/PPGraphView.cpp \
     utils/RichTextPainter.cpp \
@@ -122,6 +123,7 @@ SOURCES += \
 
 HEADERS  += \
     cutter.h \
+    PPCutterCore.h \
     widgets/DisassemblerGraphView.h \
     widgets/PPGraphView.h \
     utils/RichTextPainter.h \

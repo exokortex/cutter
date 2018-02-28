@@ -24,6 +24,7 @@
 //#include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include "PPCutterCore.h"
 #include <pp/ElfPatcher.h>
 #include <pp/StateCalculators/AEE/ApeStateCalculator.h>
 #include <pp/StateCalculators/PureSw/PureSwUpdateStateCalculator.h>
@@ -225,6 +226,8 @@ void PPGraphView::refreshView()
 
 void PPGraphView::loadCurrentGraph()
 {
+    PPCore()->saveProject();
+
     TempConfig tempConfig;
     tempConfig.set("scr.html", true)
             .set("scr.color", COLOR_MODE_16M)

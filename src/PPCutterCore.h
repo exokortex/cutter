@@ -20,6 +20,8 @@ public:
     ~PPCutterCore();
     static PPCutterCore *getInstance();
 
+    void saveProject();
+
 signals:
 
 public slots:
