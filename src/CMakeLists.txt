@@ -74,15 +74,11 @@ message(STATUS "Building Cutter version ${CUTTER_VERSION_FULL}")
 add_definitions("-DAPP_VERSION=\"${CUTTER_VERSION_FULL}\"")
 
 add_executable(ppcutter ${UI_FILES} ${QRC_FILES} ${SOURCE_FILES} ${HEADER_FILES})
-qt5_use_modules(ppcutter Core Widgets Gui Svg)
+qt5_use_modules(ppcutter Core Widgets Gui Svg WebEngineWidgets)
 target_link_libraries(ppcutter ${RADARE2_LIBRARIES})
+target_link_libraries(ppcutter ${PYTHON_LIBRARIES})
 
 find_package(pp REQUIRED)
 target_link_libraries(ppcutter pp::pp)
-
-add_executable(cutter ${UI_FILES} ${QRC_FILES} ${SOURCE_FILES} ${HEADER_FILES})
-qt5_use_modules(cutter Core Widgets Gui Svg WebEngineWidgets)
-target_link_libraries(cutter ${RADARE2_LIBRARIES})
-target_link_libraries(cutter ${PYTHON_LIBRARIES})
 
 install(TARGETS "ppcutter" DESTINATION "bin")
