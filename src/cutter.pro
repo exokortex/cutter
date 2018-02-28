@@ -7,7 +7,7 @@ VERSION = 1.2
 
 ICON = img/cutter.icns
 
-QT += core gui widgets svg
+QT += core gui widgets svg webenginewidgets
 QT_CONFIG -= no-pkg-config
 CONFIG += c++11
 
@@ -27,9 +27,30 @@ macx {
     QMAKE_INFO_PLIST = apple/Info.plist
 }
 
-
 unix:exists(/usr/local/include/libr) {
     INCLUDEPATH += /usr/local/include/libr
+}
+
+# Libraries
+include(lib_radare2.pri)
+win32 {
+    pythonpath = $$quote($$system("where python"))
+    pythonpath = $$replace(pythonpath, ".exe ", ".exe;")
+    pythonpath = $$section(pythonpath, ";", 0, 0)
+    pythonpath = $$clean_path($$dirname(pythonpath))
+    LIBS += -L$${pythonpath} -L$${pythonpath}/libs -lpython3
+    INCLUDEPATH += $${pythonpath}/include
+    message($$pythonpath)
+    message($$LIBS)
+    message($$INCLUDEPATH)
+}
+
+unix|macx {
+    CONFIG += link_pkgconfig
+    !packagesExist(python3) {
+        error("ERROR: Python 3 could not be found. Make sure it is available to pkg-config.")
+    }
+    PKGCONFIG += python3
 }
 
 SOURCES += \
@@ -93,7 +114,11 @@ SOURCES += \
     widgets/ClassesWidget.cpp \
     widgets/ResourcesWidget.cpp \
     widgets/VTablesWidget.cpp \
-    CutterApplication.cpp
+    CutterApplication.cpp \
+    utils/JupyterConnection.cpp \
+    widgets/JupyterWidget.cpp \
+    utils/PythonAPI.cpp \
+    utils/NestedIPyKernel.cpp
 
 HEADERS  += \
     cutter.h \
@@ -156,7 +181,11 @@ HEADERS  += \
     widgets/ClassesWidget.h \
     widgets/ResourcesWidget.h \
     CutterApplication.h \
-    widgets/VTablesWidget.h
+    widgets/VTablesWidget.h \
+    utils/JupyterConnection.h \
+    widgets/JupyterWidget.h \
+    utils/PythonAPI.h \
+    utils/NestedIPyKernel.h
 
 FORMS    += \
     dialogs/AboutDialog.ui \
@@ -194,7 +223,8 @@ FORMS    += \
     widgets/QuickFilterView.ui \
     widgets/PseudocodeWidget.ui \
     widgets/ClassesWidget.ui \
-    widgets/VTablesWidget.ui
+    widgets/VTablesWidget.ui \
+    widgets/JupyterWidget.ui
 
 RESOURCES += \
     resources.qrc \
@@ -202,10 +232,6 @@ RESOURCES += \
 
 
 DISTFILES += cutter.astylerc
-
-
-include(lib_radare2.pri)
-
 
 # 'make install' for AppImage
 unix {

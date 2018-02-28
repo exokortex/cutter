@@ -19,6 +19,7 @@ AStyle*
 *.so
 *.dll
 *.dylib
+*.h.gch
 
 # Qt-es
 
@@ -80,4 +81,5 @@ ninja.exe
 #Mesonbuild
 src/subprojects/
 
-*.h.gch
+# Python
+__pycache__

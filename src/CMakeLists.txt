@@ -18,7 +18,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
-find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Svg)
+find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Svg WebEngineWidgets)
 
 
 if(WIN32)
@@ -39,6 +39,10 @@ endif()
 find_package(Radare2 REQUIRED)
 include_directories(${RADARE2_INCLUDE_DIRS})
 link_directories(${RADARE2_LIBRARY_DIRS})
+
+
+find_package(PythonLibs 3.3 REQUIRED)
+include_directories(${PYTHON_INCLUDE_DIRS})
 
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
@@ -75,5 +79,10 @@ target_link_libraries(ppcutter ${RADARE2_LIBRARIES})
 
 find_package(pp REQUIRED)
 target_link_libraries(ppcutter pp::pp)
+
+add_executable(cutter ${UI_FILES} ${QRC_FILES} ${SOURCE_FILES} ${HEADER_FILES})
+qt5_use_modules(cutter Core Widgets Gui Svg WebEngineWidgets)
+target_link_libraries(cutter ${RADARE2_LIBRARIES})
+target_link_libraries(cutter ${PYTHON_LIBRARIES})
 
 install(TARGETS "ppcutter" DESTINATION "bin")
