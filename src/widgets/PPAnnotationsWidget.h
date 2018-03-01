@@ -1,4 +1,4 @@
-#ifndef PPANNOTATIONSWIDGET_H
+    #ifndef PPANNOTATIONSWIDGET_H
 #define PPANNOTATIONSWIDGET_H
 
 #include <memory>

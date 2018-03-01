@@ -247,6 +247,11 @@ border-top: 0px;
           </column>
           <column>
            <property name="text">
+            <string>Type</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
             <string>Comment</string>
            </property>
           </column>
@@ -296,6 +301,11 @@ QToolTip {
           <column>
            <property name="text">
             <string>Function/Offset</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>Type</string>
            </property>
           </column>
           <column>

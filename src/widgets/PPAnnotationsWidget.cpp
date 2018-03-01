@@ -165,20 +165,20 @@ void PPAnnotationsWidget::refreshTree()
     qhelpers::adjustColumns(ui->commentsTreeWidget, 0);
 
     // Add nested comments
-    ui->nestedCmtsTreeWidget->clear();
-    for (auto functionName : nestedComments.keys())
-    {
-        QTreeWidgetItem *item = new QTreeWidgetItem(ui->nestedCmtsTreeWidget);
-        item->setText(0, functionName);
-        for (CommentDescription comment : nestedComments.value(functionName))
-        {
-            QTreeWidgetItem *it = new QTreeWidgetItem();
-            it->setText(0, RAddressString(comment.offset));
-            it->setText(1, comment.name);
-            it->setData(0, Qt::UserRole, QVariant::fromValue(comment));
-            item->addChild(it);
-        }
-        ui->nestedCmtsTreeWidget->addTopLevelItem(item);
-    }
-    qhelpers::adjustColumns(ui->nestedCmtsTreeWidget, 0);
+    //ui->nestedCmtsTreeWidget->clear();
+    //for (auto functionName : nestedComments.keys())
+    //{
+    //    QTreeWidgetItem *item = new QTreeWidgetItem(ui->nestedCmtsTreeWidget);
+    //    item->setText(0, functionName);
+    //    for (CommentDescription comment : nestedComments.value(functionName))
+    //    {
+    //        QTreeWidgetItem *it = new QTreeWidgetItem();
+    //        it->setText(0, RAddressString(comment.offset));
+    //        it->setText(1, comment.name);
+    //        it->setData(0, Qt::UserRole, QVariant::fromValue(comment));
+    //        item->addChild(it);
+    //    }
+    //    ui->nestedCmtsTreeWidget->addTopLevelItem(item);
+    //}
+    //qhelpers::adjustColumns(ui->nestedCmtsTreeWidget, 0);
 }

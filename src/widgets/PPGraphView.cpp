@@ -124,89 +124,9 @@ PPGraphView::PPGraphView(QWidget *parent, MainWindow *main)
     mMenu->addAction(&actionExportGraph);
     connect(&actionExportGraph, SIGNAL(triggered(bool)), this, SLOT(on_actionExportGraph_triggered()));
 
-    loadFile();
+    PPCore()->loadFile(main->getFilename().toUtf8().constData());
     initFont();
     colorsUpdatedSlot();
-}
-
-void PPGraphView::loadFile()
-{
-    auto logger = get_logger("PP-Graph");
-
-    std::string inputFile = main->getFilename().toUtf8().constData();
-    std::cout << "inputFile: " << inputFile << std::endl;
-    uint64_t k0 = 0x12345678;
-    uint64_t k1 = 0x8765432100000000;
-    int rounds = 12;
-
-    auto elf = llvm::make_unique<ELFIO::elfio>();
-    if (!elf->load(inputFile))
-    {
-        std::cout << "PP: File not found" << std::endl;
-        logger->error("File \"{}\" is not found or it is not an ELF file",
-                      inputFile);
-        exit(-1);
-    }
-    std::cout << "PP: File loaded" << std::endl;
-    logger->debug("elf file \"{}\" successfully loaded", inputFile);
-
-    const ELFIO::Elf_Half machine = elf->get_machine();
-    std::unique_ptr<StateCalculator> stateCalc;
-
-    if (machine == EM_ARM) {
-        std::cout << "PP: identified ELF as ARM" << std::endl;
-
-        LLVMInitializeARMTargetInfo();
-        LLVMInitializeARMTargetMC();
-        LLVMInitializeARMDisassembler();
-
-        objDis = llvm::make_unique<ObjectDisassembler>(
-            llvm::make_unique<Architecture::Thumb::Info>());
-        state = llvm::make_unique<DisassemblerState>(objDis->getInfo());
-
-        std::unique_ptr<StateUpdateFunction> updateFunc;
-        if (false) // cli.m0_)
-          updateFunc =
-              llvm::make_unique<SumStateUpdateFunction<false, true>>(*state);
-        else
-          updateFunc =
-              llvm::make_unique<CrcStateUpdateFunction<Crc32c<32>, true, true>>(
-                  *state);
-
-        stateCalc = llvm::make_unique<PureSwUpdateStateCalculator>(
-            *state, std::move(updateFunc));
-        stateCalc->definePreState(objDis->getInfo().sanitize(elf->get_entry()),
-                                  CryptoState{4});
-    } else if (machine == EM_RISCV) {
-        std::cout << "PP: processing ELF as RISCV" << std::endl;
-
-        LLVMInitializeRISCVTargetInfo();
-        LLVMInitializeRISCVTargetMC();
-        LLVMInitializeRISCVDisassembler();
-
-        objDis = llvm::make_unique<ObjectDisassembler>(
-            llvm::make_unique<Architecture::Riscv::Info>());
-        state = llvm::make_unique<DisassemblerState>(objDis->getInfo());
-        stateCalc = llvm::make_unique<ApeStateCalculator>(
-            *state, llvm::make_unique<PrinceApeStateUpdateFunction>(
-                        *state, k0, k1, rounds));
-    }
-
-    if (!objDis || !state || !stateCalc) {
-        std::cout << "PP: Architecture of the elf file is not supported" << std::endl;
-        return;
-    }
-
-    if (state->loadElf(inputFile))
-        return;
-
-    try {
-        while (objDis->disassemble(*state));
-        stateCalc->prepare();
-        state->cleanupState();
-    } catch (const Exception &e) {
-        std::cout << "PP: Aborted disassembling due to exception" << e.what() << std::endl;
-    }
 }
 
 PPGraphView::~PPGraphView()
@@ -226,8 +146,6 @@ void PPGraphView::refreshView()
 
 void PPGraphView::loadCurrentGraph()
 {
-    PPCore()->saveProject();
-
     TempConfig tempConfig;
     tempConfig.set("scr.html", true)
             .set("scr.color", COLOR_MODE_16M)
@@ -251,10 +169,10 @@ void PPGraphView::loadCurrentGraph()
 
     std::cout << "PP: f.entry " << f.entry << std::endl;
 
-    ::Function *ppFunction = NULL;
+    const ::Function *ppFunction = NULL;
     int entryPointIdx = 0;
 
-    for (auto &&ppFunc : state->functions) {
+    for (auto &&ppFunc : PPCore()->getState().functions) {
         int epi = 0;
         for (auto &ePoint : ppFunc.getEntryPoints()) {
             std::cout << "PP: function <" << ePoint.name << "> @ " << ePoint.address << std::endl;
@@ -323,10 +241,10 @@ void PPGraphView::loadCurrentGraph()
             i.size = di.instruction.size() - 1;
 
             QString color = "#000000";
-            if (di.isTerminator(*state) == CERTAIN) {
+            if (di.isTerminator(PPCore()->getState()) == CERTAIN) {
                 color = "#2080d0";
             }
-            std::string asmString = objDis->getInfo().printInstrunction(di.instruction);
+            std::string asmString = PPCore()->getObjDis().getInfo().printInstrunction(di.instruction);
             QString asmQString = QString::fromUtf8(asmString.c_str());
             QString disas = QString("<font color='#000000'>%1</font>&nbsp;&nbsp;<font color='%3'>%2")
               .arg(di.address, 8, 16, QChar('0'))

@@ -191,8 +191,6 @@ private:
     DisassemblyContextMenu* mMenu;
 
     MainWindow *main;
-    std::unique_ptr<DisassemblerState> state;
-    std::unique_ptr<ObjectDisassembler> objDis;
 
     void initFont();
     void prepareGraphNode(GraphBlock &block);
@@ -201,7 +199,6 @@ private:
     DisassemblyBlock *blockForAddress(RVA addr);
     void seek(RVA addr, bool update_viewport=true);
     void seekInstruction(bool previous_instr);
-    void loadFile();
 
     QList<QShortcut*> shortcuts;
 
