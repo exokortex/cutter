@@ -8,6 +8,9 @@ if(FALSE) # ignore cutter name and version in future upstream pulls
 
 project(cutter VERSION 1.2)
 
+option(CUTTER_ENABLE_JUPYTER "Enable Jupyter integration. Requires Python >= 3.3." ON)
+option(CUTTER_ENABLE_QTWEBENGINE "Use QtWebEngine for in-app Jupyter Browser. Unused if CUTTER_ENABLE_JUPYTER=OFF." ON)
+
 endif()
 
 project(ppcutter VERSION 0.1)
@@ -18,7 +21,14 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
-find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Svg WebEngineWidgets)
+find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Svg)
+if(CUTTER_ENABLE_JUPYTER AND CUTTER_ENABLE_QTWEBENGINE)
+    find_package(Qt5 COMPONENTS WebEngineWidgets)
+    if(NOT Qt5_FOUND)
+        message(FATAL_ERROR "QtWebEngine could not be found which is required for the in-app Jupyter Browser.
+If you do not want to enable this in-app Browser, re-run CMake with -DCUTTER_ENABLE_QTWEBENGINE=OFF.")
+    endif()
+endif()
 
 
 if(WIN32)
@@ -40,9 +50,16 @@ find_package(Radare2 REQUIRED)
 include_directories(${RADARE2_INCLUDE_DIRS})
 link_directories(${RADARE2_LIBRARY_DIRS})
 
+if(CUTTER_ENABLE_JUPYTER)
+    find_package(PythonLibs 3.3)
+    if(NOT PythonLibs_FOUND)
+        message(FATAL_ERROR "Python >= 3.3 could not be found which is required for Jupyter integration.
+If you do not want to enable Jupyter, re-run CMake with -DCUTTER_ENABLE_JUPYTER=OFF.")
+    endif()
 
-find_package(PythonLibs 3.3 REQUIRED)
-include_directories(${PYTHON_INCLUDE_DIRS})
+    include_directories(${PYTHON_INCLUDE_DIRS})
+    add_definitions(-DCUTTER_ENABLE_JUPYTER)
+endif()
 
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
@@ -74,15 +91,20 @@ message(STATUS "Building Cutter version ${CUTTER_VERSION_FULL}")
 add_definitions("-DAPP_VERSION=\"${CUTTER_VERSION_FULL}\"")
 
 add_executable(ppcutter ${UI_FILES} ${QRC_FILES} ${SOURCE_FILES} ${HEADER_FILES})
-qt5_use_modules(ppcutter Core Widgets Gui Svg WebEngineWidgets)
+qt5_use_modules(ppcutter Core Widgets Gui Svg)
 target_link_libraries(ppcutter ${RADARE2_LIBRARIES})
-target_link_libraries(ppcutter ${PYTHON_LIBRARIES})
+if(CUTTER_ENABLE_JUPYTER)
+    target_link_libraries(cutter ${PYTHON_LIBRARIES})
+    if(CUTTER_ENABLE_QTWEBENGINE)
+        qt5_use_modules(cutter WebEngineWidgets)
+    endif()
+endif()
 
 find_package(pp REQUIRED)
 target_link_libraries(ppcutter pp::pp)
 
-install(TARGETS "ppcutter" DESTINATION "bin")
-
 target_include_directories(ppcutter PRIVATE "../external/rapidjson/include"})
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../external ${CMAKE_CURRENT_BINARY_DIR}/external)
 target_link_libraries(ppcutter nlohmann_json)
+
+install(TARGETS "ppcutter" DESTINATION "bin")

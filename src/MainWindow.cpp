@@ -57,7 +57,6 @@
 #include "widgets/FlagsWidget.h"
 #include "widgets/VisualNavbar.h"
 #include "widgets/Dashboard.h"
-#include "widgets/Notepad.h"
 #include "widgets/Sidebar.h"
 #include "widgets/SdbDock.h"
 #include "widgets/Omnibar.h"
@@ -231,8 +230,12 @@ void MainWindow::initUI()
     ADD_DOCK(PPAnnotationsWidget, ppAnnotationsDock, ui->actionComments);
     ADD_DOCK(StringsWidget, stringsDock, ui->actionStrings);
     ADD_DOCK(FlagsWidget, flagsDock, ui->actionFlags);
+#ifdef CUTTER_ENABLE_JUPYTER
     ADD_DOCK(JupyterWidget, jupyterDock, ui->actionJupyter);
-    ADD_DOCK(Notepad, notepadDock, ui->actionNotepad);
+#else
+    ui->actionJupyter->setEnabled(false);
+    ui->actionJupyter->setVisible(false);
+#endif
     ADD_DOCK(Dashboard, dashboardDock, ui->actionDashboard);
     ADD_DOCK(SdbDock, sdbDock, ui->actionSDBBrowser);
     ADD_DOCK(ClassesWidget, classesDock, ui->actionClasses);
@@ -347,12 +350,6 @@ void MainWindow::finalizeOpen()
     // comments widget displays the function names.
     core->cmd("fs sections");
     refreshAll();
-
-    if (core->getNotes().isEmpty())
-    {
-        core->setNotes(tr("# Binary information\n\n") + core->cmd("i") +
-                       "\n" + core->cmd("ie") + "\n" + core->cmd("iM") + "\n");
-    }
 
     addOutput(tr(" > Finished, happy reversing :)"));
     // Add fortune message
@@ -555,11 +552,12 @@ void MainWindow::restoreDocks()
     tabifyDockWidget(dashboardDock, importsDock);
     tabifyDockWidget(dashboardDock, exportsDock);
     tabifyDockWidget(dashboardDock, symbolsDock);
-    tabifyDockWidget(dashboardDock, notepadDock);
     tabifyDockWidget(dashboardDock, classesDock);
     tabifyDockWidget(dashboardDock, resourcesDock);
     tabifyDockWidget(dashboardDock, vTablesDock);
+#ifdef CUTTER_ENABLE_JUPYTER
     tabifyDockWidget(dashboardDock, jupyterDock);
+#endif
 
     updateDockActionsChecked();
 }
@@ -594,7 +592,6 @@ void MainWindow::showDefaultDocks()
                                                 consoleDock,
                                                 importsDock,
                                                 symbolsDock,
-                                                notepadDock,
                                                 graphDock,
                                                 ppGraphDock,
                                                 disassemblyDock,
@@ -602,7 +599,9 @@ void MainWindow::showDefaultDocks()
                                                 hexdumpDock,
                                                 pseudocodeDock,
                                                 dashboardDock,
+#ifdef CUTTER_ENABLE_JUPYTER
                                                 jupyterDock
+#endif
                                               };
 
     for (auto w : dockWidgets)
@@ -634,11 +633,6 @@ void MainWindow::resetToDefaultLayout()
     restoreSidebarDock.restoreWidth(sidebarDock->widget());
 
     Core()->setMemoryWidgetPriority(CutterCore::MemoryWidgetType::Disassembly);
-}
-
-void MainWindow::sendToNotepad(const QString &txt)
-{
-    core->setNotes(core->getNotes() + "```\n" + txt + "\n```");
 }
 
 void MainWindow::addOutput(const QString &msg)

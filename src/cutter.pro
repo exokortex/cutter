@@ -14,6 +14,10 @@ CONFIG += c++11
 # Define the preprocessor macro to get the application version in our application.
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
+# TODO: make optional
+DEFINES += CUTTER_ENABLE_JUPYTER
+DEFINES += CUTTER_ENABLE_QTWEBENGINE
+
 INCLUDEPATH *= .
 
 win32 {
@@ -85,7 +89,6 @@ SOURCES += \
     widgets/FlagsWidget.cpp \
     widgets/FunctionsWidget.cpp \
     widgets/ImportsWidget.cpp \
-    widgets/Notepad.cpp \
     widgets/Omnibar.cpp \
     widgets/PieView.cpp \
     widgets/RelocsWidget.cpp \
@@ -153,7 +156,6 @@ HEADERS  += \
     widgets/FlagsWidget.h \
     widgets/FunctionsWidget.h \
     widgets/ImportsWidget.h \
-    widgets/Notepad.h \
     widgets/Omnibar.h \
     widgets/PieView.h \
     widgets/RelocsWidget.h \
@@ -209,7 +211,6 @@ FORMS    += \
     widgets/ExportsWidget.ui \
     widgets/FunctionsWidget.ui \
     widgets/ImportsWidget.ui \
-    widgets/Notepad.ui \
     widgets/SdbDock.ui \
     widgets/RelocsWidget.ui \
     widgets/SectionsDock.ui \

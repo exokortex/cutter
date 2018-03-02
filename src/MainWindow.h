@@ -17,7 +17,6 @@
 class CutterCore;
 class Omnibar;
 class PreviewWidget;
-class Notepad;
 class Highlighter;
 class AsciiHighlighter;
 class VisualNavbar;
@@ -42,7 +41,9 @@ class PPGraphView;
 class ClassesWidget;
 class ResourcesWidget;
 class VTablesWidget;
+#ifdef CUTTER_ENABLE_JUPYTER
 class JupyterWidget;
+#endif
 class QDockWidget;
 
 namespace Ui
@@ -88,7 +89,6 @@ public:
     void setFilename(const QString &fn);
     void addOutput(const QString &msg);
     void addDebugOutput(const QString &msg);
-    void sendToNotepad(const QString &txt);
     void refreshOmniBar(const QStringList &flags);
 
 public slots:
@@ -168,7 +168,6 @@ private:
 
     QList<QDockWidget *> dockWidgets;
     QMap<QAction *, QDockWidget *> dockWidgetActions;
-    Notepad            *notepadDock = nullptr;
     DisassemblyWidget  *disassemblyDock = nullptr;
     SidebarWidget      *sidebarDock = nullptr;
     HexdumpWidget      *hexdumpDock = nullptr;
@@ -198,7 +197,9 @@ private:
     QDockWidget        *asmDock = nullptr;
     QDockWidget        *calcDock = nullptr;
     NewFileDialog      *newFileDialog = nullptr;
+#ifdef CUTTER_ENABLE_JUPYTER
     JupyterWidget      *jupyterDock = nullptr;
+#endif
 
     void toggleDockWidget(QDockWidget *dock_widget, bool show);
 
