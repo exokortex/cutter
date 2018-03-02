@@ -11,6 +11,7 @@
 #include "menus/DisassemblyContextMenu.h"
 #include "utils/RichTextPainter.h"
 
+#include <vector>
 #include <pp/types.h>
 #include <pp/objectdisassembler.h>
 #include "MainWindow.h"
@@ -191,6 +192,7 @@ private:
     DisassemblyContextMenu* mMenu;
 
     MainWindow *main;
+    static std::vector<QString> instructionColors;
 
     void initFont();
     void prepareGraphNode(GraphBlock &block);

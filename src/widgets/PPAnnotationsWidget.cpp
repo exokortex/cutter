@@ -7,6 +7,9 @@
 #include "MainWindow.h"
 #include "utils/Helpers.h"
 
+#include "PPCutterCore.h"
+#include <pp/disassemblerstate.h>
+
 PPAnnotationsWidget::PPAnnotationsWidget(MainWindow *main, QWidget *parent) :
     QDockWidget(parent),
     ui(new Ui::PPAnnotationsWidget),
@@ -38,8 +41,8 @@ PPAnnotationsWidget::~PPAnnotationsWidget() {}
 void PPAnnotationsWidget::on_commentsTreeWidget_itemDoubleClicked(QTreeWidgetItem *item, int)
 {
     // Get offset and name of item double clicked
-    CommentDescription comment = item->data(0, Qt::UserRole).value<CommentDescription>();
-    CutterCore::getInstance()->seek(comment.offset);
+    PPAnnotation annotation = item->data(0, Qt::UserRole).value<PPAnnotation>();
+    CutterCore::getInstance()->seek(annotation.offset);
 }
 
 void PPAnnotationsWidget::on_nestedCmtsTreeWidget_itemDoubleClicked(QTreeWidgetItem *item, int)
@@ -51,8 +54,8 @@ void PPAnnotationsWidget::on_nestedCmtsTreeWidget_itemDoubleClicked(QTreeWidgetI
     }
 
     // Get offset and name of item double clicked
-    CommentDescription comment = item->data(0, Qt::UserRole).value<CommentDescription>();
-    CutterCore::getInstance()->seek(comment.offset);
+    PPAnnotation annotation = item->data(0, Qt::UserRole).value<PPAnnotation>();
+    CutterCore::getInstance()->seek(annotation.offset);
 
 }
 
@@ -147,21 +150,30 @@ QMap<QString, QList<QList<QString>>> CutterCore::getNestedComments()
 void PPAnnotationsWidget::refreshTree()
 {
     ui->nestedCmtsTreeWidget->clear();
-    QList<CommentDescription> comments = CutterCore::getInstance()->getAllComments("CCu");
-    QMap<QString, QList<CommentDescription>> nestedComments;
+    //QMap<QString, QList<CommentDescription>> nestedComments;
 
-    for (CommentDescription comment : comments)
+    for (const PPAnnotation& annotation : PPCore()->getFile().annotations)
     {
-        QString fcn_name = CutterCore::getInstance()->cmdFunctionAt(comment.offset);
+        std::cout << "adding annotation..." << std::endl;
+        std::string fname = "";
+        const ::Function *f =  PPCore()->getState().getFunction(annotation.offset);
+        if (f == nullptr)
+            continue;
+        for (auto& entrypoint : PPCore()->getState().getFunction(annotation.offset)->getEntryPoints())
+            fname += entrypoint.name;
+        QString fcn_name = QString::fromUtf8(fname.c_str());
         QTreeWidgetItem *item = new QTreeWidgetItem();
-        item->setText(0, RAddressString(comment.offset));
+        item->setText(0, RAddressString(annotation.offset));
         item->setText(1, fcn_name);
-        item->setText(2, comment.name);
-        item->setData(0, Qt::UserRole, QVariant::fromValue(comment));
+        item->setText(2, QString::fromUtf8(PPCutterCore::annotationTypeToString(annotation.type).c_str()));
+        item->setText(3, QString::fromUtf8(annotation.data.dump().c_str()));
+        item->setText(4, QString::fromUtf8(annotation.comment.c_str()));
+        item->setData(0, Qt::UserRole, QVariant::fromValue(annotation));
         ui->commentsTreeWidget->addTopLevelItem(item);
 
-        nestedComments[fcn_name].append(comment);
+        //nestedComments[fcn_name].append(comment);
     }
+    std::cout << "refreshTree() done" << std::endl;
     qhelpers::adjustColumns(ui->commentsTreeWidget, 0);
 
     // Add nested comments

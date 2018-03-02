@@ -84,3 +84,5 @@ target_link_libraries(ppcutter pp::pp)
 install(TARGETS "ppcutter" DESTINATION "bin")
 
 target_include_directories(ppcutter PRIVATE "../external/rapidjson/include"})
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../external ${CMAKE_CURRENT_BINARY_DIR}/external)
+target_link_libraries(ppcutter nlohmann_json)

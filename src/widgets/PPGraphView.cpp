@@ -42,6 +42,18 @@
 #include <pp/types.h>
 #include <pp/function.h>
 
+std::vector<QString> PPGraphView::instructionColors = {
+    "#f00", // UNKNOWN = 0,
+    "#000000", // SEQUENTIAL,
+    "#c00", // DIRECT_CALL,     // call + return -> sequential
+    "#33c", // INDIRECT_CALL,   // call + return -> sequential
+    "#0c0", // RETURN,          // end of BB and function
+    "#4c0", // TRAP,            // end of BB, unknown successor
+    "#03f", // DIRECT_BRANCH,   // end of BB, one successor BB
+    "#43f", // INDIRECT_BRANCH, // end of BB, one or more successor BBs
+    "#83f", // COND_BRANCH,     // end of BB, one or more successor BBs
+};
+
 PPGraphView::PPGraphView(QWidget *parent, MainWindow *main)
     : GraphView(parent),
       mFontMetrics(nullptr),
@@ -174,8 +186,10 @@ void PPGraphView::loadCurrentGraph()
 
     for (auto &&ppFunc : PPCore()->getState().functions) {
         int epi = 0;
+        std::cout << "PP: function" << std::endl;
+        ppFunc.print(std::cout);
         for (auto &ePoint : ppFunc.getEntryPoints()) {
-            std::cout << "PP: function <" << ePoint.name << "> @ " << ePoint.address << std::endl;
+            std::cout << "PP: entryPoint <" << ePoint.name << "> @ " << ePoint.address << std::endl;
             if (f.entry == ePoint.address) {
                 ppFunction = &ppFunc;
                 entryPointIdx = epi;
@@ -240,10 +254,11 @@ void PPGraphView::loadCurrentGraph()
             // Skip last byte, otherwise it will overlap with next instruction
             i.size = di.instruction.size() - 1;
 
-            QString color = "#000000";
-            if (di.isTerminator(PPCore()->getState()) == CERTAIN) {
-                color = "#2080d0";
-            }
+            QString color = instructionColors[di.type];//"#000000";
+            //if (di.isTerminator(PPCore()->getState()) == CERTAIN) {
+            //    color = "#2080d0";
+            //}
+
             std::string asmString = PPCore()->getObjDis().getInfo().printInstrunction(di.instruction);
             QString asmQString = QString::fromUtf8(asmString.c_str());
             QString disas = QString("<font color='#000000'>%1</font>&nbsp;&nbsp;<font color='%3'>%2")
@@ -278,7 +293,8 @@ void PPGraphView::loadCurrentGraph()
     QString funcName = func["name"].toString().trimmed();
     if (ppFunction != NULL)
     {
-        std::string ppFunctionName = ppFunction->getEntryPoints()[entryPointIdx].name;
+        //std::string ppFunctionName = ppFunction->getEntryPoints()[entryPointIdx].name;
+        std::string ppFunctionName = ppFunction->getJoinedName();
         QString qname = QString::fromUtf8(ppFunctionName.c_str());
         windowTitle += " (" + qname + ")";
     }

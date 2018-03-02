@@ -51,10 +51,101 @@ PPCutterCore::~PPCutterCore()
 {
 }
 
+InstructionType PPCutterCore::parseInstructionType(const std::string iType)
+{
+    if (iType == "unknown")
+        return UNKNOWN;
+    else if (iType == "sequential")
+        return SEQUENTIAL;
+    else if (iType == "call.direct")
+        return DIRECT_CALL;
+    else if (iType == "call.indirect")
+        return INDIRECT_CALL;
+    else if (iType == "return")
+        return RETURN;
+    else if (iType == "trap")
+        return TRAP;
+    else if (iType == "branch.direct")
+        return DIRECT_BRANCH;
+    else if (iType == "branch.indirect")
+        return INDIRECT_BRANCH;
+    else if (iType == "branch.conditional")
+        return COND_BRANCH;
+    //assert(false && "missing case");
+    return UNKNOWN;
+}
+
+std::string PPCutterCore::instructionTypeToString(const InstructionType iType)
+{
+    if (iType == UNKNOWN)
+        return "unknown";
+    else if (iType == SEQUENTIAL)
+        return "sequential";
+    else if (iType == DIRECT_CALL)
+        return "call.direct";
+    else if (iType == INDIRECT_CALL)
+        return "call.indirect";
+    else if (iType == RETURN)
+        return "return";
+    else if (iType == TRAP)
+        return "trap";
+    else if (iType == DIRECT_BRANCH)
+        return "branch.direct";
+    else if (iType == INDIRECT_BRANCH)
+        return "branch.indirect";
+    else if (iType == COND_BRANCH)
+        return "branch.conditional";
+    //assert(false && "missing case");
+    return "ERROR";
+}
+
+std::string PPCutterCore::annotationTypeToString(const PPAnnotationType aType)
+{
+    if (aType == ENTRYPOINT)
+        return "entrypoint";
+    else if (aType == INST_TYPE)
+        return "inst_type";
+
+    return "ERROR";
+}
 
 void PPCutterCore::loadFile(QString path)
 {
     auto logger = get_logger("PP-Core");
+
+    // create emtpy file
+    file = std::unique_ptr<PPFile>(new PPFile());
+
+    json annData1 = {{"name", "f1"}};
+    json annData2 = {{"name", "f2"}};
+    json annData3 = {{"name", "f3"}};
+    json annData4 = {{"name", "f4"}};
+    json annData5 = {{"name", "f5"}};
+    file->annotations.emplace_back(0x204, ENTRYPOINT, "test comment 3", annData3);
+    file->annotations.emplace_back(0x128, ENTRYPOINT, "test comment 1", annData1);
+    file->annotations.emplace_back(0x158, ENTRYPOINT, "test comment 2", annData2);
+    file->annotations.emplace_back(0x2c0, ENTRYPOINT, "test comment 4", annData4);
+    file->annotations.emplace_back(0x2c8, ENTRYPOINT, "test comment 5", annData5);
+
+    //PPAnnotation testAnnotation(0x204, ENTRYPOINT, "test comment", annData1);
+    //PPAnnotation testAnnotation2(0x204, ENTRYPOINT, "test comment", annData2);
+    //PPAnnotation testAnnotation3(0x204, ENTRYPOINT, "test comment", annData3);
+    //PPAnnotation testAnnotation4(0x204, ENTRYPOINT, "test comment", annData4);
+    //testAnnotation.offset = 0x204;
+    //testAnnotation.type = ENTRYPOINT;
+    //testAnnotation.comment = "test annotation";
+    //testAnnotation.data = data;//std::unique_ptr<Value>(new Value());
+
+
+    //state->defineFunction(0x128, "f2");
+    //state->defineFunction(0x158, "f3");
+    //state->defineFunction(0x2c0, "f4");
+    //state->defineFunction(0x2c8, "f5");
+
+    //file->annotations.push_back(std::move(testAnnotation));
+
+    PPFunction testFun;
+    file->functions.push_back(testFun);
 
     std::string inputFile = path.toStdString();
     std::cout << "inputFile: " << inputFile << std::endl;
@@ -71,7 +162,6 @@ void PPCutterCore::loadFile(QString path)
         exit(-1);
     }
     std::cout << "PP: File loaded" << std::endl;
-    logger->debug("elf file \"{}\" successfully loaded", inputFile);
 
     const ELFIO::Elf_Half machine = elf->get_machine();
     std::unique_ptr<StateCalculator> stateCalc;
@@ -123,12 +213,40 @@ void PPCutterCore::loadFile(QString path)
     if (state->loadElf(inputFile))
         return;
 
+    // apply annotations
+    for (auto &annotation : file->annotations) {
+        std::cout << "adding annotation @ " << annotation.offset << std::endl;
+        switch (annotation.type) {
+            case ENTRYPOINT:
+                {
+                    std::cout << "type: ENTRYPOINT, name=" << annotation.data["name"] << std::endl;
+                    state->defineFunction(annotation.offset, annotation.data["name"]);
+                    break;
+                }
+
+            default:
+                std::cout << "type: unknown" << std::endl;
+                // not implemented
+                break;
+        }
+    }
+
+
+    std::cout << "==============================" << std::endl;
+
+    int num_rounds = 0;
     try {
-        while (objDis->disassemble(*state));
+        while (objDis->disassemble(*state)) num_rounds++;
+        std::cout << "rounds: " << num_rounds << std::endl;
+        while (objDis->disassemble(*state)) num_rounds++;
+        std::cout << "rounds: " << num_rounds << std::endl;
+        std::cout << "functions: " << state->functions.size() << std::endl;
+
+
         stateCalc->prepare();
         state->cleanupState();
     } catch (const Exception &e) {
-        std::cout << "PP: Aborted disassembling due to exception" << e.what() << std::endl;
+        std::cout << "PP: Aborted disassembling due to exception: " << e.what() << std::endl;
     }
 }
 
