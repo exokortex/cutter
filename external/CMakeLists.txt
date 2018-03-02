@@ -1,0 +1,2 @@
+add_subdirectory(nlohmann_json)
+find_package(nlohmann_json)
