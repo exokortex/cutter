@@ -66,6 +66,7 @@ SOURCES += \
     utils/RichTextPainter.cpp \
     dialogs/OptionsDialog.cpp \
     dialogs/AboutDialog.cpp \
+    dialogs/PPAnnotationsDialog.cpp \
     dialogs/CommentsDialog.cpp \
     dialogs/EditInstructionDialog.cpp \
     dialogs/FlagDialog.cpp \
@@ -133,6 +134,7 @@ HEADERS  += \
     utils/CachedFontMetrics.h \
     dialogs/AboutDialog.h \
     dialogs/preferences/AsmOptionsWidget.h \
+    dialogs/PPAnnotationsDialog.h \
     dialogs/CommentsDialog.h \
     dialogs/EditInstructionDialog.h \
     dialogs/FlagDialog.h \
@@ -194,6 +196,7 @@ HEADERS  += \
 FORMS    += \
     dialogs/AboutDialog.ui \
     dialogs/preferences/AsmOptionsWidget.ui \
+    dialogs/PPAnnotationsDialog.ui \
     dialogs/CommentsDialog.ui \
     dialogs/EditInstructionDialog.ui \
     dialogs/FlagDialog.ui \

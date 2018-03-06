@@ -1,6 +1,7 @@
 #include "DisassemblyContextMenu.h"
 #include "dialogs/preferences/PreferencesDialog.h"
 #include "dialogs/EditInstructionDialog.h"
+#include "dialogs/PPAnnotationsDialog.h"
 #include "dialogs/CommentsDialog.h"
 #include "dialogs/FlagDialog.h"
 #include "dialogs/RenameDialog.h"
@@ -16,6 +17,7 @@ DisassemblyContextMenu::DisassemblyContextMenu(QWidget *parent)
         actionEditInstruction(this),
         actionEditBytes(this),
         actionCopy(this),
+        actionAddAnnotation(this),
         actionAddComment(this),
         actionAddFlag(this),
         actionCreateFunction(this),
@@ -40,6 +42,7 @@ DisassemblyContextMenu::DisassemblyContextMenu(QWidget *parent)
 {
     createAction(&actionCopy, tr("Copy"), getCopySequence(), SLOT(on_actionCopy_triggered()));
     copySeparator = addSeparator();
+    createAction(&actionAddAnnotation, tr("Add Annotation"), getCommentSequence(), SLOT(on_actionAddAnnotation_triggered()));
     createAction(&actionAddComment, tr("Add Comment"), getCommentSequence(), SLOT(on_actionAddComment_triggered()));
     createAction(&actionAddFlag, tr("Add Flag"), getAddFlagSequence(), SLOT(on_actionAddFlag_triggered()));
     createAction(&actionCreateFunction, tr("Create Function"), {}, SLOT(on_actionCreateFunction_triggered()));
@@ -274,6 +277,20 @@ void DisassemblyContextMenu::on_actionEditBytes_triggered()
 void DisassemblyContextMenu::on_actionCopy_triggered()
 {
     emit copy();
+}
+
+void DisassemblyContextMenu::on_actionAddAnnotation_triggered()
+{
+    PPAnnotationsDialog *annotationsDialog = new PPAnnotationsDialog(this);
+
+    annotationsDialog->setWindowTitle(tr("Edit Annotation at %1").arg(RAddressString(offset)));
+
+    annotationsDialog->setAddress(offset);
+    if (annotationsDialog->exec())
+    {
+        //QString comment = annotationsDialog->getComment();
+
+    }
 }
 
 void DisassemblyContextMenu::on_actionAddComment_triggered()

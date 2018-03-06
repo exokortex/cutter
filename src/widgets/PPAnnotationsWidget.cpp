@@ -74,6 +74,7 @@ void PPAnnotationsWidget::showTitleContextMenu(const QPoint &pt)
     // Set functions popup menu
     QMenu *menu = new QMenu(this);
     menu->clear();
+    menu->addAction(ui->actionAddAnnotation);
     menu->addAction(ui->actionHorizontal);
     menu->addAction(ui->actionVertical);
 
@@ -92,6 +93,13 @@ void PPAnnotationsWidget::showTitleContextMenu(const QPoint &pt)
 
     menu->exec(this->mapToGlobal(pt));
     delete menu;
+}
+
+void PPAnnotationsWidget::on_actionAddAnnotation_triggered()
+{
+    //PPAnnotation function = ui->commentsTreeWidget->selectionModel()->currentIndex().data(PPAnnotationsModel::FunctionDescriptionRole).value<PPAnnotation>();
+
+    std::cout << "on_actionAddAnnotation_triggered..." << std::endl;
 }
 
 void PPAnnotationsWidget::on_actionHorizontal_triggered()

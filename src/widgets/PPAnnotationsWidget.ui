@@ -348,6 +348,11 @@ QToolTip {
     <string>Vertical view</string>
    </property>
   </action>
+  <action name="actionAddAnnotation">
+   <property name="text">
+    <string>Add Annotation</string>
+   </property>
+  </action>
  </widget>
  <resources>
   <include location="../resources.qrc"/>

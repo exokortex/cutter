@@ -105,6 +105,8 @@ std::string PPCutterCore::annotationTypeToString(const PPAnnotationType aType)
         return "entrypoint";
     else if (aType == INST_TYPE)
         return "inst_type";
+    else if (aType == LOAD_REF)
+        return "load_ref";
 
     return "ERROR";
 }
@@ -248,6 +250,15 @@ void PPCutterCore::loadFile(QString path)
     } catch (const Exception &e) {
         std::cout << "PP: Aborted disassembling due to exception: " << e.what() << std::endl;
     }
+}
+
+PPAnnotation* PPCutterCore::getAnnotationAt(AddressType addr)
+{
+    for (auto& annotation: file->annotations) {
+        if (annotation.offset == addr)
+            return &annotation;
+    }
+    return nullptr;
 }
 
 void PPCutterCore::saveProject()

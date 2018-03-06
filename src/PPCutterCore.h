@@ -31,7 +31,8 @@ struct PPAnnotation;
 
 enum PPAnnotationType {
     ENTRYPOINT,
-    INST_TYPE
+    INST_TYPE,
+    LOAD_REF
 };
 
 struct PPFile
@@ -62,7 +63,7 @@ struct PPAnnotation
 
     PPAnnotation(AddressType _offset, PPAnnotationType _type, std::string _comment, json _data) {
         offset = _offset;
-         type = _type;
+        type = _type;
         comment = _comment;
         data = _data;
     }
@@ -104,6 +105,8 @@ public:
     inline const PPFile &getFile() const {
         return *file;
     }
+
+    PPAnnotation* getAnnotationAt(AddressType addr);
 
 signals:
 

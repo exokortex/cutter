@@ -31,6 +31,7 @@ private slots:
     void on_toolButton_clicked();
     void on_toolButton_2_clicked();
 
+    void on_actionAddAnnotation_triggered();
     void on_actionHorizontal_triggered();
     void on_actionVertical_triggered();
 

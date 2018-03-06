@@ -28,6 +28,7 @@ private slots:
 
     void on_actionCopy_triggered();
 
+    void on_actionAddAnnotation_triggered();
     void on_actionAddComment_triggered();
     void on_actionCreateFunction_triggered();
     void on_actionAddFlag_triggered();
@@ -77,6 +78,7 @@ private:
 
 
 
+    QAction actionAddAnnotation;
     QAction actionAddComment;
     QAction actionAddFlag;
     QAction actionCreateFunction;
