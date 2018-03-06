@@ -1,7 +1,7 @@
 #ifndef DISASSEMBLYCONTEXTMENU_H
 #define DISASSEMBLYCONTEXTMENU_H
 
-#include "cutter.h"
+#include "Cutter.h"
 #include <QMenu>
 #include <QKeySequence>
 
@@ -24,6 +24,7 @@ private slots:
     void aboutToShowSlot();
 
     void on_actionEditInstruction_triggered();
+    void on_actionNopInstruction_triggered();
     void on_actionEditBytes_triggered();
 
     void on_actionCopy_triggered();
@@ -71,6 +72,7 @@ private:
     QMenu *editMenu;
     QAction *editMenuAction;
     QAction actionEditInstruction;
+    QAction actionNopInstruction;
     QAction actionEditBytes;
 
     QAction actionCopy;

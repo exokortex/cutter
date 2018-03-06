@@ -6,14 +6,14 @@ include(DisallowInSource)
 
 if(FALSE) # ignore cutter name and version in future upstream pulls
 
-project(cutter VERSION 1.2)
+project(Cutter VERSION 1.2)
+
+endif()
 
 option(CUTTER_ENABLE_JUPYTER "Enable Jupyter integration. Requires Python >= 3.3." ON)
 option(CUTTER_ENABLE_QTWEBENGINE "Use QtWebEngine for in-app Jupyter Browser. Unused if CUTTER_ENABLE_JUPYTER=OFF." ON)
 
-endif()
-
-project(ppcutter VERSION 0.1)
+project(ppCutter VERSION 0.1)
 
 set(CMAKE_CXX_STANDARD 11)
 
@@ -28,6 +28,7 @@ if(CUTTER_ENABLE_JUPYTER AND CUTTER_ENABLE_QTWEBENGINE)
         message(FATAL_ERROR "QtWebEngine could not be found which is required for the in-app Jupyter Browser.
 If you do not want to enable this in-app Browser, re-run CMake with -DCUTTER_ENABLE_QTWEBENGINE=OFF.")
     endif()
+    add_definitions(-DCUTTER_ENABLE_QTWEBENGINE)
 endif()
 
 
@@ -68,21 +69,21 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
 endif()
 
 
-# Parse cutter.pro to get filenames
+# Parse Cutter.pro to get filenames
 include(QMakeProParse)
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cutter.pro"
-        "${CMAKE_CURRENT_BINARY_DIR}/cutter.pro"
-        COPYONLY) # trigger reconfigure if cutter.pro changes
-parse_qmake_pro("${CMAKE_CURRENT_BINARY_DIR}/cutter.pro" CUTTER_PRO)
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/Cutter.pro"
+        "${CMAKE_CURRENT_BINARY_DIR}/Cutter.pro"
+        COPYONLY) # trigger reconfigure if Cutter.pro changes
+parse_qmake_pro("${CMAKE_CURRENT_BINARY_DIR}/Cutter.pro" CUTTER_PRO)
 set(SOURCE_FILES ${CUTTER_PRO_SOURCES})
 set(HEADER_FILES ${CUTTER_PRO_HEADERS})
 set(UI_FILES ${CUTTER_PRO_FORMS})
 set(QRC_FILES ${CUTTER_PRO_RESOURCES})
 
-message(STATUS "sources from cutter.pro: ${SOURCE_FILES}")
-message(STATUS "headers from cutter.pro: ${HEADER_FILES}")
-message(STATUS "forms from cutter.pro: ${UI_FILES}")
-message(STATUS "resources from cutter.pro: ${QRC_FILES}")
+message(STATUS "sources from Cutter.pro: ${SOURCE_FILES}")
+message(STATUS "headers from Cutter.pro: ${HEADER_FILES}")
+message(STATUS "forms from Cutter.pro: ${UI_FILES}")
+message(STATUS "resources from Cutter.pro: ${QRC_FILES}")
 
 
 set(CUTTER_VERSION_SUFFIX "-dev")
@@ -90,21 +91,19 @@ set(CUTTER_VERSION_FULL "${PROJECT_VERSION}${CUTTER_VERSION_SUFFIX}")
 message(STATUS "Building Cutter version ${CUTTER_VERSION_FULL}")
 add_definitions("-DAPP_VERSION=\"${CUTTER_VERSION_FULL}\"")
 
-add_executable(ppcutter ${UI_FILES} ${QRC_FILES} ${SOURCE_FILES} ${HEADER_FILES})
-qt5_use_modules(ppcutter Core Widgets Gui Svg)
-target_link_libraries(ppcutter ${RADARE2_LIBRARIES})
+add_executable(ppCutter ${UI_FILES} ${QRC_FILES} ${SOURCE_FILES} ${HEADER_FILES})
+qt5_use_modules(ppCutter Core Widgets Gui Svg)
+target_link_libraries(ppCutter ${RADARE2_LIBRARIES})
 if(CUTTER_ENABLE_JUPYTER)
-    target_link_libraries(cutter ${PYTHON_LIBRARIES})
+    target_link_libraries(ppCutter ${PYTHON_LIBRARIES})
     if(CUTTER_ENABLE_QTWEBENGINE)
-        qt5_use_modules(cutter WebEngineWidgets)
+        qt5_use_modules(ppCutter WebEngineWidgets)
     endif()
 endif()
 
 find_package(pp REQUIRED)
-target_link_libraries(ppcutter pp::pp)
-
-target_include_directories(ppcutter PRIVATE "../external/rapidjson/include"})
+target_link_libraries(ppCutter pp::pp)
+target_include_directories(ppCutter PRIVATE "../external/rapidjson/include"})
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../external ${CMAKE_CURRENT_BINARY_DIR}/external)
-target_link_libraries(ppcutter nlohmann_json)
-
-install(TARGETS "ppcutter" DESTINATION "bin")
+target_link_libraries(ppCutter nlohmann_json)
+install(TARGETS "ppCutter" DESTINATION "bin")

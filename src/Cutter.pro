@@ -7,12 +7,27 @@ VERSION = 1.2
 
 ICON = img/cutter.icns
 
-QT += core gui widgets svg webenginewidgets
+QT += core gui widgets svg
 QT_CONFIG -= no-pkg-config
 CONFIG += c++11
 
+# You can spawn qmake with qmake "CONFIG+=CUTTER_ENABLE_JUPYTER" to set a variable
+# Or manually edit this file
+#CONFIG += CUTTER_ENABLE_JUPYTER
+#CONFIG += CUTTER_ENABLE_QTWEBENGINE
+
 # Define the preprocessor macro to get the application version in our application.
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
+CUTTER_ENABLE_QTWEBENGINE {
+    message("Jupyter support enabled.")
+    DEFINES += CUTTER_ENABLE_JUPYTER
+}
+
+CUTTER_ENABLE_QTWEBENGINE {
+    message("QtWebEngine support enabled.")
+    DEFINES += CUTTER_ENABLE_QTWEBENGINE
+    QT += webenginewidgets
+}
 
 # TODO: make optional
 DEFINES += CUTTER_ENABLE_JUPYTER
@@ -37,7 +52,7 @@ unix:exists(/usr/local/include/libr) {
 
 # Libraries
 include(lib_radare2.pri)
-win32 {
+win32:CUTTER_ENABLE_JUPYTER {
     pythonpath = $$quote($$system("where python"))
     pythonpath = $$replace(pythonpath, ".exe ", ".exe;")
     pythonpath = $$section(pythonpath, ";", 0, 0)
@@ -49,7 +64,7 @@ win32 {
     message($$INCLUDEPATH)
 }
 
-unix|macx {
+unix:CUTTER_ENABLE_JUPYTER|macx:CUTTER_ENABLE_JUPYTER {
     CONFIG += link_pkgconfig
     !packagesExist(python3) {
         error("ERROR: Python 3 could not be found. Make sure it is available to pkg-config.")
@@ -58,8 +73,8 @@ unix|macx {
 }
 
 SOURCES += \
-    main.cpp \
-    cutter.cpp \
+    Main.cpp \
+    Cutter.cpp \
     PPCutterCore.cpp \
     widgets/DisassemblerGraphView.cpp \
     widgets/PPGraphView.cpp \
@@ -126,7 +141,7 @@ SOURCES += \
     utils/NestedIPyKernel.cpp
 
 HEADERS  += \
-    cutter.h \
+    Cutter.h \
     PPCutterCore.h \
     widgets/DisassemblerGraphView.h \
     widgets/PPGraphView.h \
@@ -237,7 +252,7 @@ RESOURCES += \
     themes/qdarkstyle/style.qrc
 
 
-DISTFILES += cutter.astylerc
+DISTFILES += Cutter.astylerc
 
 # 'make install' for AppImage
 unix {
@@ -251,7 +266,7 @@ unix {
     share_pixmaps.files = $$icon_file
 
 
-    desktop_file = cutter.desktop
+    desktop_file = Cutter.desktop
 
     # built-in no need for files atm
     target.path = $$PREFIX/bin

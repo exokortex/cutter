@@ -2,7 +2,7 @@
 #include <QJsonObject>
 #include <utils/TempConfig.h>
 #include "utils/Configuration.h"
-#include "cutter.h"
+#include "Cutter.h"
 #include "sdb.h"
 
 Q_GLOBAL_STATIC(ccClass, uniqueInstance)
@@ -326,6 +326,12 @@ void CutterCore::delFlag(RVA addr)
 void CutterCore::editInstruction(RVA addr, const QString &inst)
 {
     cmd("wa " + inst + " @ " + RAddressString(addr));
+    emit instructionChanged(addr);
+}
+
+void CutterCore::nopInstruction(RVA addr)
+{
+    cmd("wao nop @ " + RAddressString(addr));
     emit instructionChanged(addr);
 }
 

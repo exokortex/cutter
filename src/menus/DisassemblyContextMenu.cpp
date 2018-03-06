@@ -15,6 +15,7 @@ DisassemblyContextMenu::DisassemblyContextMenu(QWidget *parent)
         offset(0),
         canCopy(false),
         actionEditInstruction(this),
+        actionNopInstruction(this),        
         actionEditBytes(this),
         actionCopy(this),
         actionAddAnnotation(this),
@@ -90,10 +91,13 @@ DisassemblyContextMenu::DisassemblyContextMenu(QWidget *parent)
     editMenuAction = addMenu(editMenu);
     actionEditInstruction.setText(tr("Instruction"));
     editMenu->addAction(&actionEditInstruction);
+    actionNopInstruction.setText(tr("Nop Instruction"));
+    editMenu->addAction(&actionNopInstruction);
     actionEditBytes.setText(tr("Bytes"));
     editMenu->addAction(&actionEditBytes);
 
     connect(&actionEditInstruction, SIGNAL(triggered(bool)), this, SLOT(on_actionEditInstruction_triggered()));
+    connect(&actionNopInstruction, SIGNAL(triggered(bool)), this, SLOT(on_actionNopInstruction_triggered()));    
     connect(&actionEditBytes, SIGNAL(triggered(bool)), this, SLOT(on_actionEditBytes_triggered()));
 
     connect(&actionSetBaseBinary, SIGNAL(triggered(bool)), this, SLOT(on_actionSetBaseBinary_triggered()));
@@ -254,6 +258,11 @@ void DisassemblyContextMenu::on_actionEditInstruction_triggered()
             Core()->editInstruction(offset, instruction);
         }
     }
+}
+
+void DisassemblyContextMenu::on_actionNopInstruction_triggered()
+{
+    Core()->nopInstruction(offset);
 }
 
 void DisassemblyContextMenu::on_actionEditBytes_triggered()
