@@ -459,13 +459,6 @@ bool CutterCore::tryFile(QString path, bool rw)
         return false;
     }
 
-    bool is_writable = false;
-    if (cf->core && cf->core->io && cf->core->io->desc)
-    {
-        is_writable = cf->core->io->desc->flags & R_IO_WRITE;
-    }
-    // if rbin works, tell entry0, and symbols (main, constructor, ..)
-
     r_core_file_close (this->core_, cf);
 
     return true;
@@ -552,7 +545,6 @@ void CutterCore::resetDefaultAsmOptions()
     setConfig("asm.capitalize", Config()->getAsmCapitalize());
     setConfig("asm.varsub", Config()->getAsmVarsub());
     setConfig("asm.varsub_only", Config()->getAsmVarsubOnly());
-    setConfig("asm.tabs", Config()->getAsmTabs());
 }
 
 void CutterCore::saveDefaultAsmOptions()
@@ -604,6 +596,11 @@ void CutterCore::setCPU(QString arch, QString cpu, int bits, bool temporary)
 void CutterCore::setEndianness(bool big)
 {
     setConfig("cfg.bigendian", big);
+}
+
+void CutterCore::setBBSize(int size)
+{
+    setConfig("anal.bb.maxsize", size);
 }
 
 void CutterCore::setDefaultCPU()
@@ -813,7 +810,7 @@ void CutterCore::setSettings()
     setConfig("asm.tabsoff", 5);
     setConfig("asm.midflags", 2);
 
-    setConfig("anal.hasnext", true);
+    setConfig("anal.hasnext", false);
     setConfig("asm.lines.call", false);
     setConfig("asm.flgoff", true);
     setConfig("anal.autoname", true);
@@ -827,6 +824,9 @@ void CutterCore::setSettings()
 
     // Colors
     setConfig("scr.color", COLOR_MODE_DISABLED);
+
+    // Don't show hits
+    setConfig("search.flags", false);
 }
 
 QList<RVA> CutterCore::getSeekHistory()
@@ -1281,6 +1281,53 @@ QList<VTableDescription> CutterCore::getAllVTables()
 
         ret << res;
     }
+    return ret;
+}
+
+QList<TypeDescription> CutterCore::getAllTypes()
+{
+    CORE_LOCK();
+    QList<TypeDescription> ret;
+
+    QJsonArray typesArray = cmdj("tj").array();
+
+    foreach (QJsonValue value, typesArray)
+    {
+        QJsonObject typeObject = value.toObject();
+
+        TypeDescription exp;
+
+        exp.type = typeObject["type"].toString();
+        exp.size = typeObject["size"].toVariant().toULongLong();
+        exp.format = typeObject["format"].toString();
+
+        ret << exp;
+    }
+
+    return ret;
+}
+
+QList<SearchDescription> CutterCore::getAllSearch(QString search_for, QString space)
+{
+    CORE_LOCK();
+    QList<SearchDescription> ret;
+
+    QJsonArray searchArray = cmdj(space + QString(" ") + search_for).array();
+    
+    foreach (QJsonValue value, searchArray)
+    {
+        QJsonObject searchObject = value.toObject();
+
+        SearchDescription exp;
+
+        exp.offset = searchObject["offset"].toVariant().toULongLong();
+        exp.size = searchObject["len"].toVariant().toULongLong();
+        exp.code = searchObject["code"].toString();
+        exp.data = searchObject["data"].toString();
+
+        ret << exp;
+    }
+
     return ret;
 }
 

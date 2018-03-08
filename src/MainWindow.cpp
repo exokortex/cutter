@@ -50,6 +50,8 @@
 #include "widgets/PPAnnotationsWidget.h"
 #include "widgets/ImportsWidget.h"
 #include "widgets/ExportsWidget.h"
+#include "widgets/TypesWidget.h"
+#include "widgets/SearchWidget.h"
 #include "widgets/SymbolsWidget.h"
 #include "widgets/StringsWidget.h"
 #include "widgets/SectionsDock.h"
@@ -100,7 +102,6 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {
-    delete configuration;
 }
 
 void MainWindow::initUI()
@@ -115,20 +116,6 @@ void MainWindow::initUI()
     // Hide central tab widget tabs
     QTabBar *centralbar = ui->centralTabWidget->tabBar();
     centralbar->setVisible(false);
-
-    // Sepparator between back/forward and undo/redo buttons
-    QWidget *spacer4 = new QWidget();
-    spacer4->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
-    spacer4->setMinimumSize(10, 10);
-    ui->mainToolBar->insertWidget(ui->actionForward, spacer4);
-    ui->actionForward->setIcon(QIcon(new SvgIconEngine(QString(":/img/icons/arrow_right.svg"))));
-
-    // Popup menu on theme toolbar button
-    QToolButton *backButton = new QToolButton(this);
-    backButton->setIcon(QIcon(new SvgIconEngine(QString(":/img/icons/arrow_left.svg"))));
-    //backButton->setPopupMode(QToolButton::DelayedPopup);
-    ui->mainToolBar->insertWidget(ui->actionForward, backButton);
-    connect(backButton, SIGNAL(clicked()), this, SLOT(backButton_clicked()));
 
     // Sepparator between undo/redo and goto lineEdit
     QWidget *spacer3 = new QWidget();
@@ -224,6 +211,8 @@ void MainWindow::initUI()
     ADD_DOCK(FunctionsWidget, functionsDock, ui->actionFunctions);
     ADD_DOCK(ImportsWidget, importsDock, ui->actionImports);
     ADD_DOCK(ExportsWidget, exportsDock, ui->actionExports);
+    ADD_DOCK(TypesWidget, typesDock, ui->actionTypes);
+    ADD_DOCK(SearchWidget, searchDock, ui->actionSearchInst);
     ADD_DOCK(SymbolsWidget, symbolsDock, ui->actionSymbols);
     ADD_DOCK(RelocsWidget, relocsDock, ui->actionRelocs);
     ADD_DOCK(CommentsWidget, commentsDock, ui->actionComments);
@@ -517,11 +506,6 @@ void MainWindow::toggleDockWidget(QDockWidget *dock_widget, bool show)
     }
 }
 
-void MainWindow::backButton_clicked()
-{
-    core->seekPrev();
-}
-
 void MainWindow::restoreDocks()
 {
     // In the upper half the functions are the first widget
@@ -551,6 +535,8 @@ void MainWindow::restoreDocks()
     tabifyDockWidget(dashboardDock, relocsDock);
     tabifyDockWidget(dashboardDock, importsDock);
     tabifyDockWidget(dashboardDock, exportsDock);
+    tabifyDockWidget(dashboardDock, typesDock);
+    tabifyDockWidget(dashboardDock, searchDock);
     tabifyDockWidget(dashboardDock, symbolsDock);
     tabifyDockWidget(dashboardDock, classesDock);
     tabifyDockWidget(dashboardDock, resourcesDock);
@@ -700,16 +686,6 @@ void MainWindow::on_actionSaveAs_triggered()
     saveProjectAs();
 }
 
-void MainWindow::on_actionUndoSeek_triggered()
-{
-    Core()->seekPrev();
-}
-
-void MainWindow::on_actionRedoSeek_triggered()
-{
-    Core()->seekNext();
-}
-
 void MainWindow::on_actionRun_Script_triggered()
 {
     QFileDialog dialog(this);
@@ -761,9 +737,24 @@ void MainWindow::on_actionQuit_triggered()
     close();
 }
 
+void MainWindow::on_actionBackward_triggered()
+{
+    Core()->seekPrev();
+}
+
 void MainWindow::on_actionForward_triggered()
 {
-    core->seekNext();
+    Core()->seekNext();
+}
+
+void MainWindow::on_actionUndoSeek_triggered()
+{
+    Core()->seekPrev();
+}
+
+void MainWindow::on_actionRedoSeek_triggered()
+{
+    Core()->seekNext();
 }
 
 void MainWindow::on_actionDisasAdd_comment_triggered()

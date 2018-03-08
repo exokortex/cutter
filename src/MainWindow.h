@@ -41,6 +41,8 @@ class PPGraphView;
 class ClassesWidget;
 class ResourcesWidget;
 class VTablesWidget;
+class TypesWidget;
+class SearchWidget;
 #ifdef CUTTER_ENABLE_JUPYTER
 class JupyterWidget;
 #endif
@@ -110,8 +112,6 @@ public slots:
 
     void toggleResponsive(bool maybe);
 
-    void backButton_clicked();
-
 private slots:
     void on_actionAbout_triggered();
 
@@ -128,12 +128,12 @@ private slots:
     void on_actionSave_triggered();
     void on_actionSaveAs_triggered();
 
+    void on_actionBackward_triggered();
+    void on_actionForward_triggered();
     void on_actionUndoSeek_triggered();
     void on_actionRedoSeek_triggered();
 
     void on_actionOpen_triggered();
-
-    void on_actionForward_triggered();
 
     void on_actionTabs_on_Top_triggered();
 
@@ -177,6 +177,8 @@ private:
     FunctionsWidget    *functionsDock = nullptr;
     ImportsWidget      *importsDock = nullptr;
     ExportsWidget      *exportsDock = nullptr;
+    TypesWidget        *typesDock = nullptr;
+    SearchWidget        *searchDock = nullptr;
     SymbolsWidget      *symbolsDock = nullptr;
     RelocsWidget       *relocsDock = nullptr;
     CommentsWidget     *commentsDock = nullptr;
