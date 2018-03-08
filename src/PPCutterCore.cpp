@@ -116,18 +116,21 @@ void PPCutterCore::loadFile(QString path)
     auto logger = get_logger("PP-Core");
 
     // create emtpy file
-    file = std::unique_ptr<PPFile>(new PPFile());
+    file = std::make_unique<PPFile>();
 
-    json annData1 = {{"name", "f1"}};
-    json annData2 = {{"name", "f2"}};
-    json annData3 = {{"name", "f3"}};
-    json annData4 = {{"name", "f4"}};
-    json annData5 = {{"name", "f5"}};
-    file->annotations.emplace_back(0x204, ENTRYPOINT, "test comment 3", annData3);
-    file->annotations.emplace_back(0x128, ENTRYPOINT, "test comment 1", annData1);
-    file->annotations.emplace_back(0x158, ENTRYPOINT, "test comment 2", annData2);
-    file->annotations.emplace_back(0x2c0, ENTRYPOINT, "test comment 4", annData4);
-    file->annotations.emplace_back(0x2c8, ENTRYPOINT, "test comment 5", annData5);
+    json annData0 = {{"name", "main"}};
+    json annData1 = {{"name", "__udivsi3"}};
+    json annData2 = {{"name", "DebugMon_Handler"}};
+    json annData3 = {{"name", "entry0"}};
+    json annData4 = {{"name", "__aeabi_ldiv0"}};
+    json annData5 = {{"name", "_exit"}};
+    file->annotations.emplace_back(0x00000128, ENTRYPOINT, "main() method", annData0);
+    file->annotations.emplace_back(0x00000158, ENTRYPOINT, "", annData1);
+    file->annotations.emplace_back(0x000001e4, ENTRYPOINT, "", annData2);
+    file->annotations.emplace_back(0x00000204, ENTRYPOINT, "", annData3);
+    file->annotations.emplace_back(0x000002c0, ENTRYPOINT, "ARM integer division", annData4);
+    file->annotations.emplace_back(0x000002c8, ENTRYPOINT, "", annData5);
+
 
     //PPAnnotation testAnnotation(0x204, ENTRYPOINT, "test comment", annData1);
     //PPAnnotation testAnnotation2(0x204, ENTRYPOINT, "test comment", annData2);
@@ -145,9 +148,6 @@ void PPCutterCore::loadFile(QString path)
     //state->defineFunction(0x2c8, "f5");
 
     //file->annotations.push_back(std::move(testAnnotation));
-
-    PPFunction testFun;
-    file->functions.push_back(testFun);
 
     std::string inputFile = path.toStdString();
     std::cout << "inputFile: " << inputFile << std::endl;

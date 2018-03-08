@@ -175,6 +175,20 @@ void PPAnnotationsWidget::refreshTree()
         item->setText(1, fcn_name);
         item->setText(2, QString::fromUtf8(PPCutterCore::annotationTypeToString(annotation.type).c_str()));
         item->setText(3, QString::fromUtf8(annotation.data.dump().c_str()));
+
+        QString data = "";
+        bool first = true;
+        for (auto it = annotation.data.begin(); it != annotation.data.end(); ++it) {
+            if (data != "")
+                data += ", ";
+            std::string key = it.key();
+            std::string value = it.value();
+            data += QString::fromUtf8(key.c_str());
+            data += "=";
+            data += QString::fromUtf8(value.c_str());
+        }
+        item->setText(3, data);
+
         item->setText(4, QString::fromUtf8(annotation.comment.c_str()));
         item->setData(0, Qt::UserRole, QVariant::fromValue(annotation));
         ui->commentsTreeWidget->addTopLevelItem(item);
