@@ -84,6 +84,7 @@ SOURCES += \
     Main.cpp \
     Cutter.cpp \
     PPCutterCore.cpp \
+    models/PPAnnotationDataModel.cpp \
     widgets/DisassemblerGraphView.cpp \
     widgets/PPGraphView.cpp \
     utils/RichTextPainter.cpp \
@@ -153,6 +154,7 @@ SOURCES += \
 HEADERS  += \
     Cutter.h \
     PPCutterCore.h \
+    models/PPAnnotationDataModel.h \
     widgets/DisassemblerGraphView.h \
     widgets/PPGraphView.h \
     utils/RichTextPainter.h \

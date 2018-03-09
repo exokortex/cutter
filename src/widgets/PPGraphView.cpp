@@ -224,25 +224,32 @@ void PPGraphView::loadCurrentGraph()
         db.true_path = RVA_INVALID;
         db.false_path = RVA_INVALID;
 
-        // mark block if it is the entry of the function
-        if (ppFunction->getEntryPoints()[entryPointIdx].address == block_entry)
-        {
-            RichTextPainter::List rtpl;
-            RichTextPainter::CustomRichText_t title;
-            title.highlight = true;
-            title.flags = RichTextPainter::FlagColor;
-            std::string titles = "Entry Point: " + ppFunction->getEntryPoints()[entryPointIdx].name;
-            title.text = QString::fromUtf8(titles.c_str());
-            title.textColor = ConfigColor("fname");
-            rtpl.push_back(title);
-            db.header_text = rtpl;
-        }
-
         for (auto sit = bb->succ_begin(); sit != bb->succ_end(); ++sit) {
             const BasicBlock *succ = *sit;
             // get address of first instruction (= address of block)
             RVA addr = (succ->inst_begin())->address;
             gb.exits.push_back(addr);
+        }
+
+        // mark block if it is the entry of the function
+        if (ppFunction->getEntryPoints()[entryPointIdx].address == block_entry)
+        {
+            std::cout << "PP: adding entry point annotation..." << std::endl;
+            Instr i;
+            i.addr = block_entry;
+            i.size = 1;
+
+            std::string titles = "<font color='#44f'>Entry Point: " + ppFunction->getEntryPoints()[entryPointIdx].name + "</font>";
+            QString text = QString::fromUtf8(titles.c_str());
+
+            QTextDocument textDoc;
+            textDoc.setHtml(text);
+            RichTextPainter::List richText = RichTextPainter::fromTextDocument(textDoc);
+            bool cropped;
+            int blockLength = Config()->getGraphBlockMaxChars() + Core()->getConfigb("asm.bytes") * 24 + Core()->getConfigb("asm.emu") * 10;
+            i.text = Text(RichTextPainter::cropped(richText, blockLength, "...", &cropped));
+            i.fullText = Text();
+            db.instrs.push_back(i);
         }
 
         for (auto dii = bb->inst_begin(); dii != bb->inst_end(); ++dii) {

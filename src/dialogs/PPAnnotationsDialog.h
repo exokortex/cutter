@@ -6,6 +6,10 @@
 
 #include "PPCutterCore.h"
 
+#include "models/PPAnnotationDataModel.h"
+
+class PPAnnotationDataModel;
+
 namespace Ui
 {
     class PPAnnotationsDialog;
@@ -28,11 +32,13 @@ private slots:
 
 private:
     AddressType addr;
-    std::unique_ptr<PPAnnotation> annotation;
+    PPAnnotation* annotation;
 
     std::unique_ptr<Ui::PPAnnotationsDialog> ui;
 
     bool eventFilter(QObject *obj, QEvent *event);
+
+    PPAnnotationDataModel* dataModel;
 };
 
 #endif // PPANNOTATIONSDIALOG_H

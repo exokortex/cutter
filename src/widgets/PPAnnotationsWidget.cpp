@@ -29,7 +29,7 @@ PPAnnotationsWidget::PPAnnotationsWidget(MainWindow *main, QWidget *parent) :
     connect(this, SIGNAL(customContextMenuRequested(const QPoint &)),
             this, SLOT(showTitleContextMenu(const QPoint &)));
 
-    connect(Core(), SIGNAL(commentsChanged()), this, SLOT(refreshTree()));
+    connect(PPCore(), SIGNAL(annotationsChanged()), this, SLOT(refreshTree()));
     connect(Core(), SIGNAL(refreshAll()), this, SLOT(refreshTree()));
 
     // Hide the buttons frame
@@ -158,6 +158,7 @@ QMap<QString, QList<QList<QString>>> CutterCore::getNestedComments()
 void PPAnnotationsWidget::refreshTree()
 {
     ui->nestedCmtsTreeWidget->clear();
+    ui->commentsTreeWidget->clear();
     //QMap<QString, QList<CommentDescription>> nestedComments;
 
     for (const PPAnnotation& annotation : PPCore()->getFile().annotations)

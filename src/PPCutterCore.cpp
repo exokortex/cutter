@@ -307,3 +307,8 @@ void PPCutterCore::saveProject()
     PrettyWriter<OStreamWrapper> writer(osw);
     d.Accept(writer);
 }
+
+void PPCutterCore::registerAnnotationChange()
+{
+    emit annotationsChanged();
+}

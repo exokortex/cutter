@@ -8,6 +8,10 @@ PPAnnotationsDialog::PPAnnotationsDialog(QWidget *parent) :
     ui->setupUi(this);
     setWindowFlags(windowFlags() & (~Qt::WindowContextHelpButtonHint));
 
+    dataModel = new PPAnnotationDataModel(this);
+
+    ui->dataTreeView->setModel(dataModel);
+
     // Event filter for capturing Ctrl/Cmd+Return
     //ui->textEdit->installEventFilter(this);
 }
@@ -35,11 +39,12 @@ void PPAnnotationsDialog::setAddress(AddressType addr)
     this->addr = addr;
     PPAnnotation* oldAnnotation = PPCore()->getAnnotationAt(addr);
     if (oldAnnotation != nullptr) {
-        annotation = std::unique_ptr<PPAnnotation>(new PPAnnotation(*oldAnnotation));
+        annotation = oldAnnotation;
+        dataModel->setAnnotation(annotation);
         // TODO use proper conversion
-        ui->annotationTypeDropdown->setCurrentIndex((int)annotation->type);
+        /*ui->annotationTypeDropdown->setCurrentIndex((int)annotation->type);
 
-        ui->dataTreeWidget->clear();
+        ui->dataTreeView->clear();
         for (auto it = annotation->data.begin(); it != annotation->data.end(); ++it)
         {
             QTreeWidgetItem *tempItem = new QTreeWidgetItem();
@@ -48,8 +53,8 @@ void PPAnnotationsDialog::setAddress(AddressType addr)
             tempItem->setText(0, QString::fromUtf8(key.c_str()));
             tempItem->setText(1, QString::fromUtf8(value.c_str()));
             //tempItem->setData(0, Qt::UserRole, QVariant::fromValue(xref));
-            ui->dataTreeWidget->insertTopLevelItem(0, tempItem);
-        }
+            ui->dataTreeView->insertTopLevelItem(0, tempItem);
+        }*/
     }
 }
 

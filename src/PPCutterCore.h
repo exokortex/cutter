@@ -108,7 +108,10 @@ public:
 
     PPAnnotation* getAnnotationAt(AddressType addr);
 
+    void registerAnnotationChange();
+
 signals:
+    void annotationsChanged();
 
 public slots:
 

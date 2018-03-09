@@ -80,30 +80,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QTreeWidget" name="dataTreeWidget">
-         <property name="frameShape">
-          <enum>QFrame::NoFrame</enum>
-         </property>
-         <property name="frameShadow">
-          <enum>QFrame::Plain</enum>
-         </property>
-         <property name="indentation">
-          <number>5</number>
-         </property>
-         <property name="columnCount">
-          <number>2</number>
-         </property>
-         <column>
-          <property name="text">
-           <string>Key</string>
-          </property>
-         </column>
-         <column>
-          <property name="text">
-           <string>Value</string>
-          </property>
-         </column>
-        </widget>
+        <widget class="QTreeView" name="dataTreeView"/>
        </item>
       </layout>
      </widget>
