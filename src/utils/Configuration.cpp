@@ -23,19 +23,18 @@ Configuration* Configuration::instance()
 void Configuration::loadInitial()
 {
     setDarkTheme(getDarkTheme());
-    QString theme = getCurrentTheme();
-    if (theme != "default")
-    {
-        Core()->cmd(QString("eco %1").arg(theme));
-    }
+    setColorTheme(getCurrentTheme());
 }
 
 void Configuration::resetAll()
 {
-    s.clear();
     Core()->cmd("e-");
     Core()->setSettings();
     Core()->resetDefaultAsmOptions();
+    // Delete the file so no extra configuration is in it.
+    QFile settingsFile(s.fileName());
+    settingsFile.remove();
+    s.clear();
 
     loadInitial();
     emit fontsUpdated();
@@ -141,6 +140,21 @@ void Configuration::setDarkTheme(bool set)
     emit colorsUpdated();
 }
 
+QString Configuration::getLogoFile()
+{
+    return logoFile;
+}
+
+/*!
+ * \brief Configuration::setColor sets the local Cutter configuration color
+ * \param name Color Name
+ * \param color The color you want to set
+ */
+void Configuration::setColor(const QString &name, const QColor &color)
+{
+    s.setValue("colors." + name, color);
+}
+
 const QColor Configuration::getColor(const QString &name) const
 {
     if (s.contains("colors." + name)) {
@@ -150,32 +164,25 @@ const QColor Configuration::getColor(const QString &name) const
     }
 }
 
-QString Configuration::getLogoFile()
-{
-    return logoFile;
-}
-
-/**
- * @brief Configuration::setColor sets the local Cutter configuration color
- * @param name Color Name
- * @param color The color you want to set
- */
-void Configuration::setColor(const QString &name, const QColor &color)
-{
-    s.setValue("colors." + name, color);
-}
-
 void Configuration::setColorTheme(QString theme)
 {
-    if (theme == "default")
-    {
+    if (theme == "default") {
         Core()->cmd("ecd");
         s.setValue("theme", "default");
-    }
-    else
-    {
+    } else {
         Core()->cmd(QString("eco %1").arg(theme));
         s.setValue("theme", theme);
+    }
+    // Duplicate interesting colors into our Cutter Settings
+    // Dirty fix for arrow colors, TODO refactor getColor, setColor, etc.
+    QJsonDocument colors = Core()->cmdj("ecj");
+    QJsonObject colorsObject = colors.object();
+    QJsonObject::iterator it;
+    for (it = colorsObject.begin(); it != colorsObject.end(); it++) {
+        if (!it.key().contains("graph"))
+            continue;
+        QJsonArray rgb = it.value().toArray();
+        s.setValue("colors." + it.key(), QColor(rgb[0].toInt(), rgb[1].toInt(), rgb[2].toInt()));
     }
     emit colorsUpdated();
 }
