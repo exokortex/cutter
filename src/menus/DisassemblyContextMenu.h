@@ -7,7 +7,7 @@
 
 class DisassemblyContextMenu : public QMenu
 {
-Q_OBJECT
+    Q_OBJECT
 
 public:
     DisassemblyContextMenu(QWidget *parent = nullptr);
@@ -25,11 +25,13 @@ private slots:
 
     void on_actionEditInstruction_triggered();
     void on_actionNopInstruction_triggered();
+    void on_actionJmpReverse_triggered();
+    void showReverseJmpQuery();
     void on_actionEditBytes_triggered();
 
     void on_actionCopy_triggered();
-
     void on_actionAddAnnotation_triggered();
+    void on_actionCopyAddr_triggered();
     void on_actionAddComment_triggered();
     void on_actionCreateFunction_triggered();
     void on_actionAddFlag_triggered();
@@ -67,17 +69,18 @@ private:
     RVA offset;
     bool canCopy;
 
-    QList<QAction*> anonymousActions;
+    QList<QAction *> anonymousActions;
 
     QMenu *editMenu;
     QAction *editMenuAction;
     QAction actionEditInstruction;
     QAction actionNopInstruction;
+    QAction actionJmpReverse;
     QAction actionEditBytes;
 
     QAction actionCopy;
     QAction *copySeparator;
-
+    QAction actionCopyAddr;
 
 
     QAction actionAddAnnotation;

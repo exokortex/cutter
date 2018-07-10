@@ -4,17 +4,16 @@
 #include <memory>
 
 #include "Cutter.h"
+#include "CutterDockWidget.h"
 
 #include <QAbstractListModel>
 #include <QSortFilterProxyModel>
-#include <QDockWidget>
 
 class MainWindow;
 class QTreeWidget;
 
-namespace Ui
-{
-    class TypesWidget;
+namespace Ui {
+class TypesWidget;
 }
 
 
@@ -33,7 +32,7 @@ public:
     enum Columns { TYPE = 0, SIZE, FORMAT, COUNT };
     static const int TypeDescriptionRole = Qt::UserRole;
 
-    TypesModel(QList<TypeDescription> *types, QObject *parent = 0);
+    TypesModel(QList<TypeDescription> *types, QObject *parent = nullptr);
 
     int rowCount(const QModelIndex &parent = QModelIndex()) const;
     int columnCount(const QModelIndex &parent = QModelIndex()) const;
@@ -52,7 +51,7 @@ class TypesSortFilterProxyModel : public QSortFilterProxyModel
     Q_OBJECT
 
 public:
-    TypesSortFilterProxyModel(TypesModel *source_model, QObject *parent = 0);
+    TypesSortFilterProxyModel(TypesModel *source_model, QObject *parent = nullptr);
 
 protected:
     bool filterAcceptsRow(int row, const QModelIndex &parent) const override;
@@ -61,12 +60,12 @@ protected:
 
 
 
-class TypesWidget : public QDockWidget
+class TypesWidget : public CutterDockWidget
 {
     Q_OBJECT
 
 public:
-    explicit TypesWidget(MainWindow *main, QWidget *parent = 0);
+    explicit TypesWidget(MainWindow *main, QAction *action = nullptr);
     ~TypesWidget();
 
 private slots:
@@ -76,7 +75,6 @@ private slots:
 
 private:
     std::unique_ptr<Ui::TypesWidget> ui;
-    MainWindow      *main;
 
     TypesModel *types_model;
     TypesSortFilterProxyModel *types_proxy_model;

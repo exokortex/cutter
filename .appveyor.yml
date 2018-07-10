@@ -1,4 +1,4 @@
-version: '1.2-git-{build}'
+version: '1.5-git-{build}'
 skip_tags: true
 image: 'Visual Studio 2015'
 clone_depth: 1
@@ -16,21 +16,18 @@ branches:
 # Environment
 environment:
   NINJA_URL: https://github.com/ninja-build/ninja/releases/download/v1.8.2/ninja-win.zip
-  QTDIR: 'C:\Qt\5.10.0\msvc2015_64'
-  QT32PATH: 'C:\Qt\5.10.0\msvc2015'
-  QT64PATH: 'C:\Qt\5.10.0\msvc2015_64'
+  QT32PATH: 'C:\Qt\5.9\msvc2015'
+  QT64PATH: 'C:\Qt\5.9\msvc2015_64'
   VSVARSALLPATH: 'C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat'
   matrix:
     # Build: qmake vs2015 x86 shared
     - ARCH: x86
       PYTHON: 'C:\Python36'
       QMAKE: 1
-      BITS: 32
     # Build: qmake vs2015 x64 shared
     - ARCH: x64
       PYTHON: 'C:\Python36-x64'
       QMAKE: 1
-      BITS: 64
     # Build: meson ninja x64 static
     - ARCH: x64
       PYTHON: 'C:\Python36-x64'
@@ -44,15 +41,16 @@ install:
   - cmd: python -m pip install meson
   - cmd: powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; wget %NINJA_URL% -OutFile ninja.zip; Expand-Archive .\ninja.zip -DestinationPath ."
   # Artifacts
-  - cmd: if defined MESON ( set "ARTIFACT_NAME=Cutter_%ARCH%_static" ) else ( set "ARTIFACT_NAME=Cutter_%ARCH%" )
-  - cmd: if defined MESON ( set "ARTIFACT_PATH=dist%BITS%" ) else ( set "ARTIFACT_PATH=build%BITS%\cutter" )
+  - cmd: set "ARTIFACT_NAME=Cutter_%ARCH%"
+  - cmd: if defined MESON ( set "ARTIFACT_PATH=dist_%ARCH%" ) else ( set "ARTIFACT_PATH=build_%ARCH%\cutter" )
 
 before_build:
   - cmd: git submodule update --init
+  - cmd: python scripts\compile_python_resources.py
 
 # Build config
 build_script:
-  - cmd: if defined QMAKE ( call prepare_r2.bat && call build.bat CUTTER_ENABLE_JUPYTER CUTTER_ENABLE_QTWEBENGINE )
+  - cmd: if defined QMAKE ( call prepare_r2.bat && call build.bat )
   - cmd: if defined MESON ( python meson.py --dist=%ARTIFACT_PATH% --backend=%BACKEND% --jupyter --webengine )
 
 after_build:
@@ -61,8 +59,12 @@ after_build:
   - ps: $env:py_url = "https://www.python.org/ftp/python/${env:py_version}/python-${env:py_version}-embed-${env:py_platform}.zip"
   - cmd: powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; wget %py_url% -OutFile python_embed.zip; Expand-Archive .\python_embed.zip -DestinationPath .\python_embed; Remove-Item -Path .\python_embed\vcruntime140.dll"
   - cmd: powershell -Command "Expand-Archive .\python_embed\python36.zip -DestinationPath .\%ARTIFACT_PATH%\python36"
-  - cmd: python -m pip install -I -t "%ARTIFACT_PATH%\python36\site-packages" jupyter
+  - cmd: rd /s /q "%ARTIFACT_PATH%\python36\lib2to3"
+  - cmd: python -m pip install -I --no-compile -t "%ARTIFACT_PATH%\python36\site-packages" jupyter
+  - cmd: if exist "%ARTIFACT_PATH%\python36\site-packages\test" ( rd /s /q "%ARTIFACT_PATH%\python36\site-packages\test" )
   - cmd: for /d %%p in ("%ARTIFACT_PATH%\python36\site-packages\*.dist-info" "%ARTIFACT_PATH%\python36\site-packages\*.egg-info") do rd /s /q "%%p"
+  - cmd: python -O -m compileall -b -q "%ARTIFACT_PATH%\python36\site-packages"
+  - cmd: del /s "%ARTIFACT_PATH%\python36\site-packages\*.py"
   - cmd: copy python_embed\*.pyd "%ARTIFACT_PATH%\python36\" && copy python_embed\*.dll "%ARTIFACT_PATH%\"
   - cmd: powershell -Command "[System.IO.File]::WriteAllLines(\"%ARTIFACT_PATH%\python36._pth\", \"python36`r`npython36\site-packages\")"
 
@@ -75,13 +77,13 @@ artifacts:
     name: "%ARTIFACT_NAME%"
 
 deploy:
-  release: cutter-$(appveyor_build_version)
   description: 'Cutter binaries (Windows)'
   provider: GitHub
   auth_token:
     secure: 2SmsqS2RaX2N5c9UwUcfBwNmMX64FfPAZFShLyxIkZXiC8vLaYCHToWxBYEuWRSk
-  artifact: Cutter%BITS%
+  artifact: "%ARTIFACT_NAME%"
   draft: true
   prerelease: false
   on:
+    branch: master
     appveyor_repo_tag: true

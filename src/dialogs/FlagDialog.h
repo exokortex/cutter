@@ -6,9 +6,8 @@
 #include <memory>
 #include "Cutter.h"
 
-namespace Ui
-{
-    class FlagDialog;
+namespace Ui {
+class FlagDialog;
 }
 
 class FlagDialog : public QDialog
@@ -16,7 +15,7 @@ class FlagDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit FlagDialog(RVA offset, QWidget *parent = 0);
+    explicit FlagDialog(RVA offset, QWidget *parent = nullptr);
     ~FlagDialog();
 
 private slots:

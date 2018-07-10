@@ -81,6 +81,7 @@ private:
     std::unique_ptr<ObjectDisassembler> objDis;
     std::unique_ptr<PPFile> file;
     rapidjson::Document jsonDocument;
+    bool ready;
 
 public:
     explicit PPCutterCore(QObject *parent = 0);
@@ -93,6 +94,10 @@ public:
 
     void loadFile(QString path);
     void saveProject();
+
+    inline bool isReady() {
+        return ready;
+    }
 
     inline const DisassemblerState &getState() const {
         return *state;

@@ -4,22 +4,22 @@
 #include <memory>
 
 #include "Cutter.h"
+#include "CutterDockWidget.h"
+#include "utils/StringsTask.h"
 
 #include <QAbstractListModel>
 #include <QSortFilterProxyModel>
-#include <QDockWidget>
 
 class MainWindow;
 class QTreeWidgetItem;
 
-namespace Ui
-{
-    class StringsWidget;
+namespace Ui {
+class StringsWidget;
 }
 
 class StringsModel: public QAbstractListModel
 {
-Q_OBJECT
+    Q_OBJECT
 
 private:
     QList<StringDescription> *strings;
@@ -28,7 +28,7 @@ public:
     enum Columns { OFFSET = 0, STRING, TYPE, LENGTH, SIZE, COUNT };
     static const int StringDescriptionRole = Qt::UserRole;
 
-    StringsModel(QList<StringDescription> *strings, QObject *parent = 0);
+    StringsModel(QList<StringDescription> *strings, QObject *parent = nullptr);
 
     int rowCount(const QModelIndex &parent = QModelIndex()) const;
     int columnCount(const QModelIndex &parent = QModelIndex()) const;
@@ -44,10 +44,10 @@ public:
 
 class StringsSortFilterProxyModel : public QSortFilterProxyModel
 {
-Q_OBJECT
+    Q_OBJECT
 
 public:
-    StringsSortFilterProxyModel(StringsModel *source_model, QObject *parent = 0);
+    StringsSortFilterProxyModel(StringsModel *source_model, QObject *parent = nullptr);
 
 protected:
     bool filterAcceptsRow(int row, const QModelIndex &parent) const override;
@@ -55,21 +55,24 @@ protected:
 };
 
 
-class StringsWidget : public QDockWidget
+class StringsWidget : public CutterDockWidget
 {
     Q_OBJECT
 
 public:
-    explicit StringsWidget(QWidget *parent = nullptr);
+    explicit StringsWidget(MainWindow *main, QAction *action = nullptr);
     ~StringsWidget();
 
 private slots:
     void on_stringsTreeView_doubleClicked(const QModelIndex &index);
 
     void refreshStrings();
+    void stringSearchFinished(const QList<StringDescription> &strings);
 
 private:
     std::unique_ptr<Ui::StringsWidget> ui;
+
+    QSharedPointer<StringsTask> task;
 
     StringsModel *model;
     StringsSortFilterProxyModel *proxy_model;

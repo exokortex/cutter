@@ -3,6 +3,7 @@
 
 #include <QEvent>
 #include <QApplication>
+#include <QList>
 
 #include "MainWindow.h"
 
@@ -15,7 +16,12 @@ public:
     CutterApplication(int &argc, char **argv);
     ~CutterApplication();
 
-    MainWindow *getMainWindow() { return mainWindow; }
+    MainWindow *getMainWindow()
+    {
+        return mainWindow;
+    }
+
+    void loadPlugins();
 
 protected:
     bool event(QEvent *e);

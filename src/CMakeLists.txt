@@ -6,14 +6,14 @@ include(DisallowInSource)
 
 if(FALSE) # ignore cutter name and version in future upstream pulls
 
-project(Cutter VERSION 1.2)
+project(Cutter VERSION 1.5)
 
 endif()
 
 option(CUTTER_ENABLE_JUPYTER "Enable Jupyter integration. Requires Python >= 3.3." ON)
 option(CUTTER_ENABLE_QTWEBENGINE "Use QtWebEngine for in-app Jupyter Browser. Unused if CUTTER_ENABLE_JUPYTER=OFF." ON)
 
-project(ppCutter VERSION 0.1)
+project(ppCutter VERSION 0.2)
 
 set(CMAKE_CXX_STANDARD 14)
 
@@ -92,12 +92,14 @@ message(STATUS "Building Cutter version ${CUTTER_VERSION_FULL}")
 add_definitions("-DAPP_VERSION=\"${CUTTER_VERSION_FULL}\"")
 
 add_executable(ppCutter ${UI_FILES} ${QRC_FILES} ${SOURCE_FILES} ${HEADER_FILES})
-qt5_use_modules(ppCutter Core Widgets Gui Svg)
+
+target_link_libraries(ppCutter Qt5::Core Qt5::Widgets Qt5::Gui Qt5::Svg)
 target_link_libraries(ppCutter ${RADARE2_LIBRARIES})
+
 if(CUTTER_ENABLE_JUPYTER)
     target_link_libraries(ppCutter ${PYTHON_LIBRARIES})
     if(CUTTER_ENABLE_QTWEBENGINE)
-        qt5_use_modules(ppCutter WebEngineWidgets)
+        target_link_libraries(ppCutter Qt5::WebEngineWidgets)
     endif()
 endif()
 

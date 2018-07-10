@@ -7,7 +7,7 @@
 #include <QElapsedTimer>
 #include <memory>
 #include "Cutter.h"
-#include "AnalThread.h"
+#include "AnalTask.h"
 #include "ui_OptionsDialog.h"
 
 class MainWindow;
@@ -19,13 +19,11 @@ class OptionsDialog : public QDialog
 public:
     explicit OptionsDialog(MainWindow *main);
     ~OptionsDialog();
-    RAnalFunction functionAt(ut64 addr);
+
     QStringList    asm_plugins;
 
     void setupAndStartAnalysis(int level, QList<QString> advanced);
 
-public slots:
-    void updateProgress(const QString &str);
 private slots:
     void on_okButton_clicked();
     void on_analSlider_valueChanged(int value);
@@ -33,18 +31,15 @@ private slots:
     void on_analCheckBox_clicked(bool checked);
     void on_archComboBox_currentIndexChanged(int index);
     void on_pdbSelectButton_clicked();
-
-    void updateProgressTimer();
+    void on_scriptSelectButton_clicked();
 
     void updatePDBLayout();
-
-    void anal_finished();
+    void updateScriptLayout();
 
 protected:
-	void closeEvent(QCloseEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
 
 private:
-    AnalThread analThread;
     MainWindow *main;
     CutterCore *core;
     int defaultAnalLevel;
@@ -53,21 +48,17 @@ private:
 
     void updateCPUComboBox();
 
-    void setInteractionEnabled(bool enabled);
-
 public:
-    enum class Endianness { Auto, Little, Big };
-
     std::unique_ptr<Ui::OptionsDialog> ui;
 
     QString getSelectedArch();
     QString getSelectedCPU();
     int getSelectedBits();
     int getSelectedBBSize();
-	Endianness getSelectedEndianness();
+    InitialOptions::Endianness getSelectedEndianness();
     QString getSelectedOS();
-    QTimer analTimer;
-    QElapsedTimer analElapsedTimer;
+    QList<QString> getSelectedAdvancedAnalCmds();
+
     void reject() override;
 };
 

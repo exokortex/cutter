@@ -5,32 +5,31 @@
 
 #include <QDebug>
 #include <QTextEdit>
-#include <QDockWidget>
 #include <QTreeWidget>
 #include <QTabWidget>
 #include <QUrl>
 #include <QPlainTextEdit>
 #include <QMouseEvent>
 #include <memory>
+
 #include "Cutter.h"
+#include "CutterDockWidget.h"
 #include "utils/Highlighter.h"
 #include "utils/HexAsciiHighlighter.h"
 #include "utils/HexHighlighter.h"
 #include "Dashboard.h"
 
 
-namespace Ui
-{
-    class SidebarWidget;
+namespace Ui {
+class SidebarWidget;
 }
 
-class SidebarWidget : public QDockWidget
+class SidebarWidget : public CutterDockWidget
 {
-Q_OBJECT
+    Q_OBJECT
 
 public:
-    explicit SidebarWidget(const QString &title, QWidget *parent = nullptr, Qt::WindowFlags flags = 0);
-    explicit SidebarWidget(QWidget *parent = nullptr, Qt::WindowFlags flags = 0);
+    explicit SidebarWidget(MainWindow *main, QAction *action = nullptr);
     ~SidebarWidget();
 
 private:
@@ -40,6 +39,7 @@ private:
     void updateRefs(RVA addr);
     void fillRefs(QList<XrefDescription> refs, QList<XrefDescription> xrefs);
     void fillOffsetInfo(QString off);
+    void fillRegistersInfo();
 
     void setScrollMode();
 
@@ -55,6 +55,7 @@ private slots:
     void on_opcodeDescToolButton_clicked();
     void on_xrefFromToolButton_clicked();
     void on_xrefToToolButton_clicked();
+    void on_regInfoToolButton_clicked();
 };
 
 #endif // SIDEBARWIDGET_H

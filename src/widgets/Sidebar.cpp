@@ -15,12 +15,9 @@ SideBar::SideBar(MainWindow *main) :
     ui->setupUi(this);
 
     QSettings settings;
-    if (settings.value("responsive").toBool())
-    {
+    if (settings.value("responsive").toBool()) {
         ui->respButton->setChecked(true);
-    }
-    else
-    {
+    } else {
         ui->respButton->setChecked(false);
     }
 }
@@ -34,13 +31,10 @@ void SideBar::on_tabsButton_clicked()
 
 void SideBar::on_lockButton_clicked()
 {
-    if (ui->lockButton->isChecked())
-    {
+    if (ui->lockButton->isChecked()) {
         ui->lockButton->setIcon(QIcon(":/img/icons/unlock_white.svg"));
         this->main->lockUnlock_Docks(1);
-    }
-    else
-    {
+    } else {
         ui->lockButton->setIcon(QIcon(":/img/icons/lock_white.svg"));
         this->main->lockUnlock_Docks(0);
     }
@@ -48,17 +42,17 @@ void SideBar::on_lockButton_clicked()
 
 void SideBar::on_calcInput_textChanged(const QString &arg1)
 {
-    ui->calcOutput->setText(QString::number(CutterCore::getInstance()->math(arg1)));
+    ui->calcOutput->setText(QString::number(Core()->math(arg1)));
 }
 
 void SideBar::on_asm2hex_clicked()
 {
-    ui->hexInput->setPlainText(CutterCore::getInstance()->assemble(ui->asmInput->toPlainText()));
+    ui->hexInput->setPlainText(Core()->assemble(ui->asmInput->toPlainText()));
 }
 
 void SideBar::on_hex2asm_clicked()
 {
-    ui->asmInput->setPlainText(CutterCore::getInstance()->disassemble(ui->hexInput->toPlainText()));
+    ui->asmInput->setPlainText(Core()->disassemble(ui->hexInput->toPlainText()));
 }
 
 void SideBar::on_respButton_toggled(bool checked)

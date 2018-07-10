@@ -1,5 +1,6 @@
 #include "utils/Helpers.h"
 #include "ResourcesWidget.h"
+#include "MainWindow.h"
 #include <QVBoxLayout>
 
 ResourcesModel::ResourcesModel(QList<ResourcesDescription> *resources, QObject *parent)
@@ -22,40 +23,36 @@ QVariant ResourcesModel::data(const QModelIndex &index, int role) const
 {
     const ResourcesDescription &res = resources->at(index.row());
 
-    switch (role)
-    {
-        case Qt::DisplayRole:
-            switch (index.column())
-            {
-                case NAME:
-                    return res.name;
-                case VADDR:
-                    return RAddressString(res.vaddr);
-                case INDEX:
-                    return res.index;
-                case TYPE:
-                    return res.type;
-                case SIZE:
-                    return qhelpers::formatBytecount(res.size);
-                case LANG:
-                    return res.lang;
-                default:
-                    return QVariant();
-            }
-        case Qt::UserRole:
-            return QVariant::fromValue(res);
+    switch (role) {
+    case Qt::DisplayRole:
+        switch (index.column()) {
+        case NAME:
+            return res.name;
+        case VADDR:
+            return RAddressString(res.vaddr);
+        case INDEX:
+            return res.index;
+        case TYPE:
+            return res.type;
+        case SIZE:
+            return qhelpers::formatBytecount(res.size);
+        case LANG:
+            return res.lang;
         default:
             return QVariant();
+        }
+    case Qt::UserRole:
+        return QVariant::fromValue(res);
+    default:
+        return QVariant();
     }
 }
 
 QVariant ResourcesModel::headerData(int section, Qt::Orientation, int role) const
 {
-    switch (role)
-    {
+    switch (role) {
     case Qt::DisplayRole:
-        switch (section)
-        {
+        switch (section) {
         case NAME:
             return tr("Name");
         case VADDR:
@@ -86,8 +83,8 @@ void ResourcesModel::endReload()
     endResetModel();
 }
 
-ResourcesWidget::ResourcesWidget(QWidget *parent)
-    : QDockWidget(parent)
+ResourcesWidget::ResourcesWidget(MainWindow *main, QAction *action) :
+    CutterDockWidget(main, action)
 {
     setObjectName("ResourcesWidget");
 
@@ -103,7 +100,8 @@ ResourcesWidget::ResourcesWidget(QWidget *parent)
     this->setWidget(view);
 
     connect(Core(), SIGNAL(refreshAll()), this, SLOT(refreshResources()));
-    connect(view, SIGNAL(doubleClicked(const QModelIndex &)), this, SLOT(onDoubleClicked(const QModelIndex &)));
+    connect(view, SIGNAL(doubleClicked(const QModelIndex &)), this,
+            SLOT(onDoubleClicked(const QModelIndex &)));
 }
 
 void ResourcesWidget::refreshResources()
@@ -115,6 +113,9 @@ void ResourcesWidget::refreshResources()
 
 void ResourcesWidget::onDoubleClicked(const QModelIndex &index)
 {
+    if (!index.isValid())
+        return;
+
     ResourcesDescription res = index.data(Qt::UserRole).value<ResourcesDescription>();
-    CutterCore::getInstance()->seek(res.vaddr);
+    Core()->seek(res.vaddr);
 }

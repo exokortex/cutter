@@ -1,11 +1,6 @@
 #ifndef CUTTER_H
 #define CUTTER_H
 
-// Workaround for compile errors on Windows
-#ifdef _WIN32
-#include <r_addr_interval_msvc.h>
-#endif //_WIN32
-
 #include "r_core.h"
 
 // Workaround for compile errors on Windows
@@ -30,12 +25,28 @@
 #define __question(x) (QMessageBox::Yes==QMessageBox::question (this, "Alert", QString(x), QMessageBox::Yes| QMessageBox::No))
 
 #define APPNAME "Cutter"
-#define CUTTER_VERSION "1.2"
+#define CUTTER_VERSION "1.5"
 
 #define Core() (CutterCore::getInstance())
 
+/*!
+ * \brief Type to be used for all kinds of addresses/offsets in r2 address space.
+ */
 typedef ut64 RVA;
-#define RVA_INVALID UT64_MAX
+
+/*!
+ * \brief Maximum value of RVA. Do NOT use this for specifying invalid values, use RVA_INVALID instead.
+ */
+#define RVA_MAX UT64_MAX
+
+/*!
+ * \brief Value for specifying an invalid RVA.
+ */
+#define RVA_INVALID RVA_MAX
+
+class AsyncTaskManager;
+class CutterCore;
+#include "plugins/CutterPlugin.h"
 
 class RCoreLocked
 {
@@ -63,17 +74,28 @@ inline QString RSizeString(RVA size)
     return QString::asprintf("%lld", size);
 }
 
-struct FunctionDescription
+inline QString RHexString(RVA size)
 {
+    return QString::asprintf("%#llx", size);
+}
+
+struct FunctionDescription {
     RVA offset;
     RVA size;
+    RVA nargs;
+    RVA nbbs;
+    RVA nlocals;
+    RVA cc;
+    QString calltype;
     QString name;
 
-    bool contains(RVA addr) const     { return addr >= offset && addr < offset + size; }
+    bool contains(RVA addr) const
+    {
+        return addr >= offset && addr < offset + size;
+    }
 };
 
-struct ImportDescription
-{
+struct ImportDescription {
     RVA plt;
     int ordinal;
     QString bind;
@@ -81,8 +103,7 @@ struct ImportDescription
     QString name;
 };
 
-struct ExportDescription
-{
+struct ExportDescription {
     RVA vaddr;
     RVA paddr;
     RVA size;
@@ -91,45 +112,59 @@ struct ExportDescription
     QString flag_name;
 };
 
-struct TypeDescription
+struct HeaderDescription
 {
+    RVA vaddr;
+    RVA paddr;
+    QString value;
+    QString name;
+};
+
+struct ZignatureDescription
+{
+    QString name;
+    QString bytes;
+    RVA cc;
+    RVA nbbs;
+    RVA edges;
+    RVA ebbs;
+    RVA offset;
+    QStringList refs;
+};
+
+struct TypeDescription {
     QString type;
     int size;
     QString format;
 };
 
-struct SearchDescription
-{
+struct SearchDescription {
     RVA offset;
     int size;
     QString code;
     QString data;
 };
 
-struct SymbolDescription
-{
+struct SymbolDescription {
     RVA vaddr;
     QString bind;
     QString type;
     QString name;
 };
 
-struct CommentDescription
-{
+struct CommentDescription {
     RVA offset;
     QString name;
 };
 
-struct RelocDescription
-{
+struct RelocDescription {
     RVA vaddr;
     RVA paddr;
     QString type;
     QString name;
 };
 
-struct StringDescription
-{
+struct StringDescription {
     RVA vaddr;
     QString string;
     QString type;
@@ -137,30 +172,27 @@ struct StringDescription
     ut32 size;
 };
 
-struct FlagspaceDescription
-{
+struct FlagspaceDescription {
     QString name;
 };
 
-struct FlagDescription
-{
+struct FlagDescription {
     RVA offset;
     RVA size;
     QString name;
 };
 
-struct SectionDescription
-{
+struct SectionDescription {
     RVA vaddr;
     RVA paddr;
     RVA size;
     RVA vsize;
     QString name;
     QString flags;
+    QString entropy;
 };
 
-struct EntrypointDescription
-{
+struct EntrypointDescription {
     RVA vaddr;
     RVA paddr;
     RVA baddr;
@@ -169,8 +201,7 @@ struct EntrypointDescription
     QString type;
 };
 
-struct XrefDescription
-{
+struct XrefDescription {
     RVA from;
     QString from_str;
     RVA to;
@@ -178,34 +209,51 @@ struct XrefDescription
     QString type;
 };
 
-struct RBinPluginDescription
-{
+struct RBinPluginDescription {
     QString name;
     QString description;
     QString license;
     QString type;
 };
 
-struct DisassemblyLine
-{
+struct RIOPluginDescription {
+    QString name;
+    QString description;
+    QString license;
+    QString permissions;
+};
+
+struct RCorePluginDescription {
+    QString name;
+    QString description;
+};
+
+struct RAsmPluginDescription {
+    QString name;
+    QString architecture;
+    QString author;
+    QString version;
+    QString cpus;
+    QString description;
+    QString license;
+};
+
+struct DisassemblyLine {
     RVA offset;
     QString text;
 };
 
-struct ClassMethodDescription
-{
+struct ClassMethodDescription {
     QString name;
     RVA addr;
 };
 
-struct ClassFieldDescription
-{
+struct ClassFieldDescription {
     QString name;
     RVA addr;
 };
 
-struct ClassDescription
-{
+struct ClassDescription {
     QString name;
     RVA addr;
     ut64 index;
@@ -213,8 +261,7 @@ struct ClassDescription
     QList<ClassFieldDescription> fields;
 };
 
-struct ResourcesDescription
-{
+struct ResourcesDescription {
     int name;
     RVA vaddr;
     ut64 index;
@@ -223,10 +270,28 @@ struct ResourcesDescription
     QString lang;
 };
 
-struct VTableDescription
-{
+struct VTableDescription {
     RVA addr;
     QList<ClassMethodDescription> methods;
+};
+
+struct BlockDescription {
+    RVA addr;
+    RVA size;
+    int flags;
+    int functions;
+    int inFunctions;
+    int comments;
+    int symbols;
+    int strings;
+    ut8 rwx;
+};
+
+struct BlockStatistics {
+    RVA from;
+    RVA to;
+    RVA blocksize;
+    QList<BlockDescription> blocks;
 };
 
 Q_DECLARE_METATYPE(FunctionDescription)
@@ -241,6 +306,9 @@ Q_DECLARE_METATYPE(FlagDescription)
 Q_DECLARE_METATYPE(XrefDescription)
 Q_DECLARE_METATYPE(EntrypointDescription)
 Q_DECLARE_METATYPE(RBinPluginDescription)
+Q_DECLARE_METATYPE(RIOPluginDescription)
+Q_DECLARE_METATYPE(RCorePluginDescription)
+Q_DECLARE_METATYPE(RAsmPluginDescription)
 Q_DECLARE_METATYPE(ClassMethodDescription)
 Q_DECLARE_METATYPE(ClassFieldDescription)
 Q_DECLARE_METATYPE(ClassDescription)
@@ -250,7 +318,10 @@ Q_DECLARE_METATYPE(const ClassFieldDescription *)
 Q_DECLARE_METATYPE(ResourcesDescription)
 Q_DECLARE_METATYPE(VTableDescription)
 Q_DECLARE_METATYPE(TypeDescription)
+Q_DECLARE_METATYPE(HeaderDescription)
+Q_DECLARE_METATYPE(ZignatureDescription)
 Q_DECLARE_METATYPE(SearchDescription)
+Q_DECLARE_METATYPE(SectionDescription)
 
 class CutterCore: public QObject
 {
@@ -258,83 +329,117 @@ class CutterCore: public QObject
     friend class ccClass;
 
 public:
-    explicit CutterCore(QObject *parent = 0);
+    explicit CutterCore(QObject *parent = nullptr);
     ~CutterCore();
     static CutterCore *getInstance();
 
-    /* Getters */
-    RVA getOffset() const { return core_->offset; }
+    AsyncTaskManager *getAsyncTaskManager() { return asyncTaskManager; }
 
+    RVA getOffset() const                   { return core_->offset; }
+
+    /* Core functions (commands) */
     static QString sanitizeStringForCommand(QString s);
     QString cmd(const QString &str);
     QString cmdRaw(const QString &str);
     QJsonDocument cmdj(const QString &str);
-    QStringList cmdList(const QString &str)     { auto l = cmd(str).split("\n"); l.removeAll(""); return l; }
+    QStringList cmdList(const QString &str)
+    {
+        auto l = cmd(str).split("\n");
+        l.removeAll("");
+        return l;
+    }
+    QString cmdTask(const QString &str);
+    QJsonDocument cmdjTask(const QString &str);
+    QString getVersionInformation();
 
-    QList<DisassemblyLine> disassembleLines(RVA offset, int lines);
+    QJsonDocument parseJson(const char *res, const QString &cmd = QString());
 
+    /* Functions methods */
     void renameFunction(const QString &oldName, const QString &newName);
     void delFunction(RVA addr);
     void renameFlag(QString old_name, QString new_name);
-    void delFlag(RVA addr);
+    RAnalFunction *functionAt(ut64 addr);
+    QString cmdFunctionAt(QString addr);
+    QString cmdFunctionAt(RVA addr);
+    QString createFunctionAt(RVA addr, QString name);
+    void markString(RVA addr);
 
+    /* Flags */
+    void delFlag(RVA addr);
+    void delFlag(const QString &name);
+    void addFlag(RVA offset, QString name, RVA size);
+    void triggerFlagsChanged();
+
+    /* Edition functions */
     void editInstruction(RVA addr, const QString &inst);
     void nopInstruction(RVA addr);
-    
+    void jmpReverse(RVA addr);
     void editBytes(RVA addr, const QString &inst);
 
+    /* Comments */
     void setComment(RVA addr, const QString &cmt);
     void delComment(RVA addr);
-
     void setImmediateBase(const QString &r2BaseName, RVA offset = RVA_INVALID);
     void setCurrentBits(int bits, RVA offset = RVA_INVALID);
 
-    bool loadFile(QString path, uint64_t loadaddr = 0LL, uint64_t mapaddr = 0LL, int perms = R_IO_READ, int va = 0, int idx = 0, bool loadbin = false, const QString &forceBinPlugin = nullptr);
+    /* File related methods */
+    bool loadFile(QString path, ut64 baddr = 0LL, ut64 mapaddr = 0LL, int perms = R_IO_READ,
+                  int va = 0, bool loadbin = false, const QString &forceBinPlugin = nullptr);
     bool tryFile(QString path, bool rw);
+    void openFile(QString path, RVA mapaddr);
+    void loadScript(const QString &scriptname);
+    QJsonArray getOpenedFiles();
+
+    /* Analysis functions */
     void analyze(int level, QList<QString> advanced);
 
-    // Seek functions
-    void seek(QString addr);
+    /* Seek functions */
+    void seek(QString thing);
     void seek(ut64 offset);
     void seekPrev();
     void seekNext();
     RVA getOffset();
-
     RVA prevOpAddr(RVA startAddr, int count);
     RVA nextOpAddr(RVA startAddr, int count);
 
-    // Disassembly/Graph/Hexdump/Pseudocode view priority
+    /* Disassembly/Graph/Hexdump/Pseudocode view priority */
     enum class MemoryWidgetType { Disassembly, Graph, Hexdump, Pseudocode };
-    MemoryWidgetType getMemoryWidgetPriority() const            { return memoryWidgetPriority; }
-    void setMemoryWidgetPriority(MemoryWidgetType type)         { memoryWidgetPriority = type; }
-    void triggerRaisePrioritizedMemoryWidget()                  { emit raisePrioritizedMemoryWidget(memoryWidgetPriority); }
+    MemoryWidgetType getMemoryWidgetPriority() const
+    {
+        return memoryWidgetPriority;
+    }
+    void setMemoryWidgetPriority(MemoryWidgetType type)
+    {
+        memoryWidgetPriority = type;
+    }
+    void triggerRaisePrioritizedMemoryWidget()
+    {
+        emit raisePrioritizedMemoryWidget(memoryWidgetPriority);
+    }
 
+    /* Math functions */
     ut64 math(const QString &expr);
     QString itoa(ut64 num, int rdx = 16);
 
-    /* Config related */
+    /* Config functions */
     void setConfig(const QString &k, const QString &v);
     void setConfig(const QString &k, int v);
     void setConfig(const QString &k, bool v);
-    void setConfig(const QString &k, const char *v)     { setConfig(k, QString(v)); }
+    void setConfig(const QString &k, const char *v) { setConfig(k, QString(v)); }
+    void setConfig(const QString &k, const QVariant &v);
     int getConfigi(const QString &k);
     bool getConfigb(const QString &k);
     QString getConfig(const QString &k);
+    QList<QString> getColorThemes();
 
+    /* Assembly related methods */
     QString assemble(const QString &code);
     QString disassemble(const QString &hex);
     QString disassembleSingleInstruction(RVA addr);
-    void setDefaultCPU();
-    void setCPU(QString arch, QString cpu, int bits, bool temporary = false);
+    QList<DisassemblyLine> disassembleLines(RVA offset, int lines);
+    void setCPU(QString arch, QString cpu, int bits);
     void setEndianness(bool big);
     void setBBSize(int size);
-    
-    RAnalFunction *functionAt(ut64 addr);
-    QString cmdFunctionAt(QString addr);
-    QString cmdFunctionAt(RVA addr);
-
-    QString createFunctionAt(RVA addr, QString name);
-    void markString(RVA addr);
 
     /* SDB */
     QList<QString> sdbList(QString path);
@@ -345,10 +450,18 @@ public:
     ulong get_baddr();
     QList<QList<QString>> get_exec_sections();
     QString getOffsetInfo(QString addr);
+    QJsonDocument getRegistersInfo();
+    QJsonDocument getRegisterValues();
+    QString getRegisterName(QString registerRole);
+    void setRegister(QString regName, QString regValue);
+    QJsonDocument getStack(int size = 0x40);
+    QJsonDocument getBacktrace();
     RVA getOffsetJump(RVA addr);
     QString getDecompiledCode(RVA addr);
     QString getDecompiledCode(QString addr);
     QJsonDocument getFileInfo();
+    QJsonDocument getSignatureInfo();
+    QJsonDocument getFileVersionInfo();
     QStringList getStats();
     QString getSimpleGraph(QString function);
 
@@ -361,21 +474,28 @@ public:
 
     QList<RVA> getSeekHistory();
 
+    /* Plugins */
     QStringList getAsmPluginNames();
     QStringList getAnalPluginNames();
 
+    /* Projects */
     QStringList getProjectNames();
     void openProject(const QString &name);
     void saveProject(const QString &name);
-
+    void deleteProject(const QString &name);
     static bool isProjectNameValid(const QString &name);
 
+    /* Widgets */
     QList<RBinPluginDescription> getRBinPluginDescriptions(const QString &type = nullptr);
-
+    QList<RIOPluginDescription> getRIOPluginDescriptions();
+    QList<RCorePluginDescription> getRCorePluginDescriptions();
+    QList<RAsmPluginDescription> getRAsmPluginDescriptions();
     QList<FunctionDescription> getAllFunctions();
     QList<ImportDescription> getAllImports();
     QList<ExportDescription> getAllExports();
     QList<SymbolDescription> getAllSymbols();
+    QList<HeaderDescription> getAllHeaders();
+    QList<ZignatureDescription> getAllZignatures();
     QList<CommentDescription> getAllComments(const QString &filterType);
     QList<RelocDescription> getAllRelocs();
     QList<StringDescription> getAllStrings();
@@ -383,33 +503,33 @@ public:
     QList<FlagDescription> getAllFlags(QString flagspace = NULL);
     QList<SectionDescription> getAllSections();
     QList<EntrypointDescription> getAllEntrypoint();
-    QList<ClassDescription> getAllClasses();
+    QList<ClassDescription> getAllClassesFromBin();
+    QList<ClassDescription> getAllClassesFromFlags();
     QList<ResourcesDescription> getAllResources();
     QList<VTableDescription> getAllVTables();
     QList<TypeDescription> getAllTypes();
     QList<SearchDescription> getAllSearch(QString search_for, QString space);
+    BlockStatistics getBlockStatistics(unsigned int blocksCount);
 
-    QList<XrefDescription> getXRefs(RVA addr, bool to, bool whole_function, const QString &filterType = QString::null);
+    QList<XrefDescription> getXRefs(RVA addr, bool to, bool whole_function,
+                                    const QString &filterType = QString::null);
 
-    void addFlag(RVA offset, QString name, RVA size);
-    void triggerFlagsChanged();
+    QList<StringDescription> parseStringsJson(const QJsonDocument &doc);
+    QList<FunctionDescription> parseFunctionsJson(const QJsonDocument &doc);
 
+    /* Signals related */
     void triggerVarsChanged();
     void triggerFunctionRenamed(const QString &prevName, const QString &newName);
-
     void triggerRefreshAll();
-
     void triggerAsmOptionsChanged();
     void triggerGraphOptionsChanged();
 
-    void resetDefaultAsmOptions();
-    void saveDefaultAsmOptions();
+    RCoreTask *startTask(const QString &cmd);
+    void joinTask(RCoreTask *task);
+    void deleteTask(RCoreTask *task);
 
-    void loadScript(const QString &scriptname);
-    QString getVersionInformation();
-    QJsonArray getOpenedFiles();
-
-    QList<QString> getColorThemes();
+    void setCutterPlugins(QList<CutterPlugin*> plugins);
+    QList<CutterPlugin*> getCutterPlugins();
 
     RCoreLocked core() const;
 
@@ -447,15 +567,14 @@ signals:
 public slots:
 
 private:
-    QString default_arch;
-    QString default_cpu;
-    int default_bits;
-
     MemoryWidgetType memoryWidgetPriority;
 
     QString notes;
 
     RCore *core_;
+    AsyncTaskManager *asyncTaskManager;
+
+    QList<CutterPlugin*> plugins;
 };
 
 class ccClass : public CutterCore

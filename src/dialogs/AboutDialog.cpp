@@ -1,6 +1,7 @@
 #include <Cutter.h>
 #include "AboutDialog.h"
 #include "ui_AboutDialog.h"
+#include "R2PluginsDialog.h"
 #include "r_version.h"
 #include "utils/Configuration.h"
 
@@ -23,19 +24,19 @@ AboutDialog::AboutDialog(QWidget *parent) :
                           "<h2>Authors</h2>"
                           "xarkes, thestr4ng3r, ballessay<br/>"
                           "Based on work by Hugo Teso &lt;hugo.teso@gmail.org&gt; (originally Iaito).")
-        .arg(
+                       .arg(
 #ifdef CUTTER_ENABLE_JUPYTER
-        "ON"
+                           "ON"
 #else
-        "OFF"
+                           "OFF"
 #endif
-        ,
+                           ,
 #ifdef CUTTER_ENABLE_QTWEBENGINE
-        "ON"
+                           "ON"
 #else
-        "OFF"
+                           "OFF"
 #endif
-        ));
+                       ));
 }
 
 AboutDialog::~AboutDialog() {}
@@ -52,4 +53,10 @@ void AboutDialog::on_showVersionButton_clicked()
     auto versionInformation = Core()->getVersionInformation();
     popup.setText(versionInformation);
     popup.exec();
+}
+
+void AboutDialog::on_showPluginsButton_clicked()
+{
+    R2PluginsDialog dialog(this);
+    dialog.exec();
 }

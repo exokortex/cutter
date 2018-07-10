@@ -13,14 +13,13 @@ class HexHighlighter : public QSyntaxHighlighter
     Q_OBJECT
 
 public:
-    explicit HexHighlighter(QTextDocument *parent = 0);
+    explicit HexHighlighter(QTextDocument *parent = nullptr);
 
 protected:
     void highlightBlock(const QString &text);
 
 private:
-    struct HighlightingRule
-    {
+    struct HighlightingRule {
         QRegExp pattern;
         QTextCharFormat format;
     };

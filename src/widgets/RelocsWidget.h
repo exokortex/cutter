@@ -2,33 +2,70 @@
 #define RELOCSWIDGET_H
 
 #include <memory>
+#include <QAbstractTableModel>
+#include <QSortFilterProxyModel>
 
-#include <QDockWidget>
+#include "CutterDockWidget.h"
+#include "Cutter.h"
 
 class MainWindow;
-class QTreeWidgetItem;
 
-namespace Ui
-{
-    class RelocsWidget;
+namespace Ui {
+class RelocsWidget;
 }
 
-class RelocsWidget : public QDockWidget
+class RelocsModel : public QAbstractTableModel
+{
+    Q_OBJECT
+
+private:
+    QList<RelocDescription> *relocs;
+
+public:
+    enum Column { VAddrColumn = 0, TypeColumn, NameColumn, ColumnCount };
+    enum Role { RelocDescriptionRole = Qt::UserRole, AddressRole };
+
+    RelocsModel(QList<RelocDescription> *relocs, QObject* parent = nullptr);
+
+    int rowCount(const QModelIndex &parent) const;
+    int columnCount(const QModelIndex &parent) const;
+
+    QVariant data(const QModelIndex &index, int role) const;
+    QVariant headerData(int section, Qt::Orientation orientation, int role) const;
+
+    void beginReload();
+    void endReload();
+};
+
+class RelocsProxyModel : public QSortFilterProxyModel
 {
     Q_OBJECT
 
 public:
-    explicit RelocsWidget(MainWindow *main, QWidget *parent = 0);
+    RelocsProxyModel(RelocsModel *sourceModel, QObject *parent = nullptr);
+
+protected:
+    bool filterAcceptsRow(int row, const QModelIndex &parent) const override;
+    bool lessThan(const QModelIndex &left, const QModelIndex &right) const override;
+};
+
+class RelocsWidget : public CutterDockWidget
+{
+    Q_OBJECT
+
+public:
+    explicit RelocsWidget(MainWindow *main, QAction *action = nullptr);
     ~RelocsWidget();
 
 private slots:
-    void on_relocsTreeWidget_itemDoubleClicked(QTreeWidgetItem *item, int column);
-
-    void fillTreeWidget();
+    void on_relocsTreeView_doubleClicked(const QModelIndex &index);
+    void refreshRelocs();
 
 private:
     std::unique_ptr<Ui::RelocsWidget> ui;
-    MainWindow      *main;
+    RelocsModel *relocsModel;
+    RelocsProxyModel *relocsProxyModel;
+    QList<RelocDescription> relocs;
 
     void setScrollMode();
 };

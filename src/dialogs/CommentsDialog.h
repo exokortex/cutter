@@ -4,9 +4,8 @@
 #include <QDialog>
 #include <memory>
 
-namespace Ui
-{
-    class CommentsDialog;
+namespace Ui {
+class CommentsDialog;
 }
 
 class CommentsDialog : public QDialog
@@ -14,7 +13,7 @@ class CommentsDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit CommentsDialog(QWidget *parent = 0);
+    explicit CommentsDialog(QWidget *parent = nullptr);
     ~CommentsDialog();
 
     QString getComment();

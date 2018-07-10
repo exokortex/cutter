@@ -14,7 +14,7 @@
 
 const int NewFileDialog::MaxRecentFiles;
 
-static QColor getColorFor(const QString& str, int pos)
+static QColor getColorFor(const QString &str, int pos)
 {
     Q_UNUSED(str);
 
@@ -30,7 +30,7 @@ static QColor getColorFor(const QString& str, int pos)
 
 }
 
-static QIcon getIconFor(const QString& str, int pos)
+static QIcon getIconFor(const QString &str, int pos)
 {
     // Add to the icon list
     int w = 64;
@@ -51,27 +51,22 @@ static QIcon getIconFor(const QString& str, int pos)
 }
 
 NewFileDialog::NewFileDialog(QWidget *parent) :
-        QDialog(parent),
-        ui(new Ui::NewFileDialog)
+    QDialog(parent),
+    ui(new Ui::NewFileDialog)
 {
     ui->setupUi(this);
     setWindowFlags(windowFlags() & (~Qt::WindowContextHelpButtonHint));
     setAcceptDrops(true);
     ui->recentsListWidget->addAction(ui->actionRemove_item);
     ui->recentsListWidget->addAction(ui->actionClear_all);
+    ui->projectsListWidget->addAction(ui->actionRemove_project);
     ui->logoSvgWidget->load(Config()->getLogoFile());
 
     fillRecentFilesList();
-    bool projectsExist = fillProjectsList();
+    fillIOPluginsList();
 
-    if(projectsExist)
-    {
-        ui->tabWidget->setCurrentWidget(ui->projectsTab);
-    }
-    else
-    {
-        ui->tabWidget->setCurrentWidget(ui->filesTab);
-    }
+    // Set last clicked tab
+    ui->tabWidget->setCurrentIndex(Config()->getNewFileLastClicked());
 
     ui->loadProjectButton->setEnabled(ui->projectsListWidget->currentItem() != nullptr);
 
@@ -90,8 +85,7 @@ void NewFileDialog::on_selectFileButton_clicked()
 {
     QString fileName = QFileDialog::getOpenFileName(this, tr("Select file"), QDir::homePath());
 
-    if (!fileName.isEmpty())
-    {
+    if (!fileName.isEmpty()) {
         ui->newFileEdit->setText(fileName);
         ui->loadFileButton->setFocus();
     }
@@ -102,24 +96,22 @@ void NewFileDialog::on_selectProjectsDirButton_clicked()
     QFileDialog dialog(this);
     dialog.setFileMode(QFileDialog::DirectoryOnly);
 
-    QString currentDir = CutterCore::getInstance()->getConfig("dir.projects");
-    if(currentDir.startsWith("~"))
-    {
+    auto currentDir = Config()->getDirProjects();
+
+    if (currentDir.startsWith("~")) {
         currentDir = QDir::homePath() + currentDir.mid(1);
     }
     dialog.setDirectory(currentDir);
 
     dialog.setWindowTitle(tr("Select project path (dir.projects)"));
 
-    if(!dialog.exec())
-    {
+    if (!dialog.exec()) {
         return;
     }
 
     QString dir = dialog.selectedFiles().first();
-    if (!dir.isEmpty())
-    {
-        CutterCore::getInstance()->setConfig("dir.projects", dir);
+    if (!dir.isEmpty()) {
+        Config()->setDirProjects(dir);
         fillProjectsList();
     }
 }
@@ -128,8 +120,7 @@ void NewFileDialog::on_loadProjectButton_clicked()
 {
     QListWidgetItem *item = ui->projectsListWidget->currentItem();
 
-    if (item == nullptr)
-    {
+    if (item == nullptr) {
         return;
     }
 
@@ -160,14 +151,17 @@ void NewFileDialog::on_projectsListWidget_itemDoubleClicked(QListWidgetItem *ite
 
 void NewFileDialog::on_aboutButton_clicked()
 {
-	AboutDialog *a = new AboutDialog(this);
-	a->open();
+    AboutDialog *a = new AboutDialog(this);
+    a->open();
 }
 
 void NewFileDialog::on_actionRemove_item_triggered()
 {
     // Remove selected item from recents list
     QListWidgetItem *item = ui->recentsListWidget->currentItem();
+
+    if (item == nullptr)
+        return;
 
     QVariant data = item->data(Qt::UserRole);
     QString sitem = data.toString();
@@ -195,11 +189,39 @@ void NewFileDialog::on_actionClear_all_triggered()
     ui->newFileEdit->clear();
 }
 
+void NewFileDialog::on_actionRemove_project_triggered()
+{
+    CutterCore *core = Core();
+
+    QListWidgetItem *item = ui->projectsListWidget->currentItem();
+
+    if (item == nullptr)
+        return;
+
+    QVariant data = item->data(Qt::UserRole);
+    QString sitem = data.toString();
+
+    // Confirmation box
+    QMessageBox msgBox(this);
+    msgBox.setText(tr("Delete the project \"%1\" from disk ?").arg(sitem));
+    msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+    int ret = msgBox.exec();
+
+    switch (ret) {
+    case QMessageBox::Yes:
+        core->deleteProject(sitem);
+        ui->projectsListWidget->takeItem(ui->projectsListWidget->currentRow());
+        break;
+    case QMessageBox::No:
+    default:
+        break;
+    }
+}
+
 void NewFileDialog::dragEnterEvent(QDragEnterEvent *event)
 {
     // Accept drag & drop events only if they provide a URL
-    if(event->mimeData()->hasUrls())
-    {
+    if (event->mimeData()->hasUrls()) {
         event->acceptProposedAction();
     }
 }
@@ -207,8 +229,7 @@ void NewFileDialog::dragEnterEvent(QDragEnterEvent *event)
 void NewFileDialog::dropEvent(QDropEvent *event)
 {
     // Accept drag & drop events only if they provide a URL
-    if(event->mimeData()->urls().count() == 0)
-    {
+    if (event->mimeData()->urls().count() == 0) {
         qWarning() << "No URL in drop event, ignoring it.";
         return;
     }
@@ -226,8 +247,7 @@ bool NewFileDialog::fillRecentFilesList()
 
     QMutableListIterator<QString> it(files);
     int i = 0;
-    while (it.hasNext())
-    {
+    while (it.hasNext()) {
         const QString &file = it.next();
         // Get stored files
 
@@ -238,15 +258,13 @@ bool NewFileDialog::fillRecentFilesList()
 
         // Get file info
         QFileInfo info(file);
-        if (!info.exists())
-        {
+        if (!info.exists()) {
             it.remove();
-        }
-        else
-        {
+        } else {
             QListWidgetItem *item = new QListWidgetItem(
-                    getIconFor(name, i++),
-                    file + "\nCreated: " + info.created().toString() + "\nSize: " + qhelpers::formatBytecount(info.size())
+                getIconFor(name, i++),
+                file + "\nCreated: " + info.created().toString() + "\nSize: " + qhelpers::formatBytecount(
+                    info.size())
             );
             //":/img/icons/target.svg"), name );
             item->setData(Qt::UserRole, file);
@@ -262,18 +280,19 @@ bool NewFileDialog::fillRecentFilesList()
 
 bool NewFileDialog::fillProjectsList()
 {
-    CutterCore *core = CutterCore::getInstance();
+    CutterCore *core = Core();
 
-    ui->projectsDirEdit->setText(core->getConfig("dir.projects"));
+    auto currentDir = Config()->getDirProjects();
+
+    ui->projectsDirEdit->setText(currentDir);
 
     QStringList projects = core->getProjectNames();
     projects.sort(Qt::CaseInsensitive);
 
     ui->projectsListWidget->clear();
 
-    int i=0;
-    for(const QString &project : projects)
-    {
+    int i = 0;
+    for (const QString &project : projects) {
         QString info = core->cmd("Pi " + project);
 
         QListWidgetItem *item = new QListWidgetItem(getIconFor(project, i++), project + "\n" + info);
@@ -285,10 +304,24 @@ bool NewFileDialog::fillProjectsList()
     return !projects.isEmpty();
 }
 
+void NewFileDialog::fillIOPluginsList()
+{
+    ui->ioPlugin->clear();
+    ui->ioPlugin->addItem("");
+    ui->ioPlugin->setItemData(0, tr("Open a file with no extra treatment."), Qt::ToolTipRole);
+
+    int index = 1;
+    QList<RIOPluginDescription> ioPlugins = Core()->getRIOPluginDescriptions();
+    for (RIOPluginDescription plugin : ioPlugins) {
+        ui->ioPlugin->addItem(plugin.name);
+        ui->ioPlugin->setItemData(index, plugin.description, Qt::ToolTipRole);
+        index++;
+    }
+}
+
 void NewFileDialog::loadFile(const QString &filename)
 {
-    if(!Core()->tryFile(filename, false))
-    {
+    if (ui->ioPlugin->currentIndex() == 0 && !Core()->tryFile(filename, false) && !ui->checkBox_FilelessOpen->isChecked()) {
         QMessageBox msgBox(this);
         msgBox.setText(tr("Select a new program or a previous one before continuing."));
         msgBox.exec();
@@ -307,8 +340,13 @@ void NewFileDialog::loadFile(const QString &filename)
 
     // Close dialog and open MainWindow/OptionsDialog
     MainWindow *main = new MainWindow();
-    main->openNewFile(filename);
-
+    QString ioFile = "";
+    if (ui->ioPlugin->currentIndex()) {
+        ioFile = ui->ioPlugin->currentText() + "://";
+    }
+    ioFile += filename;
+    main->openNewFile(ioFile);
+    
     close();
 }
 
@@ -318,4 +356,9 @@ void NewFileDialog::loadProject(const QString &project)
     main->openProject(project);
 
     close();
+}
+
+void NewFileDialog::on_tabWidget_currentChanged(int index)
+{
+    Config()->setNewFileLastClicked(index);
 }

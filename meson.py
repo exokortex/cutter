@@ -71,10 +71,11 @@ def win_dist(args):
     log.debug('Deploying Qt5')
     subprocess.call(['windeployqt', '--release', os.path.join(dist, 'Cutter.exe')])
     log.debug('Deploying libr2')
-    r2_meson_mod.win_dist_libr2(DIST=dist)
+    r2_meson_mod.PATH_FMT.update(r2_meson_mod.R2_PATH)
+    r2_meson_mod.win_dist_libr2(DIST=dist, BUILDDIR=os.path.join(build, 'subprojects', 'radare2'),
+                                R2_DATDIR=r'radare2\share', R2_INCDIR=r'radare2\include')
 
 def build(args):
-    r2_meson_mod.prepare_capstone()
     cutter_builddir = os.path.join(ROOT, args.dir)
     if not args.webengine:
         VARS['QT'].remove('WebEngineWidgets')
@@ -88,10 +89,13 @@ def build(args):
         defines.append('-Dqresources=%s' % ','.join(VARS['RESOURCES']))
         defines.append('-Denable_jupyter=%s' % str(args.jupyter).lower())
         defines.append('-Denable_webengine=%s' % str(args.webengine).lower())
+        if os.name == 'nt':
+            defines.append('-Dradare2:r2_incdir=radare2/include')
+            defines.append('-Dradare2:r2_libdir=radare2/lib')
+            defines.append('-Dradare2:r2_datdir=radare2/share')
         r2_meson_mod.meson(os.path.join(ROOT, 'src'), cutter_builddir,
                            prefix=cutter_builddir, backend=args.backend,
                            release=True, shared=False, options=defines)
-    r2_meson_mod.build_sdb(args.backend, release=True)
     log.info('Building cutter')
     if args.backend == 'ninja':
         r2_meson_mod.ninja(cutter_builddir)

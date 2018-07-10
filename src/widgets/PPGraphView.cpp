@@ -136,7 +136,6 @@ PPGraphView::PPGraphView(QWidget *parent, MainWindow *main)
     mMenu->addAction(&actionExportGraph);
     connect(&actionExportGraph, SIGNAL(triggered(bool)), this, SLOT(on_actionExportGraph_triggered()));
 
-    PPCore()->loadFile(main->getFilename().toUtf8().constData());
     initFont();
     colorsUpdatedSlot();
 }
@@ -183,6 +182,9 @@ void PPGraphView::loadCurrentGraph()
 
     const ::Function *ppFunction = NULL;
     int entryPointIdx = 0;
+
+    if (!PPCore()->isReady())
+        return;
 
     for (auto &&ppFunc : PPCore()->getState().functions) {
         int epi = 0;

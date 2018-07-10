@@ -3,7 +3,7 @@ TEMPLATE = app
 TARGET = Cutter
 
 # The application version
-VERSION = 1.2
+VERSION = 1.5
 
 ICON = img/cutter.icns
 
@@ -11,10 +11,16 @@ QT += core gui widgets svg
 QT_CONFIG -= no-pkg-config
 CONFIG += c++11
 
-# You can spawn qmake with qmake "CONFIG+=CUTTER_ENABLE_JUPYTER" to set a variable
-# Or manually edit this file
-#CONFIG += CUTTER_ENABLE_JUPYTER
-#CONFIG += CUTTER_ENABLE_QTWEBENGINE
+!defined(CUTTER_ENABLE_JUPYTER, var)        CUTTER_ENABLE_JUPYTER=true
+equals(CUTTER_ENABLE_JUPYTER, true)         CONFIG += CUTTER_ENABLE_JUPYTER
+
+!defined(CUTTER_ENABLE_QTWEBENGINE, var)    CUTTER_ENABLE_QTWEBENGINE=true
+equals(CUTTER_ENABLE_JUPYTER, true) {
+    equals(CUTTER_ENABLE_QTWEBENGINE, true)  CONFIG += CUTTER_ENABLE_QTWEBENGINE
+}
+
+!defined(CUTTER_BUNDLE_R2_APPBUNDLE, var)   CUTTER_BUNDLE_R2_APPBUNDLE=false
+equals(CUTTER_BUNDLE_R2_APPBUNDLE, true)    CONFIG += CUTTER_BUNDLE_R2_APPBUNDLE
 
 # Define the preprocessor macro to get the application version in our application.
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
@@ -53,6 +59,9 @@ macx {
 unix:exists(/usr/local/include/libr) {
     INCLUDEPATH += /usr/local/include/libr
 }
+unix {
+    QMAKE_LFLAGS += -rdynamic # Export dynamic symbols for plugins
+}
 
 # Libraries
 include(lib_radare2.pri)
@@ -80,6 +89,11 @@ unix:CUTTER_ENABLE_JUPYTER|macx:CUTTER_ENABLE_JUPYTER {
     }
 }
 
+macx:CUTTER_BUNDLE_R2_APPBUNDLE {
+    message("Using r2 rom AppBundle")
+    DEFINES += MACOS_R2_BUNDLED
+}
+
 SOURCES += \
     Main.cpp \
     Cutter.cpp \
@@ -104,7 +118,7 @@ SOURCES += \
     utils/MdHighlighter.cpp \
     dialogs/preferences/AsmOptionsWidget.cpp \
     dialogs/NewFileDialog.cpp \
-    AnalThread.cpp \
+    AnalTask.cpp \
     widgets/CommentsWidget.cpp \
     widgets/PPAnnotationsWidget.cpp \
     widgets/ConsoleWidget.cpp \
@@ -118,7 +132,6 @@ SOURCES += \
     widgets/PieView.cpp \
     widgets/RelocsWidget.cpp \
     widgets/SdbDock.cpp \
-    widgets/SectionsDock.cpp \
     widgets/SectionsWidget.cpp \
     widgets/Sidebar.cpp \
     widgets/StringsWidget.cpp \
@@ -139,17 +152,35 @@ SOURCES += \
     dialogs/preferences/PreferencesDialog.cpp \
     dialogs/preferences/GeneralOptionsWidget.cpp \
     dialogs/preferences/GraphOptionsWidget.cpp \
+    dialogs/preferences/PreferenceCategory.cpp \
     widgets/QuickFilterView.cpp \
     widgets/ClassesWidget.cpp \
     widgets/ResourcesWidget.cpp \
     widgets/VTablesWidget.cpp \
     widgets/TypesWidget.cpp \
+    widgets/HeadersWidget.cpp \
     widgets/SearchWidget.cpp \
     CutterApplication.cpp \
     utils/JupyterConnection.cpp \
     widgets/JupyterWidget.cpp \
     utils/PythonAPI.cpp \
-    utils/NestedIPyKernel.cpp
+    utils/NestedIPyKernel.cpp \
+    dialogs/R2PluginsDialog.cpp \
+    widgets/CutterDockWidget.cpp \
+    widgets/CutterSeekableWidget.cpp \
+    widgets/GraphWidget.cpp \
+    utils/JsonTreeItem.cpp \
+    utils/JsonModel.cpp \
+    dialogs/VersionInfoDialog.cpp \
+    widgets/ZignaturesWidget.cpp \
+    utils/AsyncTask.cpp \
+    dialogs/AsyncTaskDialog.cpp \
+    widgets/StackWidget.cpp \
+    widgets/RegistersWidget.cpp \
+    widgets/BacktraceWidget.cpp \
+    dialogs/OpenFileDialog.cpp \
+    utils/CommandTask.cpp \
+    utils/ProgressIndicator.cpp
 
 HEADERS  += \
     Cutter.h \
@@ -175,7 +206,7 @@ HEADERS  += \
     utils/MdHighlighter.h \
     dialogs/OptionsDialog.h \
     dialogs/NewFileDialog.h \
-    AnalThread.h \
+    AnalTask.h \
     widgets/CommentsWidget.h \
     widgets/PPAnnotationsWidget.h \
     widgets/ConsoleWidget.h \
@@ -189,7 +220,6 @@ HEADERS  += \
     widgets/PieView.h \
     widgets/RelocsWidget.h \
     widgets/SdbDock.h \
-    widgets/SectionsDock.h \
     widgets/SectionsWidget.h \
     widgets/Sidebar.h \
     widgets/StringsWidget.h \
@@ -209,6 +239,7 @@ HEADERS  += \
     widgets/GraphView.h \
     dialogs/preferences/PreferencesDialog.h \
     dialogs/preferences/GeneralOptionsWidget.h \
+    dialogs/preferences/PreferenceCategory.h \
     dialogs/preferences/GraphOptionsWidget.h \
     widgets/QuickFilterView.h \
     widgets/ClassesWidget.h \
@@ -216,11 +247,31 @@ HEADERS  += \
     CutterApplication.h \
     widgets/VTablesWidget.h \
     widgets/TypesWidget.h \
+    widgets/HeadersWidget.h \
     widgets/SearchWidget.h \
     utils/JupyterConnection.h \
     widgets/JupyterWidget.h \
     utils/PythonAPI.h \
-    utils/NestedIPyKernel.h
+    utils/NestedIPyKernel.h \
+    dialogs/R2PluginsDialog.h \
+    widgets/CutterDockWidget.h \
+    widgets/CutterSeekableWidget.h \
+    widgets/GraphWidget.h \
+    utils/JsonTreeItem.h \
+    utils/JsonModel.h \
+    dialogs/VersionInfoDialog.h \
+    widgets/ZignaturesWidget.h \
+    utils/AsyncTask.h \
+    dialogs/AsyncTaskDialog.h \
+    widgets/StackWidget.h \
+    widgets/RegistersWidget.h \
+    widgets/BacktraceWidget.h \
+    dialogs/OpenFileDialog.h \
+    utils/StringsTask.h \
+    utils/FunctionsTask.h \
+    utils/CommandTask.h \
+    utils/ProgressIndicator.h \
+    plugins/CutterPlugin.h
 
 FORMS    += \
     dialogs/AboutDialog.ui \
@@ -245,7 +296,7 @@ FORMS    += \
     widgets/ImportsWidget.ui \
     widgets/SdbDock.ui \
     widgets/RelocsWidget.ui \
-    widgets/SectionsDock.ui \
+    widgets/SectionsWidget.ui \
     widgets/Sidebar.ui \
     widgets/StringsWidget.ui \
     widgets/SymbolsWidget.ui \
@@ -260,8 +311,17 @@ FORMS    += \
     widgets/ClassesWidget.ui \
     widgets/VTablesWidget.ui \
     widgets/TypesWidget.ui \
+    widgets/HeadersWidget.ui \
     widgets/SearchWidget.ui \
-    widgets/JupyterWidget.ui
+    widgets/JupyterWidget.ui \
+    dialogs/R2PluginsDialog.ui \
+    dialogs/VersionInfoDialog.ui \
+    widgets/ZignaturesWidget.ui \
+    dialogs/AsyncTaskDialog.ui \
+    widgets/StackWidget.ui \
+    widgets/RegistersWidget.ui \
+    widgets/BacktraceWidget.ui \
+    dialogs/OpenFileDialog.ui
 
 RESOURCES += \
     resources.qrc \
@@ -284,13 +344,18 @@ unix {
 
     desktop_file = Cutter.desktop
 
-    # built-in no need for files atm
-    target.path = $$PREFIX/bin
-
     share_applications.path = $$PREFIX/share/applications
     share_applications.files = $$desktop_file
 
-    INSTALLS += target share_applications share_pixmaps
+    appstream_file = Cutter.appdata.xml
+
+    share_appdata.path = $$PREFIX/share/appdata
+    share_appdata.files = $$appstream_file
+
+    # built-in no need for files atm
+    target.path = $$PREFIX/bin
+
+    INSTALLS += target share_appdata share_applications share_pixmaps
 
     # Triggered for example by 'qmake APPIMAGE=1'
     !isEmpty(APPIMAGE){

@@ -26,11 +26,9 @@ QVariant TypesModel::data(const QModelIndex &index, int role) const
 
     const TypeDescription &exp = types->at(index.row());
 
-    switch (role)
-    {
+    switch (role) {
     case Qt::DisplayRole:
-        switch (index.column())
-        {
+        switch (index.column()) {
         case TYPE:
             return exp.type;
         case SIZE:
@@ -49,11 +47,9 @@ QVariant TypesModel::data(const QModelIndex &index, int role) const
 
 QVariant TypesModel::headerData(int section, Qt::Orientation, int role) const
 {
-    switch (role)
-    {
+    switch (role) {
     case Qt::DisplayRole:
-        switch (section)
-        {
+        switch (section) {
         case TYPE:
             return tr("Type");
         case SIZE:
@@ -96,8 +92,7 @@ bool TypesSortFilterProxyModel::lessThan(const QModelIndex &left, const QModelIn
     TypeDescription left_exp = left.data(TypesModel::TypeDescriptionRole).value<TypeDescription>();
     TypeDescription right_exp = right.data(TypesModel::TypeDescriptionRole).value<TypeDescription>();
 
-    switch (left.column())
-    {
+    switch (left.column()) {
     case TypesModel::TYPE:
         return left_exp.type < right_exp.type;
     case TypesModel::SIZE:
@@ -113,15 +108,11 @@ bool TypesSortFilterProxyModel::lessThan(const QModelIndex &left, const QModelIn
 
 
 
-TypesWidget::TypesWidget(MainWindow *main, QWidget *parent) :
-    QDockWidget(parent),
-    ui(new Ui::TypesWidget),
-    main(main)
+TypesWidget::TypesWidget(MainWindow *main, QAction *action) :
+    CutterDockWidget(main, action),
+    ui(new Ui::TypesWidget)
 {
     ui->setupUi(this);
-
-    // Radare core found in:
-    this->main = main;
 
     types_model = new TypesModel(&types, this);
     types_proxy_model = new TypesSortFilterProxyModel(types_model, this);
@@ -138,12 +129,10 @@ TypesWidget::~TypesWidget() {}
 void TypesWidget::refreshTypes()
 {
     types_model->beginReloadTypes();
-    types = CutterCore::getInstance()->getAllTypes();
+    types = Core()->getAllTypes();
     types_model->endReloadTypes();
 
-    ui->typesTreeView->resizeColumnToContents(0);
-    ui->typesTreeView->resizeColumnToContents(1);
-    ui->typesTreeView->resizeColumnToContents(2);
+    qhelpers::adjustColumns(ui->typesTreeView, 3, 0);
 }
 
 void TypesWidget::setScrollMode()
@@ -153,6 +142,9 @@ void TypesWidget::setScrollMode()
 
 void TypesWidget::on_typesTreeView_doubleClicked(const QModelIndex &index)
 {
+    if (!index.isValid())
+        return;
+
     // TypeDescription exp = index.data(TypesModel::TypeDescriptionRole).value<TypeDescription>();
-    // CutterCore::getInstance()->seek(exp.vaddr);
+    // Core()->seek(exp.vaddr);
 }

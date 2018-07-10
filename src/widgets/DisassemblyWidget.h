@@ -2,22 +2,24 @@
 #define DISASSEMBLYWIDGET_H
 
 #include "Cutter.h"
-#include <QDockWidget>
+#include "CutterDockWidget.h"
+#include "CutterSeekableWidget.h"
 #include <QTextEdit>
 #include <QPlainTextEdit>
 #include <QShortcut>
+#include <QAction>
 
 
 class DisassemblyTextEdit;
 class DisassemblyScrollArea;
 class DisassemblyContextMenu;
 
-class DisassemblyWidget : public QDockWidget
+class DisassemblyWidget : public CutterDockWidget
 {
     Q_OBJECT
 public:
-    explicit DisassemblyWidget(QWidget *parent = nullptr);
-    QWidget* getTextWidget();
+    explicit DisassemblyWidget(MainWindow *main, QAction *action = nullptr);
+    QWidget *getTextWidget();
 
 public slots:
     void highlightCurrentLine();
@@ -26,6 +28,7 @@ public slots:
     void fontsUpdatedSlot();
     void colorsUpdatedSlot();
     void seekPrev();
+    void toggleSync();
 
 private slots:
     void on_seekChanged(RVA offset);
@@ -35,6 +38,9 @@ private slots:
     bool updateMaxLines();
 
     void cursorPositionChanged();
+
+    void zoomIn();
+    void zoomOut();
 
 private:
     DisassemblyContextMenu *mCtxMenu;
@@ -63,6 +69,8 @@ private:
     void connectCursorPositionChanged(bool disconnect);
 
     void moveCursorRelative(bool up, bool page);
+    QAction syncIt;
+    CutterSeekableWidget *seekable;
 };
 
 class DisassemblyScrollArea : public QAbstractScrollArea
@@ -90,10 +98,13 @@ class DisassemblyTextEdit: public QPlainTextEdit
 
 public:
     explicit DisassemblyTextEdit(QWidget *parent = nullptr)
-            : QPlainTextEdit(parent),
-              lockScroll(false) {}
+        : QPlainTextEdit(parent),
+          lockScroll(false) {}
 
-    void setLockScroll(bool lock)           { this->lockScroll = lock; }
+    void setLockScroll(bool lock)
+    {
+        this->lockScroll = lock;
+    }
 
 protected:
     bool viewportEvent(QEvent *event) override;

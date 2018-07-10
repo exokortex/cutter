@@ -2,6 +2,7 @@
 #include "ui_XrefsDialog.h"
 
 #include "utils/TempConfig.h"
+#include "utils/Helpers.h"
 
 #include "MainWindow.h"
 
@@ -12,7 +13,7 @@ XrefsDialog::XrefsDialog(QWidget *parent) :
     addr(0),
     func_name(QString::null),
     ui(new Ui::XrefsDialog),
-    core(CutterCore::getInstance())
+    core(Core())
 {
     ui->setupUi(this);
     setWindowFlags(windowFlags() & (~Qt::WindowContextHelpButtonHint));
@@ -37,8 +38,7 @@ void XrefsDialog::fillRefs(QList<XrefDescription> refs, QList<XrefDescription> x
 {
     /* Fill refs */
     ui->fromTreeWidget->clear();
-    for (int i = 0; i < refs.size(); ++i)
-    {
+    for (int i = 0; i < refs.size(); ++i) {
         XrefDescription xref = refs[i];
 
         QTreeWidgetItem *tempItem = new QTreeWidgetItem();
@@ -49,16 +49,11 @@ void XrefsDialog::fillRefs(QList<XrefDescription> refs, QList<XrefDescription> x
         ui->fromTreeWidget->insertTopLevelItem(0, tempItem);
     }
     // Adjust columns to content
-    int count = ui->fromTreeWidget->columnCount();
-    for (int i = 0; i != count; ++i)
-    {
-        ui->fromTreeWidget->resizeColumnToContents(i);
-    }
+    qhelpers::adjustColumns(ui->fromTreeWidget, 0);
 
     /* Fill Xrefs */
     ui->toTreeWidget->clear();
-    for (int i = 0; i < xrefs.size(); ++i)
-    {
+    for (int i = 0; i < xrefs.size(); ++i) {
         XrefDescription xref = xrefs[i];
 
         QTreeWidgetItem *tempItem = new QTreeWidgetItem();
@@ -69,11 +64,7 @@ void XrefsDialog::fillRefs(QList<XrefDescription> refs, QList<XrefDescription> x
         ui->toTreeWidget->insertTopLevelItem(0, tempItem);
     }
     // Adjust columns to content
-    int count2 = ui->toTreeWidget->columnCount();
-    for (int i = 0; i != count2; ++i)
-    {
-        ui->toTreeWidget->resizeColumnToContents(i);
-    }
+    qhelpers::adjustColumns(ui->toTreeWidget, 0);
 }
 
 void XrefsDialog::on_fromTreeWidget_itemDoubleClicked(QTreeWidgetItem *item, int column)
@@ -94,13 +85,12 @@ void XrefsDialog::on_toTreeWidget_itemDoubleClicked(QTreeWidgetItem *item, int c
     this->close();
 }
 
-QString XrefsDialog::normalizeAddr(const QString& addr) const
+QString XrefsDialog::normalizeAddr(const QString &addr) const
 {
     QString r = addr;
     QString base = addr.split("0x")[1].trimmed();
     int len = base.length();
-    if (len < 8)
-    {
+    if (len < 8) {
         int padding = 8 - len;
         QString zero = "0";
         QString zeroes = zero.repeated(padding);
@@ -118,21 +108,18 @@ void XrefsDialog::setupPreviewFont()
 void XrefsDialog::setupPreviewColors()
 {
     ui->previewTextEdit->setStyleSheet(QString("QPlainTextEdit { background-color: %1; color: %2; }")
-                                               .arg(ConfigColor("gui.background").name())
-                                               .arg(ConfigColor("btext").name()));
+                                       .arg(ConfigColor("gui.background").name())
+                                       .arg(ConfigColor("btext").name()));
 }
 
 void XrefsDialog::highlightCurrentLine()
 {
     QList<QTextEdit::ExtraSelection> extraSelections;
 
-    if (ui->previewTextEdit->isReadOnly())
-    {
+    if (ui->previewTextEdit->isReadOnly()) {
         QTextEdit::ExtraSelection selection;
 
-        QColor lineColor = QColor(190, 144, 212);
-
-        selection.format.setBackground(lineColor);
+        selection.format.setBackground(ConfigColor("highlight"));
         selection.format.setProperty(QTextFormat::FullWidthSelection, true);
         selection.cursor = ui->previewTextEdit->textCursor();
         selection.cursor.clearSelection();

@@ -86,7 +86,7 @@
      <item row="2" column="0">
       <widget class="QLabel" name="colorLabel">
        <property name="text">
-        <string>Color theme</string>
+        <string>Color Theme</string>
        </property>
       </widget>
      </item>

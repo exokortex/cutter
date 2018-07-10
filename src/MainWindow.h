@@ -6,6 +6,9 @@
 #include "Cutter.h" // only needed for ut64
 #include "widgets/DisassemblyWidget.h"
 #include "widgets/SidebarWidget.h"
+#include "widgets/StackWidget.h"
+#include "widgets/RegistersWidget.h"
+#include "widgets/BacktraceWidget.h"
 #include "widgets/HexdumpWidget.h"
 #include "widgets/PseudocodeWidget.h"
 #include "dialogs/NewFileDialog.h"
@@ -16,6 +19,7 @@
 
 class CutterCore;
 class Omnibar;
+class ProgressIndicator;
 class PreviewWidget;
 class Highlighter;
 class AsciiHighlighter;
@@ -33,7 +37,7 @@ class Dashboard;
 class QLineEdit;
 class SdbDock;
 class QAction;
-class SectionsDock;
+class SectionsWidget;
 class ConsoleWidget;
 class EntrypointWidget;
 class DisassemblerGraphView;
@@ -42,15 +46,16 @@ class ClassesWidget;
 class ResourcesWidget;
 class VTablesWidget;
 class TypesWidget;
+class HeadersWidget;
+class ZignaturesWidget;
 class SearchWidget;
 #ifdef CUTTER_ENABLE_JUPYTER
 class JupyterWidget;
 #endif
 class QDockWidget;
 
-namespace Ui
-{
-    class MainWindow;
+namespace Ui {
+class MainWindow;
 }
 
 
@@ -61,17 +66,17 @@ class MainWindow : public QMainWindow
 public:
     bool responsive;
 
-    explicit MainWindow(QWidget *parent = 0);
+    explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
-    void openNewFile(const QString &fn, int analLevel = -1, QList<QString> advancedOptions = QList<QString>());
+    void openNewFile(const QString &fn, int analLevel = -1,
+                     QList<QString> advancedOptions = QList<QString>());
     void displayNewFileDialog();
     void closeNewFileDialog();
     void displayAnalysisOptionsDialog(int analLevel, QList<QString> advancedOptions);
     void openProject(const QString &project_name);
 
     void initUI();
-    void finalizeOpen();
 
     /*!
      * @param quit whether to show destructive button in dialog
@@ -93,7 +98,13 @@ public:
     void addDebugOutput(const QString &msg);
     void refreshOmniBar(const QStringList &flags);
 
+    void addToDockWidgetList(QDockWidget *dockWidget);
+    void addDockWidgetAction(QDockWidget *dockWidget, QAction *action);
+    void addExtraWidget(QDockWidget *extraDock);
+
+
 public slots:
+    void finalizeOpen();
 
     void refreshAll();
 
@@ -112,14 +123,20 @@ public slots:
 
     void toggleResponsive(bool maybe);
 
+    void openNewFileFailed();
+
 private slots:
     void on_actionAbout_triggered();
+    void on_actionExtraGraph_triggered();
+    void on_actionExtraHexdump_triggered();
+    void on_actionExtraDisassembly_triggered();
 
     void on_actionRefresh_Panels_triggered();
 
     void on_actionDisasAdd_comment_triggered();
 
     void on_actionDefault_triggered();
+    void on_actionZen_triggered();
 
     void on_actionFunctionsRename_triggered();
 
@@ -151,6 +168,11 @@ private slots:
 
     void projectSaved(const QString &name);
 
+    void updateTasksIndicator();
+
+    void mousePressEvent(QMouseEvent *event) override;
+    bool eventFilter(QObject *object, QEvent *event);
+
 private:
     CutterCore *core;
 
@@ -164,6 +186,8 @@ private:
     AsciiHighlighter *hex_highlighter;
     VisualNavbar *visualNavbar;
     Omnibar *omnibar;
+    ProgressIndicator *tasksProgressIndicator;
+
     Configuration *configuration;
 
     QList<QDockWidget *> dockWidgets;
@@ -177,8 +201,9 @@ private:
     FunctionsWidget    *functionsDock = nullptr;
     ImportsWidget      *importsDock = nullptr;
     ExportsWidget      *exportsDock = nullptr;
+    HeadersWidget      *headersDock = nullptr;
     TypesWidget        *typesDock = nullptr;
-    SearchWidget        *searchDock = nullptr;
+    SearchWidget       *searchDock = nullptr;
     SymbolsWidget      *symbolsDock = nullptr;
     RelocsWidget       *relocsDock = nullptr;
     CommentsWidget     *commentsDock = nullptr;
@@ -188,7 +213,8 @@ private:
     Dashboard          *dashboardDock = nullptr;
     QLineEdit          *gotoEntry = nullptr;
     SdbDock            *sdbDock = nullptr;
-    SectionsDock       *sectionsDock = nullptr;
+    SectionsWidget     *sectionsDock = nullptr;
+    ZignaturesWidget   *zignaturesDock = nullptr;
     ConsoleWidget      *consoleDock = nullptr;
     ClassesWidget      *classesDock = nullptr;
     ResourcesWidget    *resourcesDock = nullptr;
@@ -198,22 +224,30 @@ private:
     PPGraphView        *ppGraphView = nullptr;
     QDockWidget        *asmDock = nullptr;
     QDockWidget        *calcDock = nullptr;
+    QDockWidget        *stackDock = nullptr;
+    QDockWidget        *registersDock = nullptr;
+    QDockWidget        *backtraceDock = nullptr;
     NewFileDialog      *newFileDialog = nullptr;
 #ifdef CUTTER_ENABLE_JUPYTER
     JupyterWidget      *jupyterDock = nullptr;
 #endif
 
-    void toggleDockWidget(QDockWidget *dock_widget, bool show);
-
     void resetToDefaultLayout();
+    void resetToZenLayout();
 
     void restoreDocks();
     void hideAllDocks();
     void showDefaultDocks();
+    void showZenDocks();
     void updateDockActionsChecked();
 
+    void toggleDockWidget(QDockWidget *dock_widget, bool show);
+
 public:
-    QString getFilename() const         { return filename; }
+    QString getFilename() const
+    {
+        return filename;
+    }
 };
 
 #endif // MAINWINDOW_H

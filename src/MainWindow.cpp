@@ -1,9 +1,5 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
-#include "dialogs/CommentsDialog.h"
-#include "dialogs/AboutDialog.h"
-#include "dialogs/RenameDialog.h"
-#include "dialogs/preferences/PreferencesDialog.h"
 #include "utils/Helpers.h"
 
 #include <QApplication>
@@ -40,10 +36,20 @@
 #include "utils/HexAsciiHighlighter.h"
 #include "utils/Helpers.h"
 #include "utils/SvgIconEngine.h"
+#include "utils/ProgressIndicator.h"
 
 #include "dialogs/NewFileDialog.h"
+#include "dialogs/OptionsDialog.h"
+#include "dialogs/SaveProjectDialog.h"
+#include "dialogs/CommentsDialog.h"
+#include "dialogs/AboutDialog.h"
+#include "dialogs/RenameDialog.h"
+#include "dialogs/preferences/PreferencesDialog.h"
+#include "dialogs/OpenFileDialog.h"
+
 #include "widgets/DisassemblerGraphView.h"
 #include "widgets/PPGraphView.h"
+#include "widgets/GraphWidget.h"
 #include "widgets/FunctionsWidget.h"
 #include "widgets/SectionsWidget.h"
 #include "widgets/CommentsWidget.h"
@@ -54,7 +60,6 @@
 #include "widgets/SearchWidget.h"
 #include "widgets/SymbolsWidget.h"
 #include "widgets/StringsWidget.h"
-#include "widgets/SectionsDock.h"
 #include "widgets/RelocsWidget.h"
 #include "widgets/FlagsWidget.h"
 #include "widgets/VisualNavbar.h"
@@ -63,15 +68,15 @@
 #include "widgets/SdbDock.h"
 #include "widgets/Omnibar.h"
 #include "widgets/ConsoleWidget.h"
-#include "dialogs/OptionsDialog.h"
 #include "widgets/EntrypointWidget.h"
-#include "dialogs/SaveProjectDialog.h"
 #include "widgets/ClassesWidget.h"
 #include "widgets/ResourcesWidget.h"
 #include "widgets/VTablesWidget.h"
 #include "widgets/JupyterWidget.h"
+#include "widgets/HeadersWidget.h"
+#include "widgets/ZignaturesWidget.h"
 
-// graphics
+// Graphics
 #include <QGraphicsEllipseItem>
 #include <QGraphicsScene>
 #include <QGraphicsView>
@@ -141,6 +146,15 @@ void MainWindow::initUI()
     spacer->setMinimumSize(20, 20);
     ui->mainToolBar->addWidget(spacer);
 
+    tasksProgressIndicator = new ProgressIndicator();
+    ui->mainToolBar->addWidget(tasksProgressIndicator);
+
+    QWidget *spacerEnd = new QWidget();
+    spacerEnd->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    spacerEnd->setMinimumSize(4, 0);
+    spacerEnd->setMaximumWidth(4);
+    ui->mainToolBar->addWidget(spacerEnd);
+
     // Visual navigation tool bar
     this->visualNavbar = new VisualNavbar(this);
     this->visualNavbar->setMovable(false);
@@ -152,28 +166,14 @@ void MainWindow::initUI()
      */
     dockWidgets.reserve(20);
 
-#define ADD_DOCK(cls, dockMember, action) \
-{ \
-    (dockMember) = new cls(this); \
-    dockWidgets.push_back(dockMember); \
-    connect((action), &QAction::triggered, this, [this](bool checked) \
-    { \
-        toggleDockWidget((dockMember), checked); \
-    }); \
-    dockWidgetActions[action] = (dockMember); \
-}
-    ADD_DOCK(DisassemblyWidget, disassemblyDock, ui->actionDisassembly);
-    ADD_DOCK(SidebarWidget, sidebarDock, ui->actionSidebar);
-    ADD_DOCK(HexdumpWidget, hexdumpDock, ui->actionHexdump);
-    ADD_DOCK(PseudocodeWidget, pseudocodeDock, ui->actionPseudocode);
-    ADD_DOCK(ConsoleWidget, consoleDock, ui->actionConsole);
+    disassemblyDock = new DisassemblyWidget(this, ui->actionDisassembly);
+    sidebarDock = new SidebarWidget(this, ui->actionSidebar);
+    hexdumpDock = new HexdumpWidget(this, ui->actionHexdump);
+    pseudocodeDock = new PseudocodeWidget(this, ui->actionPseudocode);
+    consoleDock = new ConsoleWidget(this, ui->actionConsole);
 
     // Add graph view as dockable
-    graphDock = new QDockWidget(tr("Graph"), this);
-    graphDock->setObjectName("Graph");
-    graphDock->setAllowedAreas(Qt::AllDockWidgetAreas);
-    graphView = new DisassemblerGraphView(graphDock);
-    graphDock->setWidget(graphView);
+    graphDock = new GraphWidget(this, ui->actionGraph);
 
     // Add pp graph view as dockable
     ppGraphDock = new QDockWidget(tr("PPGraph"), this);
@@ -185,53 +185,39 @@ void MainWindow::initUI()
     // Hide centralWidget as we do not need it
     ui->centralWidget->hide();
 
-    connect(graphDock, &QDockWidget::visibilityChanged, graphDock, [ = ](bool visibility)
-    {
-        if (visibility)
-        {
-            Core()->setMemoryWidgetPriority(CutterCore::MemoryWidgetType::Graph);
-        }
-    });
-    connect(ppGraphDock, &QDockWidget::visibilityChanged, ppGraphDock, [ = ](bool visibility)
-    {
-        if (visibility)
-        {
-            Core()->setMemoryWidgetPriority(CutterCore::MemoryWidgetType::Graph);
-        }
-    });
-    dockWidgets.push_back(graphDock);
-    dockWidgets.push_back(ppGraphDock);
-    connect(ui->actionGraph, &QAction::triggered, this, [this](bool checked)
-    {
-        toggleDockWidget(graphDock, checked);
-    });
-
-    ADD_DOCK(SectionsDock, sectionsDock, ui->actionSections);
-    ADD_DOCK(EntrypointWidget, entrypointDock, ui->actionEntrypoints);
-    ADD_DOCK(FunctionsWidget, functionsDock, ui->actionFunctions);
-    ADD_DOCK(ImportsWidget, importsDock, ui->actionImports);
-    ADD_DOCK(ExportsWidget, exportsDock, ui->actionExports);
-    ADD_DOCK(TypesWidget, typesDock, ui->actionTypes);
-    ADD_DOCK(SearchWidget, searchDock, ui->actionSearchInst);
-    ADD_DOCK(SymbolsWidget, symbolsDock, ui->actionSymbols);
-    ADD_DOCK(RelocsWidget, relocsDock, ui->actionRelocs);
-    ADD_DOCK(CommentsWidget, commentsDock, ui->actionComments);
-    ADD_DOCK(PPAnnotationsWidget, ppAnnotationsDock, ui->actionComments);
-    ADD_DOCK(StringsWidget, stringsDock, ui->actionStrings);
-    ADD_DOCK(FlagsWidget, flagsDock, ui->actionFlags);
+    sectionsDock = new SectionsWidget(this, ui->actionSections);
+    entrypointDock = new EntrypointWidget(this, ui->actionEntrypoints);
+    functionsDock = new FunctionsWidget(this, ui->actionFunctions);
+    importsDock = new ImportsWidget(this, ui->actionImports);
+    exportsDock = new ExportsWidget(this, ui->actionExports);
+    headersDock = new HeadersWidget(this, ui->actionHeaders);
+    zignaturesDock = new ZignaturesWidget(this, ui->actionZignatures);
+    typesDock = new TypesWidget(this, ui->actionTypes);
+    searchDock = new SearchWidget(this, ui->actionSearch);
+    symbolsDock = new SymbolsWidget(this, ui->actionSymbols);
+    relocsDock = new RelocsWidget(this, ui->actionRelocs);
+    commentsDock = new CommentsWidget(this, ui->actionComments);
+    ppAnnotationsDock = new PPAnnotationsWidget(this, ui->actionComments);
+    stringsDock = new StringsWidget(this, ui->actionStrings);
+    flagsDock = new FlagsWidget(this, ui->actionFlags);
+    stackDock = new StackWidget(this, ui->actionStack);
+    backtraceDock = new BacktraceWidget(this, ui->actionBacktrace);
+    registersDock = new RegistersWidget(this, ui->actionRegisters);
 #ifdef CUTTER_ENABLE_JUPYTER
-    ADD_DOCK(JupyterWidget, jupyterDock, ui->actionJupyter);
+    jupyterDock = new JupyterWidget(this, ui->actionJupyter);
 #else
     ui->actionJupyter->setEnabled(false);
     ui->actionJupyter->setVisible(false);
 #endif
-    ADD_DOCK(Dashboard, dashboardDock, ui->actionDashboard);
-    ADD_DOCK(SdbDock, sdbDock, ui->actionSDBBrowser);
-    ADD_DOCK(ClassesWidget, classesDock, ui->actionClasses);
-    ADD_DOCK(ResourcesWidget, resourcesDock, ui->actionResources);
-    ADD_DOCK(VTablesWidget, vTablesDock, ui->actionVTables);
+    dashboardDock = new Dashboard(this, ui->actionDashboard);
+    sdbDock = new SdbDock(this, ui->actionSDBBrowser);
+    classesDock = new ClassesWidget(this, ui->actionClasses);
+    resourcesDock = new ResourcesWidget(this, ui->actionResources);
+    vTablesDock = new VTablesWidget(this, ui->actionVTables);
 
-#undef ADD_DOCK
+
+    // Set up dock widgets default layout
+    resetToDefaultLayout();
 
     // Restore saved settings
     this->readSettings();
@@ -242,8 +228,6 @@ void MainWindow::initUI()
     setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
     //setCorner( Qt::BottomRightCorner, Qt::RightDockWidgetArea );
 
-    // Set up dock widgets default layout
-    resetToDefaultLayout();
 
     /*
      *  Some global shortcuts
@@ -262,14 +246,53 @@ void MainWindow::initUI()
     connect(refresh_shortcut, SIGNAL(activated()), this, SLOT(refreshAll()));
 
     connect(core, SIGNAL(projectSaved(const QString &)), this, SLOT(projectSaved(const QString &)));
+
+    updateTasksIndicator();
+    connect(core->getAsyncTaskManager(), &AsyncTaskManager::tasksChanged, this, &MainWindow::updateTasksIndicator);
+
+    /* Load plugins */
+    QList<CutterPlugin*> plugins = Core()->getCutterPlugins();
+    for (auto plugin : plugins) {
+        CutterDockWidget *pluginDock = plugin->setupInterface(this);
+        tabifyDockWidget(dashboardDock, pluginDock);
+    }
+}
+
+void MainWindow::updateTasksIndicator()
+{
+    bool running = Core()->getAsyncTaskManager()->getTasksRunning();
+    tasksProgressIndicator->setProgressIndicatorVisible(running);
+}
+
+void MainWindow::on_actionExtraGraph_triggered()
+{
+    QDockWidget *extraDock = new GraphWidget(this, 0);
+    addExtraWidget(extraDock);
+}
+
+void MainWindow::on_actionExtraHexdump_triggered()
+{
+    QDockWidget *extraDock = new HexdumpWidget(this, 0);
+    addExtraWidget(extraDock);
+}
+
+void MainWindow::on_actionExtraDisassembly_triggered()
+{
+    QDockWidget *extraDock = new DisassemblyWidget(this, 0);
+    addExtraWidget(extraDock);
+}
+
+void MainWindow::addExtraWidget(QDockWidget *extraDock)
+{
+    addDockWidget(Qt::TopDockWidgetArea, extraDock);
+    auto restoreExtraDock = qhelpers::forceWidth(extraDock->widget(), 600);
+    qApp->processEvents();
+    restoreExtraDock.restoreWidth(extraDock->widget());
 }
 
 void MainWindow::openNewFile(const QString &fn, int analLevel, QList<QString> advancedOptions)
 {
     setFilename(fn);
-
-    /* Reset config */
-    core->resetDefaultAsmOptions();
 
     /* Prompt to load filename.r2 script */
     QString script = QString("%1.r2").arg(this->filename);
@@ -285,6 +308,17 @@ void MainWindow::openNewFile(const QString &fn, int analLevel, QList<QString> ad
 
     /* Show analysis options dialog */
     displayAnalysisOptionsDialog(analLevel, advancedOptions);
+}
+
+void MainWindow::openNewFileFailed()
+{
+    displayNewFileDialog();
+    QMessageBox mb(this);
+    mb.setIcon(QMessageBox::Critical);
+    mb.setStandardButtons(QMessageBox::Ok);
+    mb.setWindowTitle(tr("Cannot open file!"));
+    mb.setText(tr("Could not open the file! Make sure the file exists and that you have the correct permissions."));
+    mb.exec();
 }
 
 void MainWindow::displayNewFileDialog()
@@ -309,8 +343,7 @@ void MainWindow::displayAnalysisOptionsDialog(int analLevel, QList<QString> adva
     o->setAttribute(Qt::WA_DeleteOnClose);
     o->show();
 
-    if (analLevel >= 0)
-    {
+    if (analLevel >= 0) {
         o->setupAndStartAnalysis(analLevel, advancedOptions);
     }
 }
@@ -343,19 +376,15 @@ void MainWindow::finalizeOpen()
     addOutput(tr(" > Finished, happy reversing :)"));
     // Add fortune message
     addOutput("\n" + core->cmd("fo"));
-    //previewDock->setWindowTitle("entry0");
     showMaximized();
 }
 
 bool MainWindow::saveProject(bool quit)
 {
     QString projectName = core->getConfig("prj.name");
-    if (projectName.isEmpty())
-    {
+    if (projectName.isEmpty()) {
         return saveProjectAs(quit);
-    }
-    else
-    {
+    } else {
         core->saveProject(projectName);
         return true;
     }
@@ -384,23 +413,17 @@ void MainWindow::setFilename(const QString &fn)
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     QMessageBox::StandardButton ret = QMessageBox::question(this, APPNAME,
-                                      tr("Do you really want to exit?\nSave your project before closing!"),
-                                      (QMessageBox::StandardButtons)(QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel));
-    if (ret == QMessageBox::Save)
-    {
-        if (saveProject(true))
-        {
+                                                            tr("Do you really want to exit?\nSave your project before closing!"),
+                                                            (QMessageBox::StandardButtons)(QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel));
+    if (ret == QMessageBox::Save) {
+        if (saveProject(true)) {
             saveSettings();
         }
         QMainWindow::closeEvent(event);
-    }
-    else if (ret == QMessageBox::Discard)
-    {
+    } else if (ret == QMessageBox::Discard) {
         saveSettings();
         QMainWindow::closeEvent(event);
-    }
-    else
-    {
+    } else {
         event->ignore();
     }
 }
@@ -433,19 +456,14 @@ void MainWindow::saveSettings()
 
 void MainWindow::setPanelLock()
 {
-    if (panelLock)
-    {
-        foreach (QDockWidget *dockWidget, findChildren<QDockWidget *>())
-        {
+    if (panelLock) {
+        for (QDockWidget *dockWidget : findChildren<QDockWidget *>()) {
             dockWidget->setFeatures(QDockWidget::NoDockWidgetFeatures);
         }
 
         ui->actionLock->setChecked(false);
-    }
-    else
-    {
-        foreach (QDockWidget *dockWidget, findChildren<QDockWidget *>())
-        {
+    } else {
+        for (QDockWidget *dockWidget : findChildren<QDockWidget *>()) {
             dockWidget->setFeatures(QDockWidget::AllDockWidgetFeatures);
         }
 
@@ -455,14 +473,11 @@ void MainWindow::setPanelLock()
 
 void MainWindow::setTabLocation()
 {
-    if (tabsOnTop)
-    {
+    if (tabsOnTop) {
         ui->centralTabWidget->setTabPosition(QTabWidget::North);
         this->setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::North);
         ui->actionTabs_on_Top->setChecked(true);
-    }
-    else
-    {
+    } else {
         ui->centralTabWidget->setTabPosition(QTabWidget::South);
         this->setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::South);
         ui->actionTabs_on_Top->setChecked(false);
@@ -476,34 +491,16 @@ void MainWindow::refreshAll()
 
 void MainWindow::lockUnlock_Docks(bool what)
 {
-    if (what)
-    {
-        foreach (QDockWidget *dockWidget, findChildren<QDockWidget *>())
-        {
+    if (what) {
+        for (QDockWidget *dockWidget : findChildren<QDockWidget *>()) {
             dockWidget->setFeatures(QDockWidget::NoDockWidgetFeatures);
         }
-    }
-    else
-    {
-        foreach (QDockWidget *dockWidget, findChildren<QDockWidget *>())
-        {
+    } else {
+        for (QDockWidget *dockWidget : findChildren<QDockWidget *>()) {
             dockWidget->setFeatures(QDockWidget::AllDockWidgetFeatures);
         }
     }
 
-}
-
-void MainWindow::toggleDockWidget(QDockWidget *dock_widget, bool show)
-{
-    if (!show)
-    {
-        dock_widget->close();
-    }
-    else
-    {
-        dock_widget->show();
-        dock_widget->raise();
-    }
 }
 
 void MainWindow::restoreDocks()
@@ -537,10 +534,17 @@ void MainWindow::restoreDocks()
     tabifyDockWidget(dashboardDock, exportsDock);
     tabifyDockWidget(dashboardDock, typesDock);
     tabifyDockWidget(dashboardDock, searchDock);
+    tabifyDockWidget(dashboardDock, headersDock);
+    tabifyDockWidget(dashboardDock, zignaturesDock);
     tabifyDockWidget(dashboardDock, symbolsDock);
     tabifyDockWidget(dashboardDock, classesDock);
     tabifyDockWidget(dashboardDock, resourcesDock);
     tabifyDockWidget(dashboardDock, vTablesDock);
+
+    // Add Stack, Registers and Backtrace vertically stacked
+    addExtraWidget(stackDock);
+    splitDockWidget(stackDock, registersDock, Qt::Vertical);
+    splitDockWidget(stackDock, backtraceDock, Qt::Vertical);
 #ifdef CUTTER_ENABLE_JUPYTER
     tabifyDockWidget(dashboardDock, jupyterDock);
 #endif
@@ -551,8 +555,7 @@ void MainWindow::restoreDocks()
 
 void MainWindow::hideAllDocks()
 {
-    for (auto w : dockWidgets)
-    {
+    for (auto w : dockWidgets) {
         removeDockWidget(w);
     }
 
@@ -561,8 +564,7 @@ void MainWindow::hideAllDocks()
 
 void MainWindow::updateDockActionsChecked()
 {
-    for(auto i=dockWidgetActions.constBegin(); i!=dockWidgetActions.constEnd(); i++)
-    {
+    for (auto i = dockWidgetActions.constBegin(); i != dockWidgetActions.constEnd(); i++) {
         i.key()->setChecked(!i.value()->isHidden());
     }
 }
@@ -590,14 +592,29 @@ void MainWindow::showDefaultDocks()
 #endif
                                               };
 
-    for (auto w : dockWidgets)
-    {
-        if (defaultDocks.contains(w))
-        {
+    for (auto w : dockWidgets) {
+        if (defaultDocks.contains(w)) {
             w->show();
         }
     }
 
+    updateDockActionsChecked();
+}
+
+void MainWindow::showZenDocks()
+{
+    const QList<QDockWidget *> zenDocks = { functionsDock,
+                                            stringsDock,
+                                            graphDock,
+                                            disassemblyDock,
+                                            hexdumpDock,
+                                            searchDock
+                                            };
+    for (auto w : dockWidgets) {
+        if (zenDocks.contains(w)) {
+            w->show();
+        }
+    }
     updateDockActionsChecked();
 }
 
@@ -621,6 +638,24 @@ void MainWindow::resetToDefaultLayout()
     Core()->setMemoryWidgetPriority(CutterCore::MemoryWidgetType::Disassembly);
 }
 
+void MainWindow::resetToZenLayout()
+{
+    hideAllDocks();
+    restoreDocks();
+    showZenDocks();
+    disassemblyDock->raise();
+
+    // ugly workaround to set the default widths of functions
+    // if anyone finds a way to do this cleaner that also works, feel free to change it!
+    auto restoreFunctionDock = qhelpers::forceWidth(functionsDock->widget(), 200);
+
+    qApp->processEvents();
+
+    restoreFunctionDock.restoreWidth(functionsDock->widget());
+
+    Core()->setMemoryWidgetPriority(CutterCore::MemoryWidgetType::Disassembly);
+}
+
 void MainWindow::addOutput(const QString &msg)
 {
     consoleDock->addOutput(msg);
@@ -640,18 +675,13 @@ void MainWindow::on_actionLock_triggered()
 
 void MainWindow::on_actionLockUnlock_triggered()
 {
-    if (ui->actionLockUnlock->isChecked())
-    {
-        foreach (QDockWidget *dockWidget, findChildren<QDockWidget *>())
-        {
+    if (ui->actionLockUnlock->isChecked()) {
+        for (QDockWidget *dockWidget : findChildren<QDockWidget *>()) {
             dockWidget->setFeatures(QDockWidget::NoDockWidgetFeatures);
         }
         ui->actionLockUnlock->setIcon(QIcon(":/lock"));
-    }
-    else
-    {
-        foreach (QDockWidget *dockWidget, findChildren<QDockWidget *>())
-        {
+    } else {
+        for (QDockWidget *dockWidget : findChildren<QDockWidget *>()) {
             dockWidget->setFeatures(QDockWidget::AllDockWidgetFeatures);
         }
         ui->actionLockUnlock->setIcon(QIcon(":/unlock"));
@@ -671,9 +701,21 @@ void MainWindow::on_actionDefault_triggered()
     resetToDefaultLayout();
 }
 
+void MainWindow::on_actionZen_triggered()
+{
+    resetToZenLayout();
+}
+
+/**
+ * @brief MainWindow::on_actionNew_triggered
+ * Open a new Cutter session.
+ */
 void MainWindow::on_actionNew_triggered()
 {
-    on_actionOpen_triggered();
+    // Create a new Cutter process
+    QProcess process(this);
+    process.setEnvironment(QProcess::systemEnvironment());
+    process.startDetached(qApp->applicationFilePath());
 }
 
 void MainWindow::on_actionSave_triggered()
@@ -695,16 +737,19 @@ void MainWindow::on_actionRun_Script_triggered()
 
     QString fileName;
     fileName = dialog.getOpenFileName(this, tr("Select radare2 script"));
-    if (!fileName.length()) //cancel was pressed
+    if (!fileName.length()) // Cancel was pressed
         return;
-    this->core->cmd(". " + fileName);
+    Core()->loadScript(fileName);
 }
 
+/**
+ * @brief MainWindow::on_actionOpen_triggered
+ * Open a file as in "load (add) a file in current session".
+ */
 void MainWindow::on_actionOpen_triggered()
 {
-    QProcess process(this);
-    process.setEnvironment(QProcess::systemEnvironment());
-    process.startDetached(qApp->applicationFilePath());
+    OpenFileDialog dialog(this);
+    dialog.exec();
 }
 
 void MainWindow::toggleResponsive(bool maybe)
@@ -724,10 +769,9 @@ void MainWindow::on_actionReset_settings_triggered()
 {
     QMessageBox::StandardButton ret =
         (QMessageBox::StandardButton)QMessageBox::question(this, APPNAME,
-                tr("Do you really want to clear all settings?"),
-                QMessageBox::Ok | QMessageBox::Cancel);
-    if (ret == QMessageBox::Ok)
-    {
+                                                           tr("Do you really want to clear all settings?"),
+                                                           QMessageBox::Ok | QMessageBox::Cancel);
+    if (ret == QMessageBox::Ok) {
         Config()->resetAll();
     }
 }
@@ -803,15 +847,13 @@ void MainWindow::on_actionImportPDB_triggered()
     dialog.setWindowTitle(tr("Select PDB file"));
     dialog.setNameFilters({ tr("PDB file (*.pdb)"), tr("All files (*)") });
 
-    if (!dialog.exec())
-    {
+    if (!dialog.exec()) {
         return;
     }
 
     QString pdbFile = dialog.selectedFiles().first();
 
-    if (!pdbFile.isEmpty())
-    {
+    if (!pdbFile.isEmpty()) {
         Core()->loadPDB(pdbFile);
         addOutput(tr("%1 loaded.").arg(pdbFile));
     }
@@ -820,4 +862,40 @@ void MainWindow::on_actionImportPDB_triggered()
 void MainWindow::projectSaved(const QString &name)
 {
     addOutput(tr("Project saved: ") + name);
+}
+
+void MainWindow::mousePressEvent(QMouseEvent *event)
+{
+    switch (event->button()) {
+    case Qt::BackButton:
+        Core()->seekPrev();
+        break;
+    case Qt::ForwardButton:
+        Core()->seekNext();
+        break;
+    default:
+        break;
+    }
+}
+
+bool MainWindow::eventFilter(QObject *, QEvent *event)
+{
+    if (event->type() == QEvent::MouseButtonPress) {
+        QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
+        if (mouseEvent->button() == Qt::ForwardButton || mouseEvent->button() == Qt::BackButton) {
+            mousePressEvent(mouseEvent);
+            return true;
+        }
+    }
+    return false;
+}
+
+void MainWindow::addToDockWidgetList(QDockWidget *dockWidget)
+{
+    this->dockWidgets.push_back(dockWidget);
+}
+
+void MainWindow::addDockWidgetAction(QDockWidget *dockWidget, QAction *action)
+{
+    this->dockWidgetActions[action] = dockWidget;
 }

@@ -22,6 +22,9 @@ Cutter is not aimed at existing radare2 users. It instead focuses on those whose
 
 Cutter is available for all platforms (Linux, OS X, Windows).
 You can download the latest release [here](https://github.com/radareorg/cutter/releases).
+ *  Linux: use the [AppImage](https://github.com/radareorg/cutter/releases/download/v1.5/Cutter-v1.5-x86_64.AppImage) file. Then just make it executable and run it:
+     * `chmod +x Cutter-v1.5-x86_64.AppImage`
+     * `./Cutter-v1.5-x86_64.AppImage`
 
 ### Building from source
 
@@ -30,12 +33,12 @@ You can download the latest release [here](https://github.com/radareorg/cutter/r
 Cutter is based on Qt so you will need to have it installed.
 - Download: [Qt Open Source](https://www.qt.io/download-qt-for-application-development)
 - Add Qt 5.9.1: http://doc.qt.io/qtcreator/creator-project-qmake.html
-    
+
 #### Building
 
 First you must clone the repository:
 ```sh
-git clone https://github.com/radareorg/cutter
+git clone --recurse-submodules https://github.com/radareorg/cutter
 cd cutter
 ```
 
@@ -43,11 +46,24 @@ Building on linux:
 ```sh
 ./build.sh
 ```
+##### Important note:
+When using the default `build.sh` script you might encounter a `ModuleNotFoundError` upon starting Cutter.
+This can be resolved by either
+
+1. disabling the optional jupyter support during building by modifying `build.sh` as follows:
+
+   * Uncomment `#QMAKE_CONF="CUTTER_ENABLE_JUPYTER=false CUTTER_ENABLE_QTWEBENGINE=false"`
+   * Comment out the prior empty `QMAKE_CONF=""`
+
+2. or alternatively by installing the two python dependencies manually afterwards via:
+```
+pip3 install notebook jupyter_client
+```
+____
+
 
 Building on Windows:
-```batch
-set ARCH=x64
-set PYTHON=C:\Python36-x64
+```
 prepare_r2.bat
 build.bat
 ```
@@ -55,6 +71,10 @@ build.bat
 If any of those do not work, check the more detailed version [here](https://github.com/radareorg/cutter/blob/master/docs/Compiling.md).
 
 Check this [page](https://github.com/radareorg/cutter/blob/master/docs/Common-errors.md) for common issues.
+
+### Docker
+
+To deploy *cutter* using a pre-built `Dockerfile`, it's possible to use the [provided configuration](docker). The corresponding `README.md` file also contains instructions on how to get started using the docker image with minimal effort.
 
 ## Keyboard shortcuts
 

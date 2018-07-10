@@ -15,7 +15,7 @@ class Highlighter : public QSyntaxHighlighter
     Q_OBJECT
 
 public:
-    Highlighter(QTextDocument *parent = 0);
+    Highlighter(QTextDocument *parent = nullptr);
 
 protected:
     void highlightBlock(const QString &text);
@@ -23,8 +23,7 @@ protected:
 private:
     CutterCore *core;
 
-    struct HighlightingRule
-    {
+    struct HighlightingRule {
         QRegExp pattern;
         QTextCharFormat format;
     };

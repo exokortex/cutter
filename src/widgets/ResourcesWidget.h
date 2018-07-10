@@ -2,10 +2,12 @@
 #define RESOURCESWIDGET_H
 
 #include "Cutter.h"
+#include "CutterDockWidget.h"
 
-#include <QDockWidget>
 #include <QAbstractListModel>
 #include <QTreeView>
+
+class MainWindow;
 
 class ResourcesModel : public QAbstractListModel
 {
@@ -22,13 +24,14 @@ public:
     int columnCount(const QModelIndex &parent = QModelIndex()) const override;
 
     QVariant data(const QModelIndex &index, int role) const override;
-    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
+    QVariant headerData(int section, Qt::Orientation orientation,
+                        int role = Qt::DisplayRole) const override;
 
     void beginReload();
     void endReload();
 };
 
-class ResourcesWidget : public QDockWidget
+class ResourcesWidget : public CutterDockWidget
 {
     Q_OBJECT
 
@@ -38,7 +41,7 @@ private:
     QList<ResourcesDescription> resources;
 
 public:
-    ResourcesWidget(QWidget *parent = nullptr);
+    explicit ResourcesWidget(MainWindow *main, QAction *action = nullptr);
 
 private slots:
     void refreshResources();

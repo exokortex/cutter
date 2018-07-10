@@ -3,13 +3,14 @@
 
 #include <QDebug>
 #include <QTextEdit>
-#include <QDockWidget>
 #include <QMouseEvent>
 
 #include <array>
 #include <memory>
 
 #include "Cutter.h"
+#include "CutterDockWidget.h"
+#include "CutterSeekableWidget.h"
 #include "utils/Highlighter.h"
 #include "utils/HexAsciiHighlighter.h"
 #include "utils/HexHighlighter.h"
@@ -19,18 +20,15 @@
 
 #include "ui_HexdumpWidget.h"
 
-class HexdumpWidget : public QDockWidget
+class HexdumpWidget : public CutterDockWidget
 {
     Q_OBJECT
 
 
 public:
-    explicit HexdumpWidget(const QString &title, QWidget *parent = nullptr, Qt::WindowFlags flags = 0);
-    explicit HexdumpWidget(QWidget *parent = nullptr, Qt::WindowFlags flags = 0);
+    explicit HexdumpWidget(MainWindow *main, QAction *action = nullptr);
     ~HexdumpWidget();
-
     Highlighter        *highlighter;
-
     enum Format {
         Hex,
         Octal,
@@ -51,10 +49,11 @@ public slots:
 
     void zoomIn(int range = 1);
     void zoomOut(int range = 1);
+    void toggleSync();
 
 protected:
     virtual void resizeEvent(QResizeEvent *event) override;
-    virtual void wheelEvent(QWheelEvent* event) override;
+    virtual void wheelEvent(QWheelEvent *event) override;
 
 private:
     static const int linesMarginMin = 32;
@@ -101,8 +100,10 @@ private:
     void updateParseWindow(RVA start_address, int size);
     void clearParseWindow();
 
-    int bufferLines;
-    int cols;
+    int bufferLines = 0;
+    int cols = 0;
+    QAction syncAction;
+    CutterSeekableWidget *seekable;
 
 private slots:
     void on_seekChanged(RVA addr);

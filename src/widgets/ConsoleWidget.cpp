@@ -14,8 +14,7 @@
 // TODO: Find a way to get to this without copying it here
 // source: libr/core/core.c:585..
 // remark: u.* is missing
-static const QStringList radareArgs(
-{
+static const QStringList radareArgs( {
     "?", "?v", "whereis", "which", "ls", "rm", "mkdir", "pwd", "cat", "less",
     "dH", "ds", "dso", "dsl", "dc", "dd", "dm", "db ", "db-",
     "dp", "dr", "dcu", "dmd", "dmp", "dml",
@@ -75,14 +74,12 @@ static bool isForbidden(const QString &input)
 
     const QStringList &commands = input.split(delimiters, QString::SkipEmptyParts);
 
-    for (const QString &command : commands)
-    {
+    for (const QString &command : commands) {
         const QString &trimmedCommand = command.trimmed();
 
         if (forbiddenArgs.contains(trimmedCommand)) return true;
 
-        for (const QString &arg : forbiddenArgs)
-        {
+        for (const QString &arg : forbiddenArgs) {
             if (trimmedCommand.startsWith(arg + " ")) return true;
         }
     }
@@ -90,8 +87,8 @@ static bool isForbidden(const QString &input)
     return false;
 }
 
-ConsoleWidget::ConsoleWidget(QWidget *parent, Qt::WindowFlags flags) :
-    QDockWidget(parent, flags),
+ConsoleWidget::ConsoleWidget(MainWindow *main, QAction *action) :
+    CutterDockWidget(main, action),
     ui(new Ui::ConsoleWidget),
     debugOutputEnabled(true),
     maxHistoryEntries(100),
@@ -102,7 +99,8 @@ ConsoleWidget::ConsoleWidget(QWidget *parent, Qt::WindowFlags flags) :
     // Adjust console lineedit
     ui->inputLineEdit->setTextMargins(10, 0, 0, 0);
 
-    ui->execButton->setIcon(QIcon(new SvgIconEngine(QString(":/img/icons/arrow_right.svg"), palette().buttonText().color())));
+    ui->execButton->setIcon(QIcon(new SvgIconEngine(QString(":/img/icons/arrow_right.svg"),
+                                                    palette().buttonText().color())));
 
     setupFont();
 
@@ -110,9 +108,9 @@ ConsoleWidget::ConsoleWidget(QWidget *parent, Qt::WindowFlags flags) :
     QTextDocument *console_docu = ui->outputTextEdit->document();
     console_docu->setDocumentMargin(10);
 
-    QAction *action = new QAction(tr("Clear Output"), ui->outputTextEdit);
-    connect(action, SIGNAL(triggered(bool)), ui->outputTextEdit, SLOT(clear()));
-    actions.append(action);
+    QAction *actionClear = new QAction(tr("Clear Output"), ui->outputTextEdit);
+    connect(actionClear, SIGNAL(triggered(bool)), ui->outputTextEdit, SLOT(clear()));
+    actions.append(actionClear);
 
     // Completion
     QCompleter *completer = new QCompleter(radareArgs, this);
@@ -144,12 +142,6 @@ ConsoleWidget::ConsoleWidget(QWidget *parent, Qt::WindowFlags flags) :
     connect(Config(), SIGNAL(fontsUpdated()), this, SLOT(setupFont()));
 }
 
-ConsoleWidget::ConsoleWidget(const QString &title, QWidget *parent, Qt::WindowFlags flags)
-        : ConsoleWidget(parent, flags)
-{
-    setWindowTitle(title);
-}
-
 ConsoleWidget::~ConsoleWidget() {}
 
 void ConsoleWidget::setupFont()
@@ -165,8 +157,7 @@ void ConsoleWidget::addOutput(const QString &msg)
 
 void ConsoleWidget::addDebugOutput(const QString &msg)
 {
-    if (debugOutputEnabled)
-    {
+    if (debugOutputEnabled) {
         ui->outputTextEdit->appendHtml("<font color=\"red\"> [DEBUG]:\t" + msg + "</font>");
         scrollOutputToEnd();
     }
@@ -177,21 +168,35 @@ void ConsoleWidget::focusInputLineEdit()
     ui->inputLineEdit->setFocus();
 }
 
+void ConsoleWidget::executeCommand(const QString &command)
+{
+    if (!commandTask.isNull()) {
+        return;
+    }
+
+    ui->inputLineEdit->setEnabled(false);
+
+    QString cmd_line = "[" + RAddressString(Core()->getOffset()) + "]> " + command + "\n";
+
+    commandTask = QSharedPointer<CommandTask>(new CommandTask(command));
+    connect(commandTask.data(), &CommandTask::finished, this, [this, cmd_line, command] (const QString &result) {
+        ui->outputTextEdit->appendPlainText(cmd_line + result);
+        scrollOutputToEnd();
+        historyAdd(command);
+        commandTask = nullptr;
+        ui->inputLineEdit->setEnabled(true);
+        ui->inputLineEdit->setFocus();
+    });
+    Core()->getAsyncTaskManager()->start(commandTask);
+}
+
 void ConsoleWidget::on_inputLineEdit_returnPressed()
 {
     QString input = ui->inputLineEdit->text();
-    if (!input.isEmpty())
-    {
-        if (!isForbidden(input))
-        {
-            QString res = CutterCore::getInstance()->cmd(input);
-            QString cmd_line = "[" + RAddressString(Core()->getOffset()) + "]> " + input + "\n";
-            ui->outputTextEdit->appendPlainText(cmd_line + res);
-            scrollOutputToEnd();
-            historyAdd(input);
-        }
-        else
-        {
+    if (!input.isEmpty()) {
+        if (!isForbidden(input)) {
+            executeCommand(input);
+        } else {
             addDebugOutput(tr("command forbidden: ") + input);
         }
 
@@ -214,23 +219,17 @@ void ConsoleWidget::showCustomContextMenu(const QPoint &pt)
 
 void ConsoleWidget::historyNext()
 {
-    if (!history.isEmpty())
-    {
-        if (lastHistoryPosition > invalidHistoryPos)
-        {
-            if (lastHistoryPosition >= history.size())
-            {
+    if (!history.isEmpty()) {
+        if (lastHistoryPosition > invalidHistoryPos) {
+            if (lastHistoryPosition >= history.size()) {
                 lastHistoryPosition = history.size() - 1 ;
             }
 
             --lastHistoryPosition;
 
-            if (lastHistoryPosition >= 0)
-            {
+            if (lastHistoryPosition >= 0) {
                 ui->inputLineEdit->setText(history.at(lastHistoryPosition));
-            }
-            else
-            {
+            } else {
                 ui->inputLineEdit->clear();
             }
 
@@ -241,10 +240,8 @@ void ConsoleWidget::historyNext()
 
 void ConsoleWidget::historyPrev()
 {
-    if (!history.isEmpty())
-    {
-        if (lastHistoryPosition >= history.size() - 1)
-        {
+    if (!history.isEmpty()) {
+        if (lastHistoryPosition >= history.size() - 1) {
             lastHistoryPosition = history.size() - 2;
         }
 
@@ -271,8 +268,7 @@ void ConsoleWidget::scrollOutputToEnd()
 
 void ConsoleWidget::historyAdd(const QString &input)
 {
-    if (history.size() + 1 > maxHistoryEntries)
-    {
+    if (history.size() + 1 > maxHistoryEntries) {
         history.removeLast();
     }
 
@@ -280,7 +276,6 @@ void ConsoleWidget::historyAdd(const QString &input)
 
     invalidateHistoryPosition();
 }
-
 void ConsoleWidget::invalidateHistoryPosition()
 {
     lastHistoryPosition = invalidHistoryPos;

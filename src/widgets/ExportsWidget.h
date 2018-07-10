@@ -4,25 +4,19 @@
 #include <memory>
 
 #include "Cutter.h"
+#include "CutterDockWidget.h"
 
 #include <QAbstractListModel>
 #include <QSortFilterProxyModel>
-#include <QDockWidget>
 
 class MainWindow;
 class QTreeWidget;
 
-namespace Ui
-{
-    class ExportsWidget;
+namespace Ui {
+class ExportsWidget;
 }
 
-
-class MainWindow;
-class QTreeWidgetItem;
-
-
-class ExportsModel: public QAbstractListModel
+class ExportsModel : public QAbstractListModel
 {
     Q_OBJECT
 
@@ -30,10 +24,10 @@ private:
     QList<ExportDescription> *exports;
 
 public:
-    enum Columns { OFFSET = 0, SIZE, TYPE, NAME, COUNT };
-    static const int ExportDescriptionRole = Qt::UserRole;
+    enum Column { OffsetColumn = 0, SizeColumn, TypeColumn, NameColumn, ColumnCount };
+    enum Role { ExportDescriptionRole = Qt::UserRole };
 
-    ExportsModel(QList<ExportDescription> *exports, QObject *parent = 0);
+    ExportsModel(QList<ExportDescription> *exports, QObject *parent = nullptr);
 
     int rowCount(const QModelIndex &parent = QModelIndex()) const;
     int columnCount(const QModelIndex &parent = QModelIndex()) const;
@@ -45,28 +39,24 @@ public:
     void endReloadExports();
 };
 
-
-
-class ExportsSortFilterProxyModel : public QSortFilterProxyModel
+class ExportsProxyModel : public QSortFilterProxyModel
 {
     Q_OBJECT
 
 public:
-    ExportsSortFilterProxyModel(ExportsModel *source_model, QObject *parent = 0);
+    ExportsProxyModel(ExportsModel *source_model, QObject *parent = nullptr);
 
 protected:
     bool filterAcceptsRow(int row, const QModelIndex &parent) const override;
     bool lessThan(const QModelIndex &left, const QModelIndex &right) const override;
 };
 
-
-
-class ExportsWidget : public QDockWidget
+class ExportsWidget : public CutterDockWidget
 {
     Q_OBJECT
 
 public:
-    explicit ExportsWidget(MainWindow *main, QWidget *parent = 0);
+    explicit ExportsWidget(MainWindow *main, QAction *action = nullptr);
     ~ExportsWidget();
 
 private slots:
@@ -76,14 +66,12 @@ private slots:
 
 private:
     std::unique_ptr<Ui::ExportsWidget> ui;
-    MainWindow      *main;
 
-    ExportsModel *exports_model;
-    ExportsSortFilterProxyModel *exports_proxy_model;
+    ExportsModel *exportsModel;
+    ExportsProxyModel *exportsProxyModel;
     QList<ExportDescription> exports;
 
     void setScrollMode();
 };
-
 
 #endif // EXPORTSWIDGET_H

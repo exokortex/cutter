@@ -10,10 +10,10 @@
 #include "PPCutterCore.h"
 #include <pp/disassemblerstate.h>
 
-PPAnnotationsWidget::PPAnnotationsWidget(MainWindow *main, QWidget *parent) :
-    QDockWidget(parent),
-    ui(new Ui::PPAnnotationsWidget),
-    main(main)
+PPAnnotationsWidget::PPAnnotationsWidget(MainWindow *main, QAction *action) :
+        CutterDockWidget(main, action),
+        ui(new Ui::PPAnnotationsWidget),
+        main(main)
 {
     ui->setupUi(this);
 
@@ -160,6 +160,9 @@ void PPAnnotationsWidget::refreshTree()
     ui->nestedCmtsTreeWidget->clear();
     ui->commentsTreeWidget->clear();
     //QMap<QString, QList<CommentDescription>> nestedComments;
+
+    if (!PPCore()->isReady())
+        return;
 
     for (const PPAnnotation& annotation : PPCore()->getFile().annotations)
     {

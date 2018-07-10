@@ -6,9 +6,8 @@
 
 #include <memory>
 
-namespace Ui
-{
-    class SaveProjectDialog;
+namespace Ui {
+class SaveProjectDialog;
 }
 
 class SaveProjectDialog : public QDialog
@@ -18,7 +17,7 @@ class SaveProjectDialog : public QDialog
 public:
     enum Result { Saved, Rejected, Destructive };
 
-    explicit SaveProjectDialog(bool quit, QWidget *parent = 0);
+    explicit SaveProjectDialog(bool quit, QWidget *parent = nullptr);
     ~SaveProjectDialog();
 
     virtual void accept() override;

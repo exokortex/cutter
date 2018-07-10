@@ -11,7 +11,6 @@ class IPyKernelInterfaceJupyter:
         self._id = id
 
     def send_signal(self, signum):
-        print("sending signal " + str(signum) + " to kernel")
         cutter_internal.kernel_interface_send_signal(self._id, signum)
 
     def kill(self):
@@ -32,7 +31,6 @@ class IPyKernelInterfaceJupyter:
             if self.poll() is not None:
                 return
             time.sleep(0.1)
-        pass
 
 
 class CutterInternalIPyKernelManager(IOLoopKernelManager):
@@ -101,7 +99,8 @@ class CutterNotebookApp(NotebookApp):
 
     def stop(self):
         super().stop()
-        self.thread.join()
+        if self.thread is not None:
+            self.thread.join()
 
     def init_signal(self):
         # This would call signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -120,6 +119,7 @@ def start_jupyter():
         asyncio.set_event_loop(asyncio.new_event_loop())
         app = CutterNotebookApp()
         # app.log_level = logging.DEBUG
+        app.thread = threading.current_thread()
         app.initialize()
         q.put(app)
         app.start()

@@ -1,9 +1,9 @@
-    #ifndef PPANNOTATIONSWIDGET_H
+#ifndef PPANNOTATIONSWIDGET_H
 #define PPANNOTATIONSWIDGET_H
 
 #include <memory>
 
-#include <QDockWidget>
+#include "CutterDockWidget.h"
 
 class MainWindow;
 class QTreeWidgetItem;
@@ -13,12 +13,12 @@ namespace Ui
     class PPAnnotationsWidget;
 }
 
-class PPAnnotationsWidget : public QDockWidget
+class PPAnnotationsWidget : public CutterDockWidget
 {
     Q_OBJECT
 
 public:
-    explicit PPAnnotationsWidget(MainWindow *main, QWidget *parent = 0);
+    explicit PPAnnotationsWidget(MainWindow *main, QAction *action = nullptr);
     ~PPAnnotationsWidget();
 
 protected:

@@ -113,7 +113,7 @@ std::string PPCutterCore::annotationTypeToString(const PPAnnotationType aType)
 
 void PPCutterCore::loadFile(QString path)
 {
-    auto logger = get_logger("PP-Core");
+    auto logger = get_logger();
 
     // create emtpy file
     file = std::make_unique<PPFile>();
@@ -159,8 +159,7 @@ void PPCutterCore::loadFile(QString path)
     if (!elf->load(inputFile))
     {
         std::cout << "PP: File not found" << std::endl;
-        logger->error("File \"{}\" is not found or it is not an ELF file",
-                      inputFile);
+        std::cerr << "File '" << inputFile << "' not found or it is not an ELF file";
         exit(-1);
     }
     std::cout << "PP: File loaded" << std::endl;
@@ -199,8 +198,9 @@ void PPCutterCore::loadFile(QString path)
         LLVMInitializeRISCVTargetMC();
         LLVMInitializeRISCVDisassembler();
 
+        bool rv32 = elf->get_class() == ELFCLASS32;
         objDis = llvm::make_unique<ObjectDisassembler>(
-            llvm::make_unique<Architecture::Riscv::Info>());
+            llvm::make_unique<Architecture::Riscv::Info>(rv32));
         state = llvm::make_unique<DisassemblerState>(objDis->getInfo());
         stateCalc = llvm::make_unique<ApeStateCalculator>(
             *state, llvm::make_unique<PrinceApeStateUpdateFunction>(

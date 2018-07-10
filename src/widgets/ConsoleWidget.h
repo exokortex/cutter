@@ -1,32 +1,37 @@
 #ifndef CONSOLEWIDGET_H
 #define CONSOLEWIDGET_H
 
-#include <QWidget>
 #include <memory>
 #include "MainWindow.h"
+#include "CutterDockWidget.h"
+#include "utils/CommandTask.h"
 
-namespace Ui
-{
-    class ConsoleWidget;
+namespace Ui {
+class ConsoleWidget;
 }
 
 
-class ConsoleWidget : public QDockWidget
+class ConsoleWidget : public CutterDockWidget
 {
     Q_OBJECT
 
 public:
-    explicit ConsoleWidget(const QString &title, QWidget *parent = nullptr, Qt::WindowFlags flags = 0);
-    explicit ConsoleWidget(QWidget *parent = nullptr, Qt::WindowFlags flags = 0);
+    explicit ConsoleWidget(MainWindow *main, QAction *action = nullptr);
 
     ~ConsoleWidget();
 
     void addOutput(const QString &msg);
     void addDebugOutput(const QString &msg);
 
-    void setDebugOutputEnabled(bool enabled) { debugOutputEnabled = enabled; }
+    void setDebugOutputEnabled(bool enabled)
+    {
+        debugOutputEnabled = enabled;
+    }
 
-    void setMaxHistoryEntries(int max) { maxHistoryEntries = max; }
+    void setMaxHistoryEntries(int max)
+    {
+        maxHistoryEntries = max;
+    }
 
 public slots:
     void focusInputLineEdit();
@@ -49,7 +54,9 @@ private:
     void scrollOutputToEnd();
     void historyAdd(const QString &input);
     void invalidateHistoryPosition();
-    QString executeCommand(QString command);
+    void executeCommand(const QString &command);
+
+    QSharedPointer<CommandTask> commandTask;
 
     std::unique_ptr<Ui::ConsoleWidget> ui;
     QList<QAction *> actions;
