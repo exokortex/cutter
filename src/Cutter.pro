@@ -97,8 +97,10 @@ macx:CUTTER_BUNDLE_R2_APPBUNDLE {
 SOURCES += \
     Main.cpp \
     Cutter.cpp \
-    PPCutterCore.cpp \
+    ppCore/PPCutterCore.cpp \
+    ppCore/PPFile.cpp \
     models/PPAnnotationDataModel.cpp \
+    models/PPTreeItem.cpp \
     widgets/DisassemblerGraphView.cpp \
     widgets/PPGraphView.cpp \
     utils/RichTextPainter.cpp \
@@ -184,8 +186,10 @@ SOURCES += \
 
 HEADERS  += \
     Cutter.h \
-    PPCutterCore.h \
+    ppCore/PPCutterCore.h \
+    ppCore/PPFile.h \
     models/PPAnnotationDataModel.h \
+    models/PPTreeItem.h \
     widgets/DisassemblerGraphView.h \
     widgets/PPGraphView.h \
     utils/RichTextPainter.h \

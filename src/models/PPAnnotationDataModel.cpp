@@ -1,28 +1,40 @@
-#include "PPCutterCore.h"
+#include "ppCore/PPCutterCore.h"
 #include "PPAnnotationDataModel.h"
 
+#include <iostream>
 #include <QStringList>
 
-#include "PPCutterCore.h"
+#include "ppCore/PPCutterCore.h"
 
-PPAnnotationDataModel::PPAnnotationDataModel(QObject *parent)
-        : QAbstractItemModel(parent)
+PPAnnotationDataModel::PPAnnotationDataModel(QObject *parent, json data)
+        : QAbstractItemModel(parent), rootItem(treeFromJson("Annotations", nullptr, data))
 {
-    QList<QVariant> rootData;
-    rootData << "Key" << "Value";
-    //rootItem = new PPAnnotation(rootData);
-    //setupModelData(data.split(QString("\n")), rootItem);
+    std::cout << "PPAnnotationDataModel::PPAnnotationDataModel: " << jsonFromTree(rootItem) << std::endl;
 }
 
-PPAnnotationDataModel::~PPAnnotationDataModel() {}
+PPAnnotationDataModel::~PPAnnotationDataModel()
+{
+    delete rootItem;
+}
 
-int PPAnnotationDataModel::columnCount(const QModelIndex &parent) const
+void PPAnnotationDataModel::setJsonData(json data)
+{
+    // TODO inform the view about this before manipulating data
+    delete rootItem;
+    rootItem = treeFromJson("Annotations", nullptr, data);
+    std::cout << "PPAnnotationDataModel::setJsonData: " << data << std::endl;
+    std::cout << "PPAnnotationDataModel::setJsonData: " << jsonFromTree(rootItem) << std::endl;
+    emit dataChanged(QModelIndex(), QModelIndex());
+}
+
+json PPAnnotationDataModel::getJsonData()
+{
+  return jsonFromTree(rootItem);
+}
+
+int PPAnnotationDataModel::columnCount(const QModelIndex &/*parent*/) const
 {
     return 2;
-//    if (parent.isValid())
-//        return static_cast<PPAnnotation*>(parent.internalPointer())->columnCount();
-//    else
-//        return rootItem->columnCount();
 }
 
 QVariant PPAnnotationDataModel::data(const QModelIndex &index, int role) const
@@ -33,27 +45,12 @@ QVariant PPAnnotationDataModel::data(const QModelIndex &index, int role) const
     if (role != Qt::DisplayRole)
         return QVariant();
 
-    int idx = 0;
-    for (auto it = annotation->data.begin(); it != annotation->data.end(); ++it)
-    {
-        if (idx == index.row()) {
-            std::string key = it.key();
-            std::string value = it.value();
-            switch(index.column()) {
-                case KeyColumn:
-                    return QString::fromUtf8(key.c_str());
-                case ValueColumn:
-                    return QString::fromUtf8(value.c_str());
-                default:
-                    return "error";
-            }
-        }
-        idx++;
-    }
+    PPTreeItem *item = static_cast<PPTreeItem*>(index.internalPointer());
 
-    PPAnnotation *item = static_cast<PPAnnotation*>(index.internalPointer());
+    if (!item)
+        return QVariant();
 
-    return "error 2";
+    return item->data(index.column());
 }
 
 Qt::ItemFlags PPAnnotationDataModel::flags(const QModelIndex &index) const
@@ -85,106 +82,113 @@ QVariant PPAnnotationDataModel::headerData(int section, Qt::Orientation orientat
 
 QModelIndex PPAnnotationDataModel::index(int row, int column, const QModelIndex &parent) const
 {
-    //if (!parent.isValid())
-        return createIndex(row, column, (quintptr)0); // root function nodes have id = 0
+    if (!hasIndex(row, column, parent))
+        return QModelIndex();
 
-    //return createIndex(row, column, (quintptr)(parent.row() + 1)); // sub-nodes have id = function index + 1
+    PPTreeItem *parentItem;
+
+    if (!parent.isValid())
+        parentItem = rootItem;
+    else
+        parentItem = static_cast<PPTreeItem*>(parent.internalPointer());
+
+    assert(parentItem);
+    PPTreeItem *childItem = parentItem->child(row);
+    assert(childItem != parentItem);
+    if (childItem)
+        return createIndex(row, column, childItem);
+    else
+        return QModelIndex();
 }
 
 QModelIndex PPAnnotationDataModel::parent(const QModelIndex &index) const
 {
-    if (!index.isValid() || index.column() != 0)
+    if (!index.isValid())
         return QModelIndex();
 
-    if (index.internalId() == 0) // root function node
+    PPTreeItem *childItem = static_cast<PPTreeItem*>(index.internalPointer());
+    PPTreeItem *parentItem = childItem->parentItem();
+
+    if (parentItem == rootItem)
         return QModelIndex();
-    else // sub-node
-        return this->index((int)(index.internalId() - 1), 0);
+
+    return createIndex(parentItem->row(), 0, parentItem);
 }
 
-int PPAnnotationDataModel::rowCount(const QModelIndex &parent) const
+int PPAnnotationDataModel::rowCount(const QModelIndex &index) const
 {
-    if (!parent.isValid())
-        return annotation->data.size();
+    const PPTreeItem *item;
+    if (index.column() > 0)
+        return 0;
 
-    return 0;
+    if (index.isValid())
+        item = static_cast<PPTreeItem*>(index.internalPointer());
+    else
+        item = rootItem;
+
+    std::cout << index.isValid() << " @ " << item << std::endl;
+
+    if (!item)
+        return 0;
+
+    std::cout << "rowCount " << item->childCount() << std::endl;
+    return item->childCount();
 }
-
-/*
-void PPAnnotationDataModel::setupModelData(const QStringList &lines, PPAnnotation *parent)
-{
-    QList<PPAnnotation*> parents;
-    QList<int> indentations;
-    parents << parent;
-    indentations << 0;
-
-    int number = 0;
-
-    while (number < lines.count()) {
-        int position = 0;
-        while (position < lines[number].length()) {
-            if (lines[number].at(position) != ' ')
-                break;
-            position++;
-        }
-
-        QString lineData = lines[number].mid(position).trimmed();
-
-        if (!lineData.isEmpty()) {
-            // Read the column data from the rest of the line.
-            QStringList columnStrings = lineData.split("\t", QString::SkipEmptyParts);
-            QList<QVariant> columnData;
-            for (int column = 0; column < columnStrings.count(); ++column)
-                columnData << columnStrings[column];
-
-            if (position > indentations.last()) {
-                // The last child of the current parent is now the new parent
-                // unless the current parent has no children.
-
-                if (parents.last()->childCount() > 0) {
-                    parents << parents.last()->child(parents.last()->childCount()-1);
-                    indentations << position;
-                }
-            } else {
-                while (position < indentations.last() && parents.count() > 0) {
-                    parents.pop_back();
-                    indentations.pop_back();
-                }
-            }
-
-            // Append a new item to the current parent's list of children.
-            parents.last()->appendChild(new PPAnnotation(columnData, parents.last()));
-        }
-
-        ++number;
-    }
-}*/
 
 bool PPAnnotationDataModel::setData(const QModelIndex &index, const QVariant &value,
              int role)
 {
-    int idx = 0;
-    for (auto it = annotation->data.begin(); it != annotation->data.end(); ++it)
-    {
-        if (idx == index.row()) {
-            std::string key = it.key();
-            std::string jValue = it.value();
-            switch(index.column()) {
-                case KeyColumn:
-                    return false;
-                case ValueColumn:
-                    annotation->data[key] = value.toString().toStdString();
-                    PPCore()->registerAnnotationChange();
-                    return true;
-                default:
-                    return "error";
-            }
-        }
-        idx++;
+    if (!index.isValid())
+        return false;
+
+    PPTreeItem *item = static_cast<PPTreeItem*>(index.internalPointer());
+
+    if (!item)
+        return false;
+
+    switch(index.column()) {
+        case KeyColumn:
+            return false;
+        case ValueColumn:
+            item->setValue(value.toString());
+            return true;
+        default:
+            assert(false);
+
     }
 }
 
-void PPAnnotationDataModel::setAnnotation(PPAnnotation *annotation)
+PPTreeItem* PPAnnotationDataModel::treeFromJson(QString key, PPTreeItem* parent, json json)
 {
-    this->annotation = annotation;
+    std::cout << "treeFromJson " << key.toUtf8().constData() << std::endl;
+    PPTreeItem* item = new PPTreeItem(key, parent);
+    if (json.is_object()) {
+        for (json::iterator it = json.begin(); it != json.end(); ++it) {
+            item->appendChild(treeFromJson(QString::fromStdString(it.key()), item, it.value()));
+        }
+    } else if (json.is_string()){
+        std::cout << "treeFromJson value " << json << std::endl;
+        item->setValue(QString::fromStdString(json.get<std::string>()));
+    } else {
+        std::cout << "Warning: Json contains unexpected data: " << std::endl;
+        std::cout << json.is_null() << json.is_boolean()<< json.is_number() << json.is_object() << json.is_array() << json.is_string() << std::endl;
+    }
+    return item;
+}
+
+json PPAnnotationDataModel::jsonFromTree(PPTreeItem* parent)
+{
+    if (parent->isLeaf()) {
+        std::cout << "leaf " << parent->data(1).toString().toStdString() << std::endl;
+        return parent->data(1).toString().toStdString();
+    } else {
+        std::cout << "obj " << parent->data(0).toString().toStdString() << std::endl;
+        json res;
+        for (int i = 0; i < parent->childCount(); i++) {
+            std::cout << "child"<< std::endl;
+            PPTreeItem* child = parent->child(i);
+            res[child->data(0).toString().toStdString()] = jsonFromTree(child);
+        }
+        return res;
+    }
 }

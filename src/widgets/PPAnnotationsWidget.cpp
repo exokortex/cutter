@@ -7,7 +7,7 @@
 #include "MainWindow.h"
 #include "utils/Helpers.h"
 
-#include "PPCutterCore.h"
+#include "ppCore/PPCutterCore.h"
 #include <pp/disassemblerstate.h>
 
 PPAnnotationsWidget::PPAnnotationsWidget(MainWindow *main, QAction *action) :
@@ -40,7 +40,6 @@ PPAnnotationsWidget::~PPAnnotationsWidget() {}
 
 void PPAnnotationsWidget::on_commentsTreeWidget_itemDoubleClicked(QTreeWidgetItem *item, int)
 {
-    // Get offset and name of item double clicked
     PPAnnotation annotation = item->data(0, Qt::UserRole).value<PPAnnotation>();
     CutterCore::getInstance()->seek(annotation.offset);
 }
@@ -161,47 +160,46 @@ void PPAnnotationsWidget::refreshTree()
     ui->commentsTreeWidget->clear();
     //QMap<QString, QList<CommentDescription>> nestedComments;
 
-    if (!PPCore()->isReady())
-        return;
-
-    for (const PPAnnotation& annotation : PPCore()->getFile().annotations)
+//    if (!PPCore()->isReady())
+//        return;
+/*
+    for (const auto& addr : PPCore()->getFile().annotations)
     {
+        const auto& annotation = *addr.second;
+
         std::cout << "adding annotation..." << std::endl;
-        std::string fname = "";
-        const ::Function *f =  PPCore()->getState().getFunction(annotation.offset);
+
+        const ::Function *f =  PPCore()->getState().getFunction(addr.first);
         if (f == nullptr)
             continue;
-        for (auto& entrypoint : PPCore()->getState().getFunction(annotation.offset)->getEntryPoints())
+
+        std::string fname = "";
+        for (auto& entrypoint : PPCore()->getState().getFunction(addr.first)->getEntryPoints())
             fname += entrypoint.name;
         QString fcn_name = QString::fromUtf8(fname.c_str());
-        QTreeWidgetItem *item = new QTreeWidgetItem();
-        item->setText(0, RAddressString(annotation.offset));
-        item->setText(1, fcn_name);
-        item->setText(2, QString::fromUtf8(PPCutterCore::annotationTypeToString(annotation.type).c_str()));
-        item->setText(3, QString::fromUtf8(annotation.data.dump().c_str()));
 
-        QString data = "";
-        bool first = true;
-        for (auto it = annotation.data.begin(); it != annotation.data.end(); ++it) {
-            if (data != "")
-                data += ", ";
-            std::string key = it.key();
-            std::string value = it.value();
-            data += QString::fromUtf8(key.c_str());
-            data += "=";
-            data += QString::fromUtf8(value.c_str());
+        for (const auto& type : addr.second) {
+            const auto& PPAnnotation annotation = *type.second;
+
+            QTreeWidgetItem *item = new QTreeWidgetItem();
+            item->setText(0, RAddressString(annotation.offset));
+            item->setText(1, fcn_name);
+            item->setText(2, QString::fromUtf8(PPCutterCore::annotationTypeToString(annotation.type).c_str()));
+            //item->setText(3, QString::fromUtf8(annotation.data.dump().c_str()));
+
+            data = PPCore()->jsonToQstring(annotation.data);
+
+            item->setText(3, data);
+
+            item->setText(4, QString::fromUtf8(annotation.comment.c_str()));
+            item->setData(0, Qt::UserRole, QVariant::fromValue(annotation));
+            ui->commentsTreeWidget->addTopLevelItem(item);
         }
-        item->setText(3, data);
-
-        item->setText(4, QString::fromUtf8(annotation.comment.c_str()));
-        item->setData(0, Qt::UserRole, QVariant::fromValue(annotation));
-        ui->commentsTreeWidget->addTopLevelItem(item);
-
         //nestedComments[fcn_name].append(comment);
     }
     std::cout << "refreshTree() done" << std::endl;
     qhelpers::adjustColumns(ui->commentsTreeWidget, 0);
-
+*/
     // Add nested comments
     //ui->nestedCmtsTreeWidget->clear();
     //for (auto functionName : nestedComments.keys())

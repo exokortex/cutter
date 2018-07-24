@@ -1,15 +1,17 @@
 #ifndef PPGRAPHVIEW_H
 #define PPGRAPHVIEW_H
 
-// Based on the PPGraphView from x64dbg
+// Based on the DisassemblerGraphView from x64dbg
 
 #include <QWidget>
 #include <QPainter>
 #include <QShortcut>
+#include <QLabel>
 
 #include "widgets/GraphView.h"
 #include "menus/DisassemblyContextMenu.h"
 #include "utils/RichTextPainter.h"
+#include "CutterSeekableWidget.h"
 
 #include <vector>
 #include <pp/types.h>
@@ -21,8 +23,7 @@ class PPGraphView : public GraphView
     Q_OBJECT
 
 
-    struct Token
-    {
+    struct Token {
         int start; //token[0]
         int length; //token[1]
         QString type; //token[2]
@@ -30,20 +31,19 @@ class PPGraphView : public GraphView
         QString name; //token[4]
     };
 
-    struct HighlightToken
-    {
+    struct HighlightToken {
         QString type; //highlight_token[0]
         ut64 addr; //highlight_token[1]
         QString name; //highlight_token[2]
 
-        bool equalsToken(const Token & token)
+        bool equalsToken(const Token &token)
         {
             return this->type == token.type &&
                    this->addr == token.addr &&
                    this->name == token.name;
         }
 
-        static HighlightToken* fromToken(const Token & token)
+        static HighlightToken *fromToken(const Token &token)
         {
             //TODO: memory leaks
             auto result = new HighlightToken();
@@ -54,13 +54,12 @@ class PPGraphView : public GraphView
         }
     };
 
-    struct Text
-    {
+    struct Text {
         std::vector<RichTextPainter::List> lines;
 
         Text() {}
 
-        Text(const QString & text, QColor color, QColor background)
+        Text(const QString &text, QColor color, QColor background)
         {
             RichTextPainter::List richText;
             RichTextPainter::CustomRichText_t rt;
@@ -73,7 +72,7 @@ class PPGraphView : public GraphView
             lines.push_back(richText);
         }
 
-        Text(const RichTextPainter::List & richText)
+        Text(const RichTextPainter::List &richText)
         {
             lines.push_back(richText);
         }
@@ -81,10 +80,8 @@ class PPGraphView : public GraphView
         QString ToQString() const
         {
             QString result;
-            for(auto & line : lines)
-            {
-                for(auto & t : line)
-                {
+            for (auto &line : lines) {
+                for (auto &t : line) {
                     result += t.text;
                 }
             }
@@ -92,8 +89,7 @@ class PPGraphView : public GraphView
         }
     };
 
-    struct Instr
-    {
+    struct Instr {
         ut64 addr = 0;
         ut64 size = 0;
         Text text;
@@ -102,8 +98,7 @@ class PPGraphView : public GraphView
     };
 
 
-    struct DisassemblyBlock
-    {
+    struct DisassemblyBlock {
         Text header_text;
         std::vector<Instr> instrs;
         ut64 entry = 0;
@@ -113,23 +108,21 @@ class PPGraphView : public GraphView
         bool indirectcall = false;
     };
 
-    struct Function
-    {
+    struct Function {
         bool ready;
         ut64 entry;
         ut64 update_id;
         std::vector<DisassemblyBlock> blocks;
     };
 
-    struct Analysis
-    {
+    struct Analysis {
         ut64 entry = 0;
         std::unordered_map<ut64, Function> functions;
         bool ready = false;
         ut64 update_id = 0;
         QString status = "Analyzing...";
 
-        bool find_instr(ut64 addr, ut64 & func, ut64 & instr)
+        bool find_instr(ut64 addr, ut64 &func, ut64 &instr)
         {
             //TODO implement
             Q_UNUSED(addr);
@@ -145,15 +138,18 @@ public:
     PPGraphView(QWidget *parent, MainWindow *main);
     ~PPGraphView();
     std::unordered_map<ut64, DisassemblyBlock> disassembly_blocks;
-    virtual void drawBlock(QPainter & p, GraphView::GraphBlock &block) override;
+    virtual void drawBlock(QPainter &p, GraphView::GraphBlock &block) override;
     virtual void blockClicked(GraphView::GraphBlock &block, QMouseEvent *event, QPoint pos) override;
-    virtual void blockDoubleClicked(GraphView::GraphBlock &block, QMouseEvent *event, QPoint pos) override;
+    virtual void blockDoubleClicked(GraphView::GraphBlock &block, QMouseEvent *event,
+                                    QPoint pos) override;
     virtual bool helpEvent(QHelpEvent *event) override;
     virtual void blockHelpEvent(GraphView::GraphBlock &block, QHelpEvent *event, QPoint pos) override;
-    virtual GraphView::EdgeConfiguration edgeConfiguration(GraphView::GraphBlock &from, GraphView::GraphBlock *to) override;
+    virtual GraphView::EdgeConfiguration edgeConfiguration(GraphView::GraphBlock &from,
+                                                           GraphView::GraphBlock *to) override;
     virtual void blockTransitionedTo(GraphView::GraphBlock *to) override;
 
     void loadCurrentGraph();
+    QString windowTitle;
 //    bool navigate(ut64 addr);
 
 public slots:
@@ -161,9 +157,10 @@ public slots:
     void colorsUpdatedSlot();
     void fontsUpdatedSlot();
     void onSeekChanged(RVA addr);
+    void toggleSync();
 
-    void zoomIn();
-    void zoomOut();
+    void zoomIn(QPoint mouse = QPoint(0, 0));
+    void zoomOut(QPoint mouse = QPoint(0, 0));
     void zoomReset();
 
     void takeTrue();
@@ -171,6 +168,10 @@ public slots:
 
     void nextInstr();
     void prevInstr();
+
+protected:
+    virtual void wheelEvent(QWheelEvent *event) override;
+
 private slots:
     void seekPrev();
 
@@ -179,30 +180,31 @@ private slots:
 private:
     bool first_draw = true;
     bool transition_dont_seek = false;
-    bool sent_seek = false;
 
-    HighlightToken* highlight_token;
+    HighlightToken *highlight_token;
     // Font data
-    CachedFontMetrics* mFontMetrics;
+    CachedFontMetrics *mFontMetrics;
     qreal charWidth;
     int charHeight;
     int charOffset;
     int baseline;
 
-    DisassemblyContextMenu* mMenu;
-
     MainWindow *main;
     static std::vector<QString> instructionColors;
+
+    DisassemblyContextMenu *mMenu;
+
+    void connectSeekChanged(bool disconnect);
 
     void initFont();
     void prepareGraphNode(GraphBlock &block);
     RVA getAddrForMouseEvent(GraphBlock &block, QPoint *point);
     Instr *getInstrForMouseEvent(GraphBlock &block, QPoint *point);
     DisassemblyBlock *blockForAddress(RVA addr);
-    void seek(RVA addr, bool update_viewport=true);
+    void seekLocal(RVA addr, bool update_viewport = true);
     void seekInstruction(bool previous_instr);
-
-    QList<QShortcut*> shortcuts;
+    CutterSeekableWidget *seekable = nullptr;
+    QList<QShortcut *> shortcuts;
 
     QColor disassemblyBackgroundColor;
     QColor disassemblySelectedBackgroundColor;
@@ -228,6 +230,9 @@ private:
     QColor mDisabledBreakpointColor;
 
     QAction actionExportGraph;
+    QAction actionSyncOffset;
+
+    QLabel *emptyText = nullptr;
 };
 
 #endif // PPGRAPHVIEW_H

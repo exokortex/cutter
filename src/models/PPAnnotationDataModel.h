@@ -5,14 +5,14 @@
 #include <QModelIndex>
 #include <QVariant>
 
-class PPAnnotation;
+#include "PPTreeItem.h"
 
 class PPAnnotationDataModel : public QAbstractItemModel
 {
     Q_OBJECT
 
 public:
-    explicit PPAnnotationDataModel(QObject *parent);
+    explicit PPAnnotationDataModel(QObject *parent, json data);
     ~PPAnnotationDataModel();
 
     enum Column { KeyColumn = 0, ValueColumn};
@@ -30,13 +30,17 @@ public:
     bool setData(const QModelIndex &index, const QVariant &value,
                  int role = Qt::EditRole) override;
 
-    void setAnnotation(PPAnnotation *annotation);
+    void setJsonData(json data);
+
+    json getJsonData();
 
 private:
 
-    PPAnnotation *annotation;
+    PPTreeItem* rootItem;
+
+    static PPTreeItem* treeFromJson(QString key, PPTreeItem* parent, json json);
+
+    static json jsonFromTree(PPTreeItem* root);
 };
-
-
 
 #endif //PPCUTTER_PPANNOTATIONDATAMODEL_H

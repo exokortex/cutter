@@ -10,66 +10,23 @@
 
 #include <memory>
 
+/*
 #include "rapidjson/document.h"
 #include <rapidjson/ostreamwrapper.h>
 #include <rapidjson/writer.h>
 #include <rapidjson/prettywriter.h>
 #include <fstream>
+*/
 
 #include <pp/types.h>
+#include <pp/StateCalculators/AEE/ApeStateCalculator.h>
+#include <pp/StateCalculators/PureSw/PureSwUpdateStateCalculator.h>
 #include <pp/objectdisassembler.h>
 #include <nlohmann/json.hpp>
 
+#include "PPFile.h"
+
 #define PPCore() (PPCutterCore::getInstance())
-
-using json = nlohmann::json;
-
-
-struct PPFile;
-struct PPFunction;
-struct PPAnnotation;
-
-enum PPAnnotationType {
-    ENTRYPOINT,
-    INST_TYPE,
-    LOAD_REF
-};
-
-struct PPFile
-{
-    std::string path;
-    std::string md5sum;
-    std::vector<PPFunction> functions;
-    std::vector<PPAnnotation> annotations;
-};
-
-struct PPFunction
-{
-    std::string name;
-    AddressType offset;
-    SizeType size;
-    std::string md5sum;
-};
-
-struct PPAnnotation
-{
-    AddressType offset;
-    PPAnnotationType type;
-    std::string comment;
-    json data;
-
-    PPAnnotation() {
-    }
-
-    PPAnnotation(AddressType _offset, PPAnnotationType _type, std::string _comment, json _data) {
-        offset = _offset;
-        type = _type;
-        comment = _comment;
-        data = _data;
-    }
-};
-
-Q_DECLARE_METATYPE(PPAnnotation)
 
 class PPCutterCore: public QObject
 {
@@ -79,9 +36,26 @@ class PPCutterCore: public QObject
 private:
     std::unique_ptr<DisassemblerState> state;
     std::unique_ptr<ObjectDisassembler> objDis;
+    std::unique_ptr<StateCalculator> stateCalc;
     std::unique_ptr<PPFile> file;
-    rapidjson::Document jsonDocument;
     bool ready;
+    const json defaultAnnotationData = R"({
+        "entrypoint": {
+            "name": ""
+          },
+        "inst_type": {
+            "itype": "call.direct"
+          },
+        "load_ref": {
+            "addr": "0x80000000"
+          }
+      })"_json;
+    std::map<PPAnnotationType, std::string> annotationTypeToStringMap;
+    std::map<std::string, PPAnnotationType> stringToAnnotationTypeMap;
+    void addAnnotationType(PPAnnotationType, std::string);
+
+    void applyAnnotations();
+    void disassemble();
 
 public:
     explicit PPCutterCore(QObject *parent = 0);
@@ -90,7 +64,18 @@ public:
 
     static InstructionType parseInstructionType(const std::string iType);
     static std::string instructionTypeToString(const InstructionType iType);
-    static std::string annotationTypeToString(const PPAnnotationType aType);
+    std::string annotationTypeToString(const PPAnnotationType aType);
+    PPAnnotationType annotationTypeFromString(const std::string str);
+
+    static QString jsonToQString(json json);
+
+    void fullRedo();
+
+    void updateAnnotation(AddressType addr, json data);
+
+    std::map<PPAnnotationType, std::string>& getAnnotationTypes() {
+        return annotationTypeToStringMap;
+    };
 
     void loadFile(QString path);
     void saveProject();
@@ -107,11 +92,13 @@ public:
         return *objDis;
     }
 
-    inline const PPFile &getFile() const {
+    inline const PPFile& getFile() const {
         return *file;
     }
 
-    PPAnnotation* getAnnotationAt(AddressType addr);
+    inline const json& getDefaultAnnotationData() {
+        return defaultAnnotationData;
+    }
 
     void registerAnnotationChange();
 

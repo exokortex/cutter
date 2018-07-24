@@ -4,7 +4,7 @@
 #include <QDialog>
 #include <memory>
 
-#include "PPCutterCore.h"
+#include "ppCore/PPCutterCore.h"
 
 #include "models/PPAnnotationDataModel.h"
 
@@ -20,15 +20,15 @@ class PPAnnotationsDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit PPAnnotationsDialog(QWidget *parent = 0);
+    explicit PPAnnotationsDialog(AddressType addr, QWidget *parent = 0);
     ~PPAnnotationsDialog();
 
     void setAddress(AddressType addr);
 
 private slots:
     void on_buttonBox_accepted();
-
     void on_buttonBox_rejected();
+    void checkBoxStateChanged();
 
 private:
     AddressType addr;
@@ -36,9 +36,15 @@ private:
 
     std::unique_ptr<Ui::PPAnnotationsDialog> ui;
 
+    PPAnnotationDataModel* dataModel;
+
+    std::vector<QCheckBox*> checkBoxes;
+
     bool eventFilter(QObject *obj, QEvent *event);
 
-    PPAnnotationDataModel* dataModel;
+    json getJsonAnnotations(AddressType addr);
+
+    void expandAll();
 };
 
 #endif // PPANNOTATIONSDIALOG_H

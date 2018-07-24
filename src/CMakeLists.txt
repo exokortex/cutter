@@ -105,7 +105,4 @@ endif()
 
 find_package(pp REQUIRED)
 target_link_libraries(ppCutter pp::pp)
-target_include_directories(ppCutter PRIVATE "../external/rapidjson/include"})
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../external ${CMAKE_CURRENT_BINARY_DIR}/external)
-target_link_libraries(ppCutter nlohmann_json)
 install(TARGETS "ppCutter" DESTINATION "bin")

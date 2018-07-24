@@ -325,11 +325,8 @@ void DisassemblyContextMenu::on_actionCopy_triggered()
 
 void DisassemblyContextMenu::on_actionAddAnnotation_triggered()
 {
-    PPAnnotationsDialog *annotationsDialog = new PPAnnotationsDialog(this);
+    PPAnnotationsDialog *annotationsDialog = new PPAnnotationsDialog(offset, this);
 
-    annotationsDialog->setWindowTitle(tr("Edit Annotation at %1").arg(RAddressString(offset)));
-
-    annotationsDialog->setAddress(offset);
     if (annotationsDialog->exec()) {
         //QString comment = annotationsDialog->getComment();
 

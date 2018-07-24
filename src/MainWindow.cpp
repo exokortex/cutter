@@ -83,6 +83,8 @@
 
 #include <cassert>
 
+#include "ppCore/PPCutterCore.h"
+
 static void registerCustomFonts()
 {
     int ret = QFontDatabase::addApplicationFont(":/fonts/Anonymous Pro.ttf");
@@ -716,6 +718,11 @@ void MainWindow::on_actionNew_triggered()
     QProcess process(this);
     process.setEnvironment(QProcess::systemEnvironment());
     process.startDetached(qApp->applicationFilePath());
+}
+
+void MainWindow::on_actionPPDecompile_triggered()
+{
+    PPCore()->fullRedo();
 }
 
 void MainWindow::on_actionSave_triggered()

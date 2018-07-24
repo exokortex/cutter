@@ -5,7 +5,7 @@
 #include <QJsonArray>
 #include <QDebug>
 #include <QCheckBox>
-#include "PPCutterCore.h"
+#include "ppCore/PPCutterCore.h"
 
 AnalTask::AnalTask() :
     AsyncTask()
@@ -87,7 +87,7 @@ void AnalTask::runTask()
 
     Core()->setBBSize(options.bbsize);
 
-    PPCore()->loadFile(options.filename);
+    //PPCore()->loadFile(options.filename);
 
     // Use prj.simple as default as long as regular projects are broken
     Core()->setConfig("prj.simple", true);

@@ -1,25 +1,90 @@
-#include "PPAnnotationsDialog.h"
-#include "ui_PPAnnotationsDialog.h"
+#include <QCheckBox>
 
-PPAnnotationsDialog::PPAnnotationsDialog(QWidget *parent) :
+#include "PPAnnotationsDialog.h"
+#include "Cutter.h"
+#include "ppCore/PPCutterCore.h"
+#include "ui_PPAnnotationsDialog.h"
+#include <iostream>
+
+PPAnnotationsDialog::PPAnnotationsDialog(AddressType addr, QWidget *parent) :
     QDialog(parent),
     ui(new Ui::PPAnnotationsDialog)
 {
     ui->setupUi(this);
     setWindowFlags(windowFlags() & (~Qt::WindowContextHelpButtonHint));
 
-    dataModel = new PPAnnotationDataModel(this);
-
+    this->addr = addr;
+    json data = getJsonAnnotations(addr);
+    dataModel = new PPAnnotationDataModel(this, data);
     ui->dataTreeView->setModel(dataModel);
 
-    // Event filter for capturing Ctrl/Cmd+Return
-    //ui->textEdit->installEventFilter(this);
+    for (auto& type : PPCore()->getAnnotationTypes()) {
+        QCheckBox* cb = new QCheckBox(QString::fromStdString(type.second));
+        checkBoxes.push_back(cb);
+        ui->annotationTypesLayout->addWidget(cb);
+        connect(cb, SIGNAL(clicked()), this, SLOT(checkBoxStateChanged()));
+    }
+
+    expandAll();
+
+    this->setWindowTitle(tr("Edit Annotation at %1").arg(RAddressString(addr)));
+}
+
+json PPAnnotationsDialog::getJsonAnnotations(AddressType addr)
+{
+    json data;
+    if (PPCore()->getFile().annotations.find(addr) != PPCore()->getFile().annotations.end()) {
+        for (auto& type : PPCore()->getFile().annotations.at(addr)) {
+            data[PPCore()->annotationTypeToString(type.first)] = type.second.data;
+        }
+    }
+    return data;
+}
+
+void PPAnnotationsDialog::expandAll()
+{
+    QModelIndexList indexes = dataModel->match(dataModel->index(0,0), Qt::DisplayRole, "*", -1, Qt::MatchWildcard|Qt::MatchRecursive);
+    foreach (QModelIndex index, indexes)
+    ui->dataTreeView->expand(index);
+}
+
+void PPAnnotationsDialog::checkBoxStateChanged()
+{
+    QCheckBox* button = qobject_cast<QCheckBox*>(sender());
+
+    if (!button)
+        return;
+
+    json data = dataModel->getJsonData();
+    std::string typeStr = button->text().toStdString();
+
+    std::cout << typeStr;
+
+    if (button->isChecked()) {
+        if (PPCore()->getDefaultAnnotationData().find(typeStr) != PPCore()->getDefaultAnnotationData().end()) {
+            std::cout << PPCore()->getDefaultAnnotationData()[typeStr] << std::endl;
+            std::cout << data << std::endl;
+            std::cout << "TYPEXXX: " << data.is_null() << data.is_boolean()<< data.is_number() << data.is_object() << data.is_array() << data.is_string() << std::endl;
+            data[typeStr] = PPCore()->getDefaultAnnotationData()[typeStr];
+        } else {
+            data[typeStr] = {};
+        };
+    } else if (data.find(typeStr) != data.end()) {
+        data.erase(typeStr);
+    }
+
+    dataModel->setJsonData(data);
+    ui->dataTreeView->reset();
+
+    expandAll();
 }
 
 PPAnnotationsDialog::~PPAnnotationsDialog() {}
 
 void PPAnnotationsDialog::on_buttonBox_accepted()
 {
+  // TODO update annotation with tree data
+  PPCore()->updateAnnotation(addr, dataModel->getJsonData());
 }
 
 void PPAnnotationsDialog::on_buttonBox_rejected()
@@ -32,31 +97,6 @@ void PPAnnotationsDialog::on_buttonBox_rejected()
 //    //QString ret = ui->textEdit->document()->toPlainText();
 //    return "not implemented";//ret;
 //}
-
-void PPAnnotationsDialog::setAddress(AddressType addr)
-{
-    //ui->textEdit->document()->setPlainText(comment);
-    this->addr = addr;
-    PPAnnotation* oldAnnotation = PPCore()->getAnnotationAt(addr);
-    if (oldAnnotation != nullptr) {
-        annotation = oldAnnotation;
-        dataModel->setAnnotation(annotation);
-        // TODO use proper conversion
-        /*ui->annotationTypeDropdown->setCurrentIndex((int)annotation->type);
-
-        ui->dataTreeView->clear();
-        for (auto it = annotation->data.begin(); it != annotation->data.end(); ++it)
-        {
-            QTreeWidgetItem *tempItem = new QTreeWidgetItem();
-            std::string key = it.key();
-            std::string value = it.value();
-            tempItem->setText(0, QString::fromUtf8(key.c_str()));
-            tempItem->setText(1, QString::fromUtf8(value.c_str()));
-            //tempItem->setData(0, Qt::UserRole, QVariant::fromValue(xref));
-            ui->dataTreeView->insertTopLevelItem(0, tempItem);
-        }*/
-    }
-}
 
 bool PPAnnotationsDialog::eventFilter(QObject */*obj*/, QEvent *event)
 {
