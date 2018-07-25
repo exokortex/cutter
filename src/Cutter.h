@@ -25,7 +25,7 @@
 #define __question(x) (QMessageBox::Yes==QMessageBox::question (this, "Alert", QString(x), QMessageBox::Yes| QMessageBox::No))
 
 #define APPNAME "Cutter"
-#define CUTTER_VERSION "1.5"
+#define CUTTER_VERSION "1.6"
 
 #define Core() (CutterCore::getInstance())
 
@@ -523,10 +523,6 @@ public:
     void triggerRefreshAll();
     void triggerAsmOptionsChanged();
     void triggerGraphOptionsChanged();
-
-    RCoreTask *startTask(const QString &cmd);
-    void joinTask(RCoreTask *task);
-    void deleteTask(RCoreTask *task);
 
     void setCutterPlugins(QList<CutterPlugin*> plugins);
     QList<CutterPlugin*> getCutterPlugins();

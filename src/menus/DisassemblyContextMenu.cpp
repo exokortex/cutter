@@ -21,7 +21,9 @@ DisassemblyContextMenu::DisassemblyContextMenu(QWidget *parent)
         actionJmpReverse(this),
         actionEditBytes(this),
         actionCopy(this),
+
         actionAddAnnotation(this),
+
         actionCopyAddr(this),
         actionAddComment(this),
         actionAddFlag(this),

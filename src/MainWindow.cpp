@@ -199,7 +199,9 @@ void MainWindow::initUI()
     symbolsDock = new SymbolsWidget(this, ui->actionSymbols);
     relocsDock = new RelocsWidget(this, ui->actionRelocs);
     commentsDock = new CommentsWidget(this, ui->actionComments);
+
     ppAnnotationsDock = new PPAnnotationsWidget(this, ui->actionComments);
+
     stringsDock = new StringsWidget(this, ui->actionStrings);
     flagsDock = new FlagsWidget(this, ui->actionFlags);
     stackDock = new StackWidget(this, ui->actionStack);
@@ -298,18 +300,30 @@ void MainWindow::openNewFile(const QString &fn, int analLevel, QList<QString> ad
 
     /* Prompt to load filename.r2 script */
     QString script = QString("%1.r2").arg(this->filename);
+    QString loadScript;
     if (r_file_exists(script.toStdString().data())) {
         QMessageBox mb;
         mb.setWindowTitle(tr("Script loading"));
         mb.setText(tr("Do you want to load the '%1' script?").arg(script));
         mb.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
         if (mb.exec() == QMessageBox::Yes) {
-            core->loadScript(script);
+            loadScript = script;
         }
     }
 
     /* Show analysis options dialog */
-    displayAnalysisOptionsDialog(analLevel, advancedOptions);
+    displayAnalysisOptionsDialog(analLevel, advancedOptions, loadScript);
+}
+
+void MainWindow::openNewFileFailed()
+{
+    displayNewFileDialog();
+    QMessageBox mb(this);
+    mb.setIcon(QMessageBox::Critical);
+    mb.setStandardButtons(QMessageBox::Ok);
+    mb.setWindowTitle(tr("Cannot open file!"));
+    mb.setText(tr("Could not open the file! Make sure the file exists and that you have the correct permissions."));
+    mb.exec();
 }
 
 void MainWindow::openNewFileFailed()
@@ -339,10 +353,11 @@ void MainWindow::closeNewFileDialog()
     newFileDialog = nullptr;
 }
 
-void MainWindow::displayAnalysisOptionsDialog(int analLevel, QList<QString> advancedOptions)
+void MainWindow::displayAnalysisOptionsDialog(int analLevel, QList<QString> advancedOptions, const QString &script)
 {
     OptionsDialog *o = new OptionsDialog(this);
     o->setAttribute(Qt::WA_DeleteOnClose);
+    o->setInitialScript(script);
     o->show();
 
     if (analLevel >= 0) {
@@ -365,14 +380,10 @@ void MainWindow::finalizeOpen()
 {
     core->getOpcodes();
 
-    // Set settings to override any incorrect saved in the project
+    // Override any incorrect setting saved in the project
     core->setSettings();
 
-
     addOutput(tr(" > Populating UI"));
-    // FIXME: initialization order frakup. the next line is needed so that the
-    // comments widget displays the function names.
-    core->cmd("fs sections");
     refreshAll();
 
     addOutput(tr(" > Finished, happy reversing :)"));
@@ -845,7 +856,7 @@ void MainWindow::on_actionRefresh_Panels_triggered()
 
 void MainWindow::on_actionAnalyze_triggered()
 {
-    displayAnalysisOptionsDialog(-1, QList<QString>());
+    displayAnalysisOptionsDialog(-1, QList<QString>(), nullptr);
 }
 
 void MainWindow::on_actionImportPDB_triggered()

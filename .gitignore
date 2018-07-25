@@ -63,6 +63,7 @@ src/subprojects/
 
 # Python
 __pycache__
+/python/
 
 # Other
 compile_commands.json

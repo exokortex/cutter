@@ -7,6 +7,7 @@
 #include "utils/TempConfig.h"
 #include "utils/Configuration.h"
 #include "utils/AsyncTask.h"
+#include "utils/R2Task.h"
 #include "Cutter.h"
 #include "sdb.h"
 
@@ -51,11 +52,6 @@ CutterCore::CutterCore(QObject *parent) :
 {
     r_cons_new();  // initialize console
     this->core_ = r_core_new();
-    r_core_loadlibs(this->core_, R_CORE_LOADLIBS_ALL, NULL);
-    // IMPLICIT r_bin_iobind (core_->bin, core_->io);
-
-    // Otherwise r2 may ask the user for input and Cutter would freeze
-    setConfig("scr.interactive", false);
 
 #if defined(APPIMAGE) || defined(MACOS_R2_BUNDLED)
     auto prefix = QDir(QCoreApplication::applicationDirPath());
@@ -72,6 +68,12 @@ CutterCore::CutterCore(QObject *parent) :
 #   endif
     setConfig("dir.prefix", prefix.absolutePath());
 #endif
+
+    r_core_loadlibs(this->core_, R_CORE_LOADLIBS_ALL, NULL);
+    // IMPLICIT r_bin_iobind (core_->bin, core_->io);
+
+    // Otherwise r2 may ask the user for input and Cutter would freeze
+    setConfig("scr.interactive", false);
 
     asyncTaskManager = new AsyncTaskManager(this);
 }
@@ -193,20 +195,18 @@ QJsonDocument CutterCore::cmdj(const QString &str)
 
 QString CutterCore::cmdTask(const QString &str)
 {
-    RCoreTask *task = startTask(str);
-    joinTask(task);
-    QString ret = QString::fromUtf8(task->res);
-    deleteTask(task);
-    return ret;
+    R2Task task(str);
+    task.startTask();
+    task.joinTask();
+    return task.getResult();
 }
 
 QJsonDocument CutterCore::cmdjTask(const QString &str)
 {
-    RCoreTask *task = startTask(str);
-    joinTask(task);
-    QJsonDocument ret = parseJson(task->res, str);
-    deleteTask(task);
-    return ret;
+    R2Task task(str);
+    task.startTask();
+    task.joinTask();
+    return parseJson(task.getResultRaw(), str);
 }
 
 QJsonDocument CutterCore::parseJson(const char *res, const QString &cmd)
@@ -823,23 +823,17 @@ void CutterCore::setSettings()
     setConfig("scr.interactive", false);
 
     setConfig("hex.pairs", false);
-    setConfig("asm.cmt.col", 70);
     setConfig("asm.xrefs", false);
 
     setConfig("asm.tabs.once", true);
-    setConfig("asm.tabs.off", 5);
     setConfig("asm.flags.middle", 2);
 
     setConfig("anal.hasnext", false);
     setConfig("asm.lines.call", false);
     setConfig("anal.autoname", true);
+    setConfig("anal.jmptbl", false);
 
-    // Fucking pancake xD
     setConfig("cfg.fortunes.tts", false);
-
-    // Used by the HTML5 graph
-    setConfig("http.cors", true);
-    setConfig("http.sandbox", false);
 
     // Colors
     setConfig("scr.color", COLOR_MODE_DISABLED);
@@ -1696,7 +1690,7 @@ QList<DisassemblyLine> CutterCore::disassembleLines(RVA offset, int lines)
 
 void CutterCore::loadScript(const QString &scriptname)
 {
-    r_core_cmd_file(core_, scriptname.toStdString().data());
+    r_core_cmd_file(core_, scriptname.toUtf8().constData());
 }
 QString CutterCore::getVersionInformation()
 {
@@ -1752,22 +1746,6 @@ QList<QString> CutterCore::getColorThemes()
     for (auto s : themes.array())
         r << s.toString();
     return r;
-}
-
-RCoreTask *CutterCore::startTask(const QString &cmd)
-{
-    RCoreTask *task = r_core_task_new (core_, true, cmd.toLocal8Bit().constData(), nullptr, nullptr);
-    r_core_task_enqueue(core_, task);
-    return task;
-}
-
-void CutterCore::joinTask(RCoreTask *task)
-{
-    r_core_task_join(core_, nullptr, task);
-}
-void CutterCore::deleteTask(RCoreTask *task)
-{
-    r_core_task_del(core_, task->id);
 }
 
 void CutterCore::setCutterPlugins(QList<CutterPlugin*> plugins)

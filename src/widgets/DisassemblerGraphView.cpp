@@ -173,7 +173,7 @@ void DisassemblerGraphView::loadCurrentGraph()
             layout->setAlignment(emptyText, Qt::AlignHCenter);
         }
         emptyText->setVisible(true);
-    } else {
+    } else if (emptyText) {
         emptyText->setVisible(false);
     }
 
@@ -733,7 +733,28 @@ void DisassemblerGraphView::on_actionExportGraph_triggered()
         return;
     }
     QTextStream fileOut(&file);
-    fileOut << Core()->cmd("ag -");
+    fileOut << Core()->cmd("agfd $FB");
+}
+
+void DisassemblerGraphView::wheelEvent(QWheelEvent *event)
+{
+    // when CTRL is pressed, we zoom in/out with mouse wheel
+    if (Qt::ControlModifier == event->modifiers()) {
+        const QPoint numDegrees = event->angleDelta() / 8;
+        if (!numDegrees.isNull()) {
+            const QPoint numSteps = numDegrees / 15;
+            QPoint mouse = event->globalPos();
+            if (numSteps.y() > 0) {
+                zoomIn(mouse);
+            } else if (numSteps.y() < 0) {
+                zoomOut(mouse);
+            }
+        }
+        event->accept();
+    } else {
+        // use mouse wheel for scrolling when CTRL is not pressed
+        GraphView::wheelEvent(event);
+    }
 }
 
 void DisassemblerGraphView::wheelEvent(QWheelEvent *event)

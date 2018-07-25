@@ -3,7 +3,7 @@ TEMPLATE = app
 TARGET = Cutter
 
 # The application version
-VERSION = 1.5
+VERSION = 1.6
 
 ICON = img/cutter.icns
 
@@ -49,6 +49,9 @@ win32 {
     # Generate debug symbols in release mode
     QMAKE_CXXFLAGS_RELEASE += -Zi   # Compiler
     QMAKE_LFLAGS_RELEASE += /DEBUG  # Linker
+	
+    # Multithreaded compilation
+    QMAKE_CXXFLAGS += -MP
 }
 
 macx {
@@ -182,7 +185,8 @@ SOURCES += \
     widgets/BacktraceWidget.cpp \
     dialogs/OpenFileDialog.cpp \
     utils/CommandTask.cpp \
-    utils/ProgressIndicator.cpp
+    utils/ProgressIndicator.cpp \
+    utils/R2Task.cpp
 
 HEADERS  += \
     Cutter.h \
@@ -275,7 +279,8 @@ HEADERS  += \
     utils/FunctionsTask.h \
     utils/CommandTask.h \
     utils/ProgressIndicator.h \
-    plugins/CutterPlugin.h
+    plugins/CutterPlugin.h \
+    utils/R2Task.h
 
 FORMS    += \
     dialogs/AboutDialog.ui \

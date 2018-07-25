@@ -72,6 +72,14 @@ void AnalTask::runTask()
         return;
     }
 
+    if (options.endian != InitialOptions::Endianness::Auto) {
+        Core()->setEndianness(options.endian == InitialOptions::Endianness::Big);
+    }
+
+    Core()->setBBSize(options.bbsize);
+
+    Core()->cmd("fs *");
+
     if (!options.script.isNull()) {
         log(tr("Executing script...\n"));
         Core()->loadScript(options.script);
@@ -80,14 +88,6 @@ void AnalTask::runTask()
     if (isInterrupted()) {
         return;
     }
-
-    if (options.endian != InitialOptions::Endianness::Auto) {
-        Core()->setEndianness(options.endian == InitialOptions::Endianness::Big);
-    }
-
-    Core()->setBBSize(options.bbsize);
-
-    //PPCore()->loadFile(options.filename);
 
     // Use prj.simple as default as long as regular projects are broken
     Core()->setConfig("prj.simple", true);

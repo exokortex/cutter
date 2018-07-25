@@ -6,16 +6,10 @@ SET(DEFAULT_CXX_FLAGS_GCC "-std=c++1y -Wall -Wextra -pedantic -fno-rtti")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(DisallowInSource)
 
-if(FALSE) # ignore cutter name and version in future upstream pulls
-
-project(Cutter VERSION 1.5)
-
-endif()
+project(Cutter VERSION 1.6)
 
 option(CUTTER_ENABLE_JUPYTER "Enable Jupyter integration. Requires Python >= 3.3." ON)
 option(CUTTER_ENABLE_QTWEBENGINE "Use QtWebEngine for in-app Jupyter Browser. Unused if CUTTER_ENABLE_JUPYTER=OFF." ON)
-
-project(ppCutter VERSION 0.2)
 
 set(CMAKE_CXX_STANDARD 14)
 
@@ -93,15 +87,19 @@ set(CUTTER_VERSION_FULL "${PROJECT_VERSION}${CUTTER_VERSION_SUFFIX}")
 message(STATUS "Building Cutter version ${CUTTER_VERSION_FULL}")
 add_definitions("-DAPP_VERSION=\"${CUTTER_VERSION_FULL}\"")
 
-add_executable(ppCutter ${UI_FILES} ${QRC_FILES} ${SOURCE_FILES} ${HEADER_FILES})
+add_executable(Cutter ${UI_FILES} ${QRC_FILES} ${SOURCE_FILES} ${HEADER_FILES})
 
-target_link_libraries(ppCutter Qt5::Core Qt5::Widgets Qt5::Gui Qt5::Svg)
-target_link_libraries(ppCutter ${RADARE2_LIBRARIES})
+target_link_libraries(Cutter Qt5::Core Qt5::Widgets Qt5::Gui Qt5::Svg)
+target_link_libraries(Cutter ${RADARE2_LIBRARIES})
 
+add_executable(Cutter ${UI_FILES} ${QRC_FILES} ${SOURCE_FILES} ${HEADER_FILES})
+
+target_link_libraries(Cutter Qt5::Core Qt5::Widgets Qt5::Gui Qt5::Svg)
+target_link_libraries(Cutter ${RADARE2_LIBRARIES})
 if(CUTTER_ENABLE_JUPYTER)
-    target_link_libraries(ppCutter ${PYTHON_LIBRARIES})
+    target_link_libraries(Cutter ${PYTHON_LIBRARIES})
     if(CUTTER_ENABLE_QTWEBENGINE)
-        target_link_libraries(ppCutter Qt5::WebEngineWidgets)
+        target_link_libraries(Cutter Qt5::WebEngineWidgets)
     endif()
 endif()
 
@@ -109,5 +107,5 @@ SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-rtti" )
 SET( CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address" )
 
 find_package(pp REQUIRED)
-target_link_libraries(ppCutter pp::pp)
-install(TARGETS "ppCutter" DESTINATION "bin")
+target_link_libraries(Cutter pp::pp)
+install(TARGETS "Cutter" DESTINATION "bin")
