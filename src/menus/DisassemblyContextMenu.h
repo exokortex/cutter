@@ -30,6 +30,9 @@ private slots:
     void on_actionEditBytes_triggered();
 
     void on_actionCopy_triggered();
+
+    void on_actionAddAnnotation_triggered();
+
     void on_actionCopyAddr_triggered();
     void on_actionAddComment_triggered();
     void on_actionAnalyzeFunction_triggered();
@@ -79,7 +82,7 @@ private:
     QAction *copySeparator;
     QAction actionCopyAddr;
 
-
+    QAction actionAddAnnotation;
     QAction actionAddComment;
     QAction actionAddFlag;
     QMenu *analyzeMenu;

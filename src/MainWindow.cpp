@@ -47,6 +47,9 @@
 #include "dialogs/preferences/PreferencesDialog.h"
 #include "dialogs/OpenFileDialog.h"
 
+#include "widgets/PPGraphView.h"
+#include "widgets/PPAnnotationsWidget.h"
+
 #include "widgets/DisassemblerGraphView.h"
 #include "widgets/GraphWidget.h"
 #include "widgets/FunctionsWidget.h"
@@ -84,6 +87,8 @@
 #include <QGraphicsView>
 
 #include <cassert>
+
+#include "ppCore/PPCutterCore.h"
 
 static void registerCustomFonts()
 {
@@ -198,6 +203,13 @@ void MainWindow::initUI()
     // Add graph view as dockable
     graphDock = new GraphWidget(this, ui->actionGraph);
 
+    // Add pp graph view as dockable
+    ppGraphDock = new QDockWidget(tr("PPGraph"), this);
+    ppGraphDock->setObjectName("PPGraph");
+    ppGraphDock->setAllowedAreas(Qt::AllDockWidgetAreas);
+    ppGraphView = new PPGraphView(ppGraphDock, this);
+    ppGraphDock->setWidget(ppGraphView);
+
     // Hide centralWidget as we do not need it
     ui->centralWidget->hide();
 
@@ -213,6 +225,9 @@ void MainWindow::initUI()
     symbolsDock = new SymbolsWidget(this, ui->actionSymbols);
     relocsDock = new RelocsWidget(this, ui->actionRelocs);
     commentsDock = new CommentsWidget(this, ui->actionComments);
+
+    ppAnnotationsDock = new PPAnnotationsWidget(this, ui->actionComments);
+
     stringsDock = new StringsWidget(this, ui->actionStrings);
     flagsDock = new FlagsWidget(this, ui->actionFlags);
     stackDock = new StackWidget(this, ui->actionStack);
@@ -574,8 +589,10 @@ void MainWindow::restoreDocks()
 
     // Tabs for center (must be applied after splitDockWidget())
     tabifyDockWidget(sectionsDock, commentsDock);
+    tabifyDockWidget(sectionsDock, ppAnnotationsDock);
     tabifyDockWidget(dashboardDock, disassemblyDock);
     tabifyDockWidget(dashboardDock, graphDock);
+    tabifyDockWidget(dashboardDock, ppGraphDock);
     tabifyDockWidget(dashboardDock, hexdumpDock);
     tabifyDockWidget(dashboardDock, pseudocodeDock);
     tabifyDockWidget(dashboardDock, entrypointDock);
@@ -631,11 +648,13 @@ void MainWindow::showDefaultDocks()
                                                 entrypointDock,
                                                 functionsDock,
                                                 commentsDock,
+                                                ppAnnotationsDock,
                                                 stringsDock,
                                                 consoleDock,
                                                 importsDock,
                                                 symbolsDock,
                                                 graphDock,
+                                                ppGraphDock,
                                                 disassemblyDock,
                                                 sidebarDock,
                                                 hexdumpDock,
@@ -808,6 +827,11 @@ void MainWindow::on_actionNew_triggered()
     QProcess process(this);
     process.setEnvironment(QProcess::systemEnvironment());
     process.startDetached(qApp->applicationFilePath());
+}
+
+void MainWindow::on_actionPPDecompile_triggered()
+{
+    PPCore()->fullRedo();
 }
 
 void MainWindow::on_actionSave_triggered()

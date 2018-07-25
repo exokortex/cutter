@@ -1,6 +1,8 @@
 
 cmake_minimum_required(VERSION 3.1)
 
+SET(DEFAULT_CXX_FLAGS_GCC "-std=c++1y -Wall -Wextra -pedantic -fno-rtti")
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(DisallowInSource)
 
@@ -9,8 +11,7 @@ project(Cutter VERSION 1.7)
 option(CUTTER_ENABLE_JUPYTER "Enable Jupyter integration. Requires Python >= 3.3." ON)
 option(CUTTER_ENABLE_QTWEBENGINE "Use QtWebEngine for in-app Jupyter Browser. Unused if CUTTER_ENABLE_JUPYTER=OFF." ON)
 
-
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
@@ -98,3 +99,9 @@ if(CUTTER_ENABLE_JUPYTER)
     endif()
 endif()
 
+SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-rtti" )
+SET( CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address" )
+
+find_package(pp REQUIRED)
+target_link_libraries(Cutter pp::pp)
+install(TARGETS "Cutter" DESTINATION "bin")

@@ -18,6 +18,8 @@
 #include <QMainWindow>
 #include <QList>
 
+class PPAnnotationsWidget;
+class PPGraphView;
 class CutterCore;
 class Omnibar;
 class ProgressIndicator;
@@ -141,6 +143,8 @@ private slots:
 
     void on_actionNew_triggered();
 
+    void on_actionPPDecompile_triggered();
+
     void on_actionSave_triggered();
     void on_actionSaveAs_triggered();
 
@@ -208,6 +212,7 @@ private:
     SymbolsWidget      *symbolsDock = nullptr;
     RelocsWidget       *relocsDock = nullptr;
     CommentsWidget     *commentsDock = nullptr;
+    PPAnnotationsWidget *ppAnnotationsDock = nullptr;
     StringsWidget      *stringsDock = nullptr;
     FlagsWidget        *flagsDock = nullptr;
     Dashboard          *dashboardDock = nullptr;
@@ -220,6 +225,8 @@ private:
     ResourcesWidget    *resourcesDock = nullptr;
     VTablesWidget      *vTablesDock = nullptr;
     DisassemblerGraphView *graphView = nullptr;
+    QDockWidget        *ppGraphDock = nullptr;
+    PPGraphView        *ppGraphView = nullptr;
     QDockWidget        *asmDock = nullptr;
     QDockWidget        *calcDock = nullptr;
     QDockWidget        *stackDock = nullptr;

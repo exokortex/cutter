@@ -1,6 +1,7 @@
 #include "DisassemblyContextMenu.h"
 #include "dialogs/preferences/PreferencesDialog.h"
 #include "dialogs/EditInstructionDialog.h"
+#include "dialogs/PPAnnotationsDialog.h"
 #include "dialogs/CommentsDialog.h"
 #include "dialogs/FlagDialog.h"
 #include "dialogs/RenameDialog.h"
@@ -17,6 +18,9 @@ DisassemblyContextMenu::DisassemblyContextMenu(QWidget *parent)
         offset(0),
         canCopy(false)
 {
+    initAction(&actionAddAnnotation, tr("Add Annotation"), SLOT(on_actionCopy_triggered()));
+    addAction(&actionAddAnnotation);
+
     initAction(&actionCopy, tr("Copy"), SLOT(on_actionCopy_triggered()), getCopySequence());
     addAction(&actionCopy);
 
@@ -417,6 +421,16 @@ void DisassemblyContextMenu::on_actionEditBytes_triggered()
 void DisassemblyContextMenu::on_actionCopy_triggered()
 {
     emit copy();
+}
+
+void DisassemblyContextMenu::on_actionAddAnnotation_triggered()
+{
+    PPAnnotationsDialog *annotationsDialog = new PPAnnotationsDialog(offset, this);
+
+    if (annotationsDialog->exec()) {
+        //QString comment = annotationsDialog->getComment();
+
+    }
 }
 
 void DisassemblyContextMenu::on_actionCopyAddr_triggered()
