@@ -39,6 +39,10 @@ CUTTER_ENABLE_QTWEBENGINE {
     message("QtWebEngine support disabled.")
 }
 
+# TODO: make optional
+DEFINES += CUTTER_ENABLE_JUPYTER
+DEFINES += CUTTER_ENABLE_QTWEBENGINE
+
 INCLUDEPATH *= .
 
 win32 {
@@ -94,6 +98,13 @@ macx:CUTTER_BUNDLE_R2_APPBUNDLE {
 }
 
 SOURCES += \
+    ppCore/PPCutterCore.cpp \
+    ppCore/PPFile.cpp \
+    models/PPAnnotationDataModel.cpp \
+    models/PPTreeItem.cpp \
+    widgets/PPGraphView.cpp \
+    dialogs/PPAnnotationsDialog.cpp \
+    widgets/PPAnnotationsWidget.cpp \
     Main.cpp \
     Cutter.cpp \
     widgets/DisassemblerGraphView.cpp \
@@ -178,6 +189,13 @@ SOURCES += \
     utils/R2Task.cpp
 
 HEADERS  += \
+    ppCore/PPCutterCore.h \
+    ppCore/PPFile.h \
+    models/PPAnnotationDataModel.h \
+    models/PPTreeItem.h \
+    widgets/PPGraphView.h \
+    dialogs/PPAnnotationsDialog.h \
+    widgets/PPAnnotationsWidget.h \
     Cutter.h \
     widgets/DisassemblerGraphView.h \
     utils/RichTextPainter.h \
@@ -265,6 +283,8 @@ HEADERS  += \
     utils/R2Task.h
 
 FORMS    += \
+    dialogs/PPAnnotationsDialog.ui \
+    widgets/PPAnnotationsWidget.ui \
     dialogs/AboutDialog.ui \
     dialogs/preferences/AsmOptionsWidget.ui \
     dialogs/CommentsDialog.ui \
