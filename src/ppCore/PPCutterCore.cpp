@@ -122,8 +122,6 @@ PPAnnotationType PPCutterCore::annotationTypeFromString(const std::string str)
 
 void PPCutterCore::loadFile(QString path)
 {
-    auto logger = get_logger();
-
     file = std::make_unique<PPFile>();
 
 //    updateAnnotation(0x00000128, R"({"entrypoint": {"name":"main"}})"_json);
