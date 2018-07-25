@@ -92,10 +92,6 @@ add_executable(Cutter ${UI_FILES} ${QRC_FILES} ${SOURCE_FILES} ${HEADER_FILES})
 target_link_libraries(Cutter Qt5::Core Qt5::Widgets Qt5::Gui Qt5::Svg)
 target_link_libraries(Cutter ${RADARE2_LIBRARIES})
 
-add_executable(Cutter ${UI_FILES} ${QRC_FILES} ${SOURCE_FILES} ${HEADER_FILES})
-
-target_link_libraries(Cutter Qt5::Core Qt5::Widgets Qt5::Gui Qt5::Svg)
-target_link_libraries(Cutter ${RADARE2_LIBRARIES})
 if(CUTTER_ENABLE_JUPYTER)
     target_link_libraries(Cutter ${PYTHON_LIBRARIES})
     if(CUTTER_ENABLE_QTWEBENGINE)
