@@ -2,9 +2,11 @@
 
 #include "PPTreeItem.h"
 
-PPTreeItem::PPTreeItem(QString _key, PPTreeItem *parent) :
-  key(_key), m_parentItem(parent)
+PPTreeItem::PPTreeItem(Type _type, PPTreeItem *parent, QString _key, const QString& value, ValueType valueType) :
+  type(_type), m_parentItem(parent), key(_key), value(value), valueType(valueType)
 {
+  if (parent != nullptr)
+    parent->appendChild(this);
 }
 
 PPTreeItem::~PPTreeItem()
@@ -51,4 +53,13 @@ int PPTreeItem::row() const
     return m_parentItem->m_childItems.indexOf(const_cast<PPTreeItem*>(this));
 
   return 0;
+}
+
+void PPTreeItem::print(std::ostream& out)
+{
+  out << " T_" << type << "{";
+  for (PPTreeItem* child : m_childItems) {
+    child->print(out);
+  }
+  out << "} ";
 }

@@ -47,6 +47,7 @@
 #include "dialogs/preferences/PreferencesDialog.h"
 #include "dialogs/OpenFileDialog.h"
 
+#include "widgets/PPGraphWidget.h"
 #include "widgets/PPGraphView.h"
 #include "widgets/PPAnnotationsWidget.h"
 
@@ -179,11 +180,12 @@ void MainWindow::initUI()
     graphDock = new GraphWidget(this, ui->actionGraph);
 
     // Add pp graph view as dockable
-    ppGraphDock = new QDockWidget(tr("PPGraph"), this);
-    ppGraphDock->setObjectName("PPGraph");
-    ppGraphDock->setAllowedAreas(Qt::AllDockWidgetAreas);
-    ppGraphView = new PPGraphView(ppGraphDock, this);
-    ppGraphDock->setWidget(ppGraphView);
+    ppGraphDock = new PPGraphWidget(this, ui->actionGraph);
+//    ppGraphDock = new QDockWidget(tr("PPGraph"), this);
+//    ppGraphDock->setObjectName("PPGraph");
+//    ppGraphDock->setAllowedAreas(Qt::AllDockWidgetAreas);
+//    ppGraphView = new PPGraphView(ppGraphDock, this);
+//    ppGraphDock->setWidget(ppGraphView);
 
     // Hide centralWidget as we do not need it
     ui->centralWidget->hide();
@@ -721,9 +723,24 @@ void MainWindow::on_actionNew_triggered()
     process.startDetached(qApp->applicationFilePath());
 }
 
+void MainWindow::on_actionPPProjectLoad_triggered()
+{
+  PPCore()->loadProject("annotations.json");
+}
+
+void MainWindow::on_actionPPProjectSave_triggered()
+{
+  PPCore()->saveProject("annotations.json");
+}
+
 void MainWindow::on_actionPPDecompile_triggered()
 {
-    PPCore()->fullRedo();
+    PPCore()->disassembleAll();
+}
+
+void MainWindow::on_actionPPCalculate_triggered()
+{
+    PPCore()->calculateAll();
 }
 
 void MainWindow::on_actionSave_triggered()

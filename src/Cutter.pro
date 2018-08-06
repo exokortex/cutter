@@ -99,12 +99,14 @@ macx:CUTTER_BUNDLE_R2_APPBUNDLE {
 
 SOURCES += \
     ppCore/PPCutterCore.cpp \
-    ppCore/PPFile.cpp \
+    ppCore/PPBinaryFile.cpp \
     models/PPAnnotationDataModel.cpp \
     models/PPTreeItem.cpp \
+    models/PPItemDelegate.cpp \
     widgets/PPGraphView.cpp \
     dialogs/PPAnnotationsDialog.cpp \
     widgets/PPAnnotationsWidget.cpp \
+    widgets/PPGraphWidget.cpp \
     Main.cpp \
     Cutter.cpp \
     widgets/DisassemblerGraphView.cpp \
@@ -186,16 +188,19 @@ SOURCES += \
     dialogs/OpenFileDialog.cpp \
     utils/CommandTask.cpp \
     utils/ProgressIndicator.cpp \
-    utils/R2Task.cpp
+    utils/R2Task.cpp \
+    test.cpp
 
 HEADERS  += \
     ppCore/PPCutterCore.h \
-    ppCore/PPFile.h \
+    ppCore/PPBinaryFile.h \
     models/PPAnnotationDataModel.h \
     models/PPTreeItem.h \
+    models/PPItemDelegate.h \
     widgets/PPGraphView.h \
     dialogs/PPAnnotationsDialog.h \
     widgets/PPAnnotationsWidget.h \
+    widgets/PPGraphWidget.h \
     Cutter.h \
     widgets/DisassemblerGraphView.h \
     utils/RichTextPainter.h \
@@ -280,7 +285,8 @@ HEADERS  += \
     utils/CommandTask.h \
     utils/ProgressIndicator.h \
     plugins/CutterPlugin.h \
-    utils/R2Task.h
+    utils/R2Task.h \
+    test.h
 
 FORMS    += \
     dialogs/PPAnnotationsDialog.ui \
@@ -330,7 +336,8 @@ FORMS    += \
     widgets/StackWidget.ui \
     widgets/RegistersWidget.ui \
     widgets/BacktraceWidget.ui \
-    dialogs/OpenFileDialog.ui
+    dialogs/OpenFileDialog.ui \
+    test.ui
 
 RESOURCES += \
     resources.qrc \

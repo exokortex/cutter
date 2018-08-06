@@ -40,8 +40,8 @@ PPAnnotationsWidget::~PPAnnotationsWidget() {}
 
 void PPAnnotationsWidget::on_commentsTreeWidget_itemDoubleClicked(QTreeWidgetItem *item, int)
 {
-    PPAnnotation annotation = item->data(0, Qt::UserRole).value<PPAnnotation>();
-    CutterCore::getInstance()->seek(annotation.offset);
+//    PPAnnotation annotation = item->data(0, Qt::UserRole).value<PPAnnotation>();
+//    CutterCore::getInstance()->seek(annotation.offset);
 }
 
 void PPAnnotationsWidget::on_nestedCmtsTreeWidget_itemDoubleClicked(QTreeWidgetItem *item, int)
@@ -53,8 +53,8 @@ void PPAnnotationsWidget::on_nestedCmtsTreeWidget_itemDoubleClicked(QTreeWidgetI
     }
 
     // Get offset and name of item double clicked
-    PPAnnotation annotation = item->data(0, Qt::UserRole).value<PPAnnotation>();
-    CutterCore::getInstance()->seek(annotation.offset);
+//    PPAnnotation annotation = item->data(0, Qt::UserRole).value<PPAnnotation>();
+//    CutterCore::getInstance()->seek(annotation.offset);
 
 }
 

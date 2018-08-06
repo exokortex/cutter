@@ -5,6 +5,7 @@
 #include <QMouseEvent>
 #include <QPropertyAnimation>
 
+#include <iostream>
 
 GraphView::GraphView(QWidget *parent)
     : QAbstractScrollArea(parent)

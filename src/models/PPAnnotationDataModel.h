@@ -12,7 +12,7 @@ class PPAnnotationDataModel : public QAbstractItemModel
     Q_OBJECT
 
 public:
-    explicit PPAnnotationDataModel(QObject *parent, json data);
+    explicit PPAnnotationDataModel(QObject *parent, std::set<std::shared_ptr<Annotation>> annotations);
     ~PPAnnotationDataModel();
 
     enum Column { KeyColumn = 0, ValueColumn};
@@ -30,17 +30,17 @@ public:
     bool setData(const QModelIndex &index, const QVariant &value,
                  int role = Qt::EditRole) override;
 
-    void setJsonData(json data);
+    void addAnnotation(std::shared_ptr<Annotation> annotation);
 
-    json getJsonData();
+    PPTreeItem* getItem(const QModelIndex &index) const;
+
+    void save();
 
 private:
-
     PPTreeItem* rootItem;
 
-    static PPTreeItem* treeFromJson(QString key, PPTreeItem* parent, json json);
-
-    static json jsonFromTree(PPTreeItem* root);
+    static PPTreeItem* treeFromAnnotations(std::set<std::shared_ptr<Annotation>> annotations);
+    static PPTreeItem* treeFromAnnotation(PPTreeItem* parent, std::shared_ptr<Annotation> annotation);
 };
 
 #endif //PPCUTTER_PPANNOTATIONDATAMODEL_H

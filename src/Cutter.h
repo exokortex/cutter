@@ -403,7 +403,7 @@ public:
     RVA nextOpAddr(RVA startAddr, int count);
 
     /* Disassembly/Graph/Hexdump/Pseudocode view priority */
-    enum class MemoryWidgetType { Disassembly, Graph, Hexdump, Pseudocode };
+    enum class MemoryWidgetType { Disassembly, PPGraph, Graph, Hexdump, Pseudocode };
     MemoryWidgetType getMemoryWidgetPriority() const
     {
         return memoryWidgetPriority;

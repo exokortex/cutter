@@ -142,7 +142,10 @@ private slots:
 
     void on_actionNew_triggered();
 
+    void on_actionPPProjectLoad_triggered();
+    void on_actionPPProjectSave_triggered();
     void on_actionPPDecompile_triggered();
+    void on_actionPPCalculate_triggered();
 
     void on_actionSave_triggered();
     void on_actionSaveAs_triggered();

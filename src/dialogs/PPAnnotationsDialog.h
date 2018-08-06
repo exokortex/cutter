@@ -8,7 +8,6 @@
 
 #include "models/PPAnnotationDataModel.h"
 
-class PPAnnotationDataModel;
 
 namespace Ui
 {
@@ -32,7 +31,6 @@ private slots:
 
 private:
     AddressType addr;
-    PPAnnotation* annotation;
 
     std::unique_ptr<Ui::PPAnnotationsDialog> ui;
 
@@ -42,9 +40,9 @@ private:
 
     bool eventFilter(QObject *obj, QEvent *event);
 
-    json getJsonAnnotations(AddressType addr);
-
     void expandAll();
+
+    void addAnnotationTriggered(AnnotationType type);
 };
 
 #endif // PPANNOTATIONSDIALOG_H

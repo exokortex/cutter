@@ -10,23 +10,12 @@
 
 #include <memory>
 
-/*
-#include "rapidjson/document.h"
-#include <rapidjson/ostreamwrapper.h>
-#include <rapidjson/writer.h>
-#include <rapidjson/prettywriter.h>
-#include <fstream>
-*/
 
-#include <pp/types.h>
-#include <pp/StateCalculators/AEE/ApeStateCalculator.h>
-#include <pp/StateCalculators/PureSw/PureSwUpdateStateCalculator.h>
-#include <pp/objectdisassembler.h>
-#include <nlohmann/json.hpp>
-
-#include "PPFile.h"
+#include "PPBinaryFile.h"
 
 #define PPCore() (PPCutterCore::getInstance())
+
+
 
 class PPCutterCore: public QObject
 {
@@ -34,25 +23,13 @@ class PPCutterCore: public QObject
     friend class ppccClass;
 
 private:
-    std::unique_ptr<DisassemblerState> state;
-    std::unique_ptr<ObjectDisassembler> objDis;
-    std::unique_ptr<StateCalculator> stateCalc;
-    std::unique_ptr<PPFile> file;
+
+    std::unique_ptr<PPBinaryFile> file;
+
     bool ready;
-    const json defaultAnnotationData = R"({
-        "entrypoint": {
-            "name": ""
-          },
-        "inst_type": {
-            "itype": "call.direct"
-          },
-        "load_ref": {
-            "addr": "0x80000000"
-          }
-      })"_json;
-    std::map<PPAnnotationType, std::string> annotationTypeToStringMap;
-    std::map<std::string, PPAnnotationType> stringToAnnotationTypeMap;
-    void addAnnotationType(PPAnnotationType, std::string);
+    std::map<AnnotationType, std::string> annotationTypeToStringMap;
+    std::map<std::string, AnnotationType> stringToAnnotationTypeMap;
+    void addAnnotationType(AnnotationType, std::string);
 
     void applyAnnotations();
     void disassemble();
@@ -62,42 +39,46 @@ public:
     ~PPCutterCore();
     static PPCutterCore *getInstance();
 
+    void loadFile(std::string path);
+
+    void disassembleAll();
+    void calculateAll();
+    void saveProject(std::string filepath);
+    void loadProject(std::string filepath);
+
     static InstructionType parseInstructionType(const std::string iType);
     static std::string instructionTypeToString(const InstructionType iType);
-    std::string annotationTypeToString(const PPAnnotationType aType);
-    PPAnnotationType annotationTypeFromString(const std::string str);
 
-    static QString jsonToQString(json json);
+    static QString addrToString(AddressType addr);
+    static AddressType strToAddress(QString qstr, bool* ok = nullptr);
 
-    void fullRedo();
+    std::string annotationTypeToString(const AnnotationType aType);
+    AnnotationType annotationTypeFromString(const std::string str);
 
-    void updateAnnotation(AddressType addr, json data);
 
-    std::map<PPAnnotationType, std::string>& getAnnotationTypes() {
+
+    std::set<const ::BasicBlock*> getBasicBlocksOfFunction(::Function& function, AddressType entrypointAddress);
+    void getSuccessorsRecursive(std::set<const ::BasicBlock*>& collection, const ::BasicBlock& fragment);
+
+    std::map<AnnotationType, std::string>& getAnnotationTypes() {
         return annotationTypeToStringMap;
     };
 
-    void loadFile(QString path);
-    void saveProject();
 
     inline bool isReady() {
         return ready;
     }
 
     inline const DisassemblerState &getState() const {
-        return *state;
+        return *file->state;
     }
 
     inline const ObjectDisassembler &getObjDis() const {
-        return *objDis;
+        return *file->objDis;
     }
 
-    inline const PPFile& getFile() const {
+    inline PPBinaryFile& getFile() const {
         return *file;
-    }
-
-    inline const json& getDefaultAnnotationData() {
-        return defaultAnnotationData;
     }
 
     void registerAnnotationChange();

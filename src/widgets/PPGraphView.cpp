@@ -22,7 +22,6 @@
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/FileSystem.h>
-//#include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/raw_ostream.h>
 
 #include "ppCore/PPCutterCore.h"
@@ -46,21 +45,20 @@
 std::vector<QString> PPGraphView::instructionColors = {
     "#f00", // UNKNOWN = 0,
     "#000000", // SEQUENTIAL,
-    "#c00", // DIRECT_CALL,     // call + return -> sequential
+    "#0c0", // DIRECT_CALL,     // call + return -> sequential
     "#33c", // INDIRECT_CALL,   // call + return -> sequential
-    "#0c0", // RETURN,          // end of BB and function
+    "#00c", // RETURN,          // end of BB and function
     "#4c0", // TRAP,            // end of BB, unknown successor
     "#03f", // DIRECT_BRANCH,   // end of BB, one successor BB
     "#43f", // INDIRECT_BRANCH, // end of BB, one or more successor BBs
     "#83f", // COND_BRANCH,     // end of BB, one or more successor BBs
 };
 
-PPGraphView::PPGraphView(QWidget *parent, MainWindow *main)
+PPGraphView::PPGraphView(QWidget *parent)
     : GraphView(parent),
       mFontMetrics(nullptr),
       mMenu(new DisassemblyContextMenu(this)),
-      seekable(new CutterSeekableWidget(this)),
-      main(main)
+      seekable(new CutterSeekableWidget(this))
 {
     highlight_token = nullptr;
     // Signals that require a refresh all
@@ -144,7 +142,6 @@ PPGraphView::PPGraphView(QWidget *parent, MainWindow *main)
     mMenu->addAction(&actionSyncOffset);
 
     connect(&actionSyncOffset, SIGNAL(triggered(bool)), this, SLOT(toggleSync()));
-    PPCore()->loadFile(main->getFilename().toUtf8().constData());
     initFont();
     colorsUpdatedSlot();
 }
@@ -185,6 +182,7 @@ void PPGraphView::refreshView()
 
 void PPGraphView::loadCurrentGraph()
 {
+
     TempConfig tempConfig;
     tempConfig.set("scr.html", true)
     .set("scr.color", COLOR_MODE_16M)
@@ -197,10 +195,13 @@ void PPGraphView::loadCurrentGraph()
     disassembly_blocks.clear();
     blocks.clear();
 
+    if (!PPCore()->isReady())
+        return;
+
     bool emptyGraph = functions.isEmpty();
     if (emptyGraph) {
         // If there's no function to print, just move to disassembly and add a message
-        if (Core()->getMemoryWidgetPriority() == CutterCore::MemoryWidgetType::Graph) {
+        if (Core()->getMemoryWidgetPriority() == CutterCore::MemoryWidgetType::PPGraph) {
             Core()->setMemoryWidgetPriority(CutterCore::MemoryWidgetType::Disassembly);
         }
         if (!emptyText) {
@@ -212,7 +213,7 @@ void PPGraphView::loadCurrentGraph()
             layout->setAlignment(emptyText, Qt::AlignHCenter);
         }
         emptyText->setVisible(true);
-    } else {
+    } else if (emptyText) {
         emptyText->setVisible(false);
     }
 
@@ -225,46 +226,35 @@ void PPGraphView::loadCurrentGraph()
     f.ready = true;
     f.entry = func["offset"].toVariant().toULongLong();
 
-    std::cout << "PP: f.entry " << f.entry << std::endl;
-
-    const ::Function *ppFunction = NULL;
-    int entryPointIdx = 0;
-
-//    if (!PPCore()->isReady())
-//        return;
-
-    for (auto &&ppFunc : PPCore()->getState().functions) {
-        int epi = 0;
-        std::cout << "PP: function" << std::endl;
-        ppFunc.print(std::cout);
-        for (auto &ePoint : ppFunc.getEntryPoints()) {
-            std::cout << "PP: entryPoint <" << ePoint.name << "> @ " << ePoint.address << std::endl;
-            if (f.entry == ePoint.address) {
-                ppFunction = &ppFunc;
-                entryPointIdx = epi;
-                std::cout << "PP: found!!" << std::endl;
-            }
-            epi++;
-        }
-    }
+    const PPBinaryFile& file = PPCore()->getFile();
+    ::Function *ppFunction = file.getFunctionAt(f.entry);
 
     if (!ppFunction) {
         return;
     }
-    for (auto it = ppFunction->begin(); it != ppFunction->end(); ++it)
+
+    windowTitle = tr("PP-Graph");
+    QString funcName = func["name"].toString().trimmed();
+    if (ppFunction == NULL) {
+        windowTitle += " (Empty)";
+    } else {
+        QString qname = QString::fromStdString(ppFunction->getJoinedName());
+        windowTitle += " (" + qname + ")";
+    }
+    parentWidget()->setWindowTitle(windowTitle);
+
+    RVA entry = func["offset"].toVariant().toULongLong();
+
+    setEntry(entry);
+
+    std::cout << "PP: f.entry " << f.entry << std::endl;
+
+    for (auto& bb : PPCore()->getBasicBlocksOfFunction(*ppFunction, f.entry))
     {
-        const ::Fragment* frag = *it;
-        std::cout << "PP: fragment " << frag->getStartAddress() << std::endl;
-        const BasicBlock *bb = llvm::dyn_cast_or_null<BasicBlock>(frag);
-        std::cout << "PP: BasicBlock " << frag->getStartAddress() << std::endl;
-
-        if (!bb)
-            continue;
-
+        std::cout << "PP: bb " << bb->getStartAddress() << std::endl;
 
         // get address of first instruction (= address of block)
-        RVA block_entry = (bb->inst_begin())->address;
-
+        RVA block_entry = bb->inst_begin()->address;
 
         DisassemblyBlock db;
         GraphBlock gb;
@@ -281,14 +271,17 @@ void PPGraphView::loadCurrentGraph()
         }
 
         // mark block if it is the entry of the function
-        if (ppFunction->getEntryPoints()[entryPointIdx].address == block_entry)
+        for (auto& entrypoint : ppFunction->getEntryPoints())
         {
-            std::cout << "PP: adding entry point annotation..." << std::endl;
+            if (entrypoint.address != block_entry)
+                continue;
+
+            std::cout << "PP: adding entry point marker..." << std::endl;
             Instr i;
             i.addr = block_entry;
             i.size = 1;
 
-            std::string titles = "<font color='#44f'>Entry Point: " + ppFunction->getEntryPoints()[entryPointIdx].name + "</font>";
+            std::string titles = "<font color='#44f'>Entry Point: " + entrypoint.name + "</font>";
             QString text = QString::fromUtf8(titles.c_str());
 
             QTextDocument textDoc;
@@ -314,16 +307,24 @@ void PPGraphView::loadCurrentGraph()
             //if (di.isTerminator(PPCore()->getState()) == CERTAIN) {
             //    color = "#2080d0";
             //}
-            const PPFile& f = PPCore()->getFile();
-            bool annotated = f.annotations.find(di.address) != f.annotations.end();
+            const PPBinaryFile& f = PPCore()->getFile();
+            bool annotated = false;//f.annotations.find(di.address) != f.annotations.end();
+
+            //i.associatedInstructions = PPCore()->getFile().getAssociatedAddresses(seekable->getOffset());
 
             std::string asmString = PPCore()->getObjDis().getInfo().printInstrunction(di.instruction);
             QString asmQString = QString::fromUtf8(asmString.c_str());
-            QString disas = QString("<font color='#000000'>%1%2</font>&nbsp;<font color='%4'>%3")
-              .arg(di.address, 8, 16, QChar('0'))
-              .arg(annotated ? "*" : "&nbsp;")
-              .arg(asmQString)
-              .arg(color);
+
+            QString comment = "";
+            if (di.type != InstructionType::SEQUENTIAL)
+                comment = QString(" (%1)").arg(QString::fromStdString(toString(di.type)).trimmed());
+
+            QString disas = QString("<font color='#000000'>%1%2</font>&nbsp;<font color='%4'>%3%5")
+                    .arg(di.address, 8, 16, QChar('0'))
+                    .arg(annotated ? "*" : "&nbsp;")
+                    .arg(asmQString)
+                    .arg(color)
+                    .arg(comment);
 
             QTextDocument textDoc;
             textDoc.setHtml(disas);
@@ -348,20 +349,14 @@ void PPGraphView::loadCurrentGraph()
         addBlock(gb);
     }
 
-    QString windowTitle = tr("PP-Graph");
-    QString funcName = func["name"].toString().trimmed();
-    if (ppFunction != NULL)
+    for (auto& block : blocks)
     {
-        //std::string ppFunctionName = ppFunction->getEntryPoints()[entryPointIdx].name;
-        std::string ppFunctionName = ppFunction->getJoinedName();
-        QString qname = QString::fromUtf8(ppFunctionName.c_str());
-        windowTitle += " (" + qname + ")";
+        std::cout << "@" << std::hex << block.first << " => ";
+        for (auto& exit : block.second.exits)
+            std::cout << exit << ", ";
+        std::cout << std::endl;
     }
-    parentWidget()->setWindowTitle(windowTitle);
 
-    RVA entry = func["offset"].toVariant().toULongLong();
-
-    setEntry(entry);
     /*for (QJsonValueRef blockRef : func["blocks"].toArray()) {
         QJsonObject block = blockRef.toObject();
         RVA block_entry = block["offset"].toVariant().toULongLong();
@@ -530,7 +525,7 @@ void PPGraphView::drawBlock(QPainter & p, GraphView::GraphBlock &block)
                block.width, block.height);
 
     // Draw different background for selected instruction
-    if (selected_instruction != RVA_INVALID) {
+    /*if (selected_instruction != RVA_INVALID)*/ {
         int y = block.y + (2 * charWidth) + (db.header_text.lines.size() * charHeight);
         for (Instr &instr : db.instrs) {
             auto selected = instr.addr == selected_instruction;
@@ -558,6 +553,9 @@ void PPGraphView::drawBlock(QPainter & p, GraphView::GraphBlock &block)
                            QColor(disassemblyTracedColor.red(),
                                   disassemblyTracedColor.green(),
                                   std::max(0, std::min(256, disassemblyTracedColor.blue() + colorDiff))));
+            } else if (associatedAddresses.count(instr.addr)) {
+                p.fillRect(QRect(block.x + charWidth, y, block.width - (10 + 2 * charWidth),
+                                 int(instr.text.lines.size()) * charHeight), QColor(0xff, 0x53, 0x53));
             }
             y += int(instr.text.lines.size()) * charHeight;
         }
@@ -798,6 +796,7 @@ void PPGraphView::seekLocal(RVA addr, bool update_viewport)
 {
     connectSeekChanged(true);
     seekable->seek(addr);
+    associatedAddresses = PPCore()->getFile().getAssociatedAddresses(addr);
     connectSeekChanged(false);
     if (update_viewport) {
         viewport()->update();
