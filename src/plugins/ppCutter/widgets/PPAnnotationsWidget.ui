@@ -350,7 +350,7 @@ QToolTip {
   </action>
   <action name="actionAddAnnotation">
    <property name="text">
-    <string>Add Annotation</string>
+    <string>Edit Annotation</string>
    </property>
   </action>
  </widget>

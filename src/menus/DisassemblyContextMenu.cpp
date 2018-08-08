@@ -1,7 +1,7 @@
 #include "DisassemblyContextMenu.h"
 #include "dialogs/preferences/PreferencesDialog.h"
 #include "dialogs/EditInstructionDialog.h"
-#include "dialogs/PPAnnotationsDialog.h"
+#include "plugins/ppCutter/dialogs/PPAnnotationsDialog.h"
 #include "dialogs/CommentsDialog.h"
 #include "dialogs/FlagDialog.h"
 #include "dialogs/RenameDialog.h"
@@ -49,7 +49,7 @@ DisassemblyContextMenu::DisassemblyContextMenu(QWidget *parent)
 {
     createAction(&actionCopy, tr("Copy"), getCopySequence(), SLOT(on_actionCopy_triggered()));
     copySeparator = addSeparator();
-    createAction(&actionAddAnnotation, tr("Add Annotation"), getCommentSequence(),
+    createAction(&actionAddAnnotation, tr("Edit Annotation"), getCommentSequence(),
                  SLOT(on_actionAddAnnotation_triggered()));
     createAction(&actionCopyAddr, tr("Copy address"), {}, SLOT(on_actionCopyAddr_triggered()));
     createAction(&actionAddComment, tr("Add Comment"), getCommentSequence(),

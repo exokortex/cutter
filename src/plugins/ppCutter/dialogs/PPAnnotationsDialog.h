@@ -4,11 +4,8 @@
 #include <QDialog>
 #include <memory>
 
-#include "ppCore/PPCutterCore.h"
+#include "plugins/ppCutter/core/PPCutterCore.h"
 
-#include "models/PPAnnotationDataModel.h"
-
-class PPAnnotationDataModel;
 
 namespace Ui
 {
@@ -28,23 +25,9 @@ public:
 private slots:
     void on_buttonBox_accepted();
     void on_buttonBox_rejected();
-    void checkBoxStateChanged();
 
 private:
-    AddressType addr;
-    PPAnnotation* annotation;
-
     std::unique_ptr<Ui::PPAnnotationsDialog> ui;
-
-    PPAnnotationDataModel* dataModel;
-
-    std::vector<QCheckBox*> checkBoxes;
-
-    bool eventFilter(QObject *obj, QEvent *event);
-
-    json getJsonAnnotations(AddressType addr);
-
-    void expandAll();
 };
 
 #endif // PPANNOTATIONSDIALOG_H
