@@ -101,13 +101,17 @@ macx:CUTTER_BUNDLE_R2_APPBUNDLE {
 }
 
 SOURCES += \
-    ppCore/PPCutterCore.cpp \
-    ppCore/PPFile.cpp \
-    models/PPAnnotationDataModel.cpp \
-    models/PPTreeItem.cpp \
-    widgets/PPGraphView.cpp \
-    dialogs/PPAnnotationsDialog.cpp \
-    widgets/PPAnnotationsWidget.cpp \
+    plugins/ppCutter/core/PPCutterCore.cpp \
+    plugins/ppCutter/core/PPBinaryFile.cpp \
+    plugins/ppCutter/widgets/AnnotationsEditorWidget.cpp \
+    plugins/ppCutter/widgets/AnnotationsEditorDockWidget.cpp \
+    plugins/ppCutter/models/PPAnnotationDataModel.cpp \
+    plugins/ppCutter/models/PPTreeItem.cpp \
+    plugins/ppCutter/models/PPItemDelegate.cpp \
+    plugins/ppCutter/widgets/PPGraphView.cpp \
+    plugins/ppCutter/dialogs/PPAnnotationsDialog.cpp \
+    plugins/ppCutter/widgets/PPAnnotationsWidget.cpp \
+    plugins/ppCutter/widgets/PPGraphWidget.cpp \
     Main.cpp \
     Cutter.cpp \
     widgets/DisassemblerGraphView.cpp \
@@ -200,13 +204,17 @@ SOURCES += \
     dialogs/SetToDataDialog.cpp
 
 HEADERS  += \
-    ppCore/PPCutterCore.h \
-    ppCore/PPFile.h \
-    models/PPAnnotationDataModel.h \
-    models/PPTreeItem.h \
-    widgets/PPGraphView.h \
-    dialogs/PPAnnotationsDialog.h \
-    widgets/PPAnnotationsWidget.h \
+    plugins/ppCutter/core/PPCutterCore.h \
+    plugins/ppCutter/core/PPBinaryFile.h \
+    plugins/ppCutter/widgets/AnnotationsEditorWidget.h \
+    plugins/ppCutter/widgets/AnnotationsEditorDockWidget.h \
+    plugins/ppCutter/models/PPAnnotationDataModel.h \
+    plugins/ppCutter/models/PPTreeItem.h \
+    plugins/ppCutter/models/PPItemDelegate.h \
+    plugins/ppCutter/widgets/PPGraphView.h \
+    plugins/ppCutter/dialogs/PPAnnotationsDialog.h \
+    plugins/ppCutter/widgets/PPAnnotationsWidget.h \
+    plugins/ppCutter/widgets/PPGraphWidget.h \
     Cutter.h \
     widgets/DisassemblerGraphView.h \
     utils/RichTextPainter.h \
@@ -303,8 +311,9 @@ HEADERS  += \
     utils/InitialOptions.h
 
 FORMS    += \
-    dialogs/PPAnnotationsDialog.ui \
-    widgets/PPAnnotationsWidget.ui \
+    plugins/ppCutter/dialogs/PPAnnotationsDialog.ui \
+    plugins/ppCutter/widgets/PPAnnotationsWidget.ui \
+    plugins/ppCutter/widgets/AnnotationsEditorWidget.ui \
     dialogs/AboutDialog.ui \
     dialogs/preferences/AsmOptionsWidget.ui \
     dialogs/CommentsDialog.ui \

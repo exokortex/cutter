@@ -6,6 +6,8 @@
 #include <QDebug>
 #include <QCheckBox>
 
+#include "plugins/ppCutter/core/PPCutterCore.h"
+
 AnalTask::AnalTask() :
     AsyncTask()
 {
@@ -36,6 +38,11 @@ void AnalTask::runTask()
     // Do not reload the file if already loaded
     QJsonArray openedFiles = Core()->getOpenedFiles();
     if (!openedFiles.size() && options.filename.length()) {
+
+        log(tr("Analyzing with pp...\n"));
+        PPCore()->loadFile(options.filename.toStdString());
+        log(tr("pp is done...\n"));
+
         bool fileLoaded = Core()->loadFile(options.filename,
                                            options.binLoadAddr,
                                            options.mapAddr,

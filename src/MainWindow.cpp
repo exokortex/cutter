@@ -47,8 +47,10 @@
 #include "dialogs/preferences/PreferencesDialog.h"
 #include "dialogs/OpenFileDialog.h"
 
-#include "widgets/PPGraphView.h"
-#include "widgets/PPAnnotationsWidget.h"
+#include "plugins/ppCutter/widgets/PPGraphWidget.h"
+#include "plugins/ppCutter/widgets/PPGraphView.h"
+#include "plugins/ppCutter/widgets/PPAnnotationsWidget.h"
+#include "plugins/ppCutter/widgets/AnnotationsEditorDockWidget.h"
 
 #include "widgets/DisassemblerGraphView.h"
 #include "widgets/GraphWidget.h"
@@ -88,7 +90,7 @@
 
 #include <cassert>
 
-#include "ppCore/PPCutterCore.h"
+#include "plugins/ppCutter/core/PPCutterCore.h"
 
 static void registerCustomFonts()
 {
@@ -204,11 +206,7 @@ void MainWindow::initUI()
     graphDock = new GraphWidget(this, ui->actionGraph);
 
     // Add pp graph view as dockable
-    ppGraphDock = new QDockWidget(tr("PPGraph"), this);
-    ppGraphDock->setObjectName("PPGraph");
-    ppGraphDock->setAllowedAreas(Qt::AllDockWidgetAreas);
-    ppGraphView = new PPGraphView(ppGraphDock, this);
-    ppGraphDock->setWidget(ppGraphView);
+    ppGraphDock = new PPGraphWidget(this, ui->actionGraph);
 
     // Hide centralWidget as we do not need it
     ui->centralWidget->hide();
@@ -227,6 +225,7 @@ void MainWindow::initUI()
     commentsDock = new CommentsWidget(this, ui->actionComments);
 
     ppAnnotationsDock = new PPAnnotationsWidget(this, ui->actionComments);
+    annotationsEditorDock = new AnnotationsEditorDockWidget(this, ui->actionComments);
 
     stringsDock = new StringsWidget(this, ui->actionStrings);
     flagsDock = new FlagsWidget(this, ui->actionFlags);
@@ -590,6 +589,7 @@ void MainWindow::restoreDocks()
     // Tabs for center (must be applied after splitDockWidget())
     tabifyDockWidget(sectionsDock, commentsDock);
     tabifyDockWidget(sectionsDock, ppAnnotationsDock);
+    tabifyDockWidget(sectionsDock, annotationsEditorDock);
     tabifyDockWidget(dashboardDock, disassemblyDock);
     tabifyDockWidget(dashboardDock, graphDock);
     tabifyDockWidget(dashboardDock, ppGraphDock);
@@ -649,6 +649,7 @@ void MainWindow::showDefaultDocks()
                                                 functionsDock,
                                                 commentsDock,
                                                 ppAnnotationsDock,
+                                                annotationsEditorDock,
                                                 stringsDock,
                                                 consoleDock,
                                                 importsDock,
@@ -829,9 +830,29 @@ void MainWindow::on_actionNew_triggered()
     process.startDetached(qApp->applicationFilePath());
 }
 
+void MainWindow::on_actionPPProjectLoad_triggered()
+{
+  PPCore()->loadProject("annotations.json");
+}
+
+void MainWindow::on_actionPPProjectSave_triggered()
+{
+  PPCore()->saveProject("annotations.json");
+}
+
+void MainWindow::on_actionPPReload_triggered()
+{
+    PPCore()->loadFile(filename.toStdString());
+}
+
 void MainWindow::on_actionPPDecompile_triggered()
 {
-    PPCore()->fullRedo();
+    PPCore()->disassembleAll();
+}
+
+void MainWindow::on_actionPPCalculate_triggered()
+{
+    PPCore()->calculateAll();
 }
 
 void MainWindow::on_actionSave_triggered()

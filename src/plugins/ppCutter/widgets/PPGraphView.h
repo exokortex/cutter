@@ -11,9 +11,10 @@
 #include "widgets/GraphView.h"
 #include "menus/DisassemblyContextMenu.h"
 #include "utils/RichTextPainter.h"
-#include "CutterSeekableWidget.h"
+#include "widgets/CutterSeekableWidget.h"
 
 #include <vector>
+#include <set>
 #include <pp/types.h>
 #include <pp/objectdisassembler.h>
 #include "MainWindow.h"
@@ -95,6 +96,7 @@ class PPGraphView : public GraphView
         Text text;
         Text fullText;
         std::vector<unsigned char> opcode; //instruction bytes
+        std::vector<AddressType> associatedInstructions;
     };
 
 
@@ -135,7 +137,7 @@ class PPGraphView : public GraphView
     };
 
 public:
-    PPGraphView(QWidget *parent, MainWindow *main);
+    PPGraphView(QWidget *parent);
     ~PPGraphView();
     std::unordered_map<ut64, DisassemblyBlock> disassembly_blocks;
     virtual void drawBlock(QPainter &p, GraphView::GraphBlock &block) override;
@@ -191,6 +193,7 @@ private:
 
     MainWindow *main;
     static std::vector<QString> instructionColors;
+    std::set<AddressType> associatedAddresses;
 
     DisassemblyContextMenu *mMenu;
 

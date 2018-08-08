@@ -3,7 +3,7 @@
 
 #include <memory>
 
-#include "CutterDockWidget.h"
+#include "widgets/CutterDockWidget.h"
 
 class MainWindow;
 class QTreeWidgetItem;

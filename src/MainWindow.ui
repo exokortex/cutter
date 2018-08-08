@@ -180,7 +180,6 @@ border-top: 0px;
      <string>File</string>
     </property>
     <addaction name="actionNew"/>
-    <addaction name="actionPPDecompile"/>
     <addaction name="actionOpen"/>
     <addaction name="separator"/>
     <addaction name="actionImportPDB"/>
@@ -284,12 +283,24 @@ border-top: 0px;
      <string>Debug</string>
     </property>
    </widget>
+   <widget class="QMenu" name="menuPP">
+    <property name="title">
+     <string>PP</string>
+    </property>
+    <addaction name="actionPPProjectLoad"/>
+    <addaction name="actionPPProjectSave"/>
+    <addaction name="separator"/>
+    <addaction name="actionPPReload"/>
+    <addaction name="actionPPDecompile"/>
+    <addaction name="actionPPCalculate"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
    <addaction name="menuView"/>
    <addaction name="menuWindows"/>
    <addaction name="menuDebug"/>
    <addaction name="menuHelp"/>
+   <addaction name="menuPP"/>
   </widget>
   <widget class="QToolBar" name="mainToolBar">
    <property name="sizePolicy">
@@ -355,13 +366,18 @@ border-top: 0px;
    </property>
   </action>
   <action name="actionPPDecompile">
-      <property name="text">
-         <string>Re-Decompile</string>
-     </property>
-     <property name="shortcut">
-         <string>Ctrl+D</string>
-     </property>
- </action>
+   <property name="text">
+    <string>Decompile</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+D</string>
+   </property>
+  </action>
+     <action name="actionPPReload">
+         <property name="text">
+             <string>Reload File</string>
+         </property>
+     </action>
   <action name="actionClose">
    <property name="text">
     <string>Close</string>
@@ -1183,14 +1199,31 @@ border-top: 0px;
     <string>Disassembly view</string>
    </property>
   </action>
-   <widget class="QMenu" name="addExtraWidgets">
-    <property name="title">
-     <string>Add extra...</string>
-    </property>
-    <addaction name="actionExtraGraph"/>
-    <addaction name="actionExtraHexdump"/>
-    <addaction name="actionExtraDisassembly"/>
-   </widget>
+  <action name="actionRe_Decompile">
+   <property name="text">
+    <string>Decompile</string>
+   </property>
+  </action>
+  <action name="actionPPProjectSave">
+   <property name="text">
+    <string>Save PP Project</string>
+   </property>
+  </action>
+     <action name="actionPPProjectLoad">
+         <property name="text">
+             <string>Load PP Project</string>
+         </property>
+     </action>
+     <action name="actionPPProjectLoad">
+         <property name="text">
+             <string>Load PP Project</string>
+         </property>
+     </action>
+     <action name="actionPPCalculate">
+         <property name="text">
+             <string>Calculate States</string>
+         </property>
+     </action>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
  <resources>

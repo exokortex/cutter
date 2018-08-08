@@ -99,8 +99,7 @@ if(CUTTER_ENABLE_JUPYTER)
     endif()
 endif()
 
-SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-rtti" )
-SET( CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address" )
+SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fno-rtti" )
 
 find_package(pp REQUIRED)
 target_link_libraries(Cutter pp::pp)

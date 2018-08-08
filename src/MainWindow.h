@@ -20,6 +20,7 @@
 
 class PPAnnotationsWidget;
 class PPGraphView;
+class AnnotationsEditorDockWidget;
 class CutterCore;
 class Omnibar;
 class ProgressIndicator;
@@ -143,7 +144,11 @@ private slots:
 
     void on_actionNew_triggered();
 
+    void on_actionPPProjectLoad_triggered();
+    void on_actionPPProjectSave_triggered();
+    void on_actionPPReload_triggered();
     void on_actionPPDecompile_triggered();
+    void on_actionPPCalculate_triggered();
 
     void on_actionSave_triggered();
     void on_actionSaveAs_triggered();
@@ -213,6 +218,7 @@ private:
     RelocsWidget       *relocsDock = nullptr;
     CommentsWidget     *commentsDock = nullptr;
     PPAnnotationsWidget *ppAnnotationsDock = nullptr;
+    AnnotationsEditorDockWidget *annotationsEditorDock = nullptr;
     StringsWidget      *stringsDock = nullptr;
     FlagsWidget        *flagsDock = nullptr;
     Dashboard          *dashboardDock = nullptr;
