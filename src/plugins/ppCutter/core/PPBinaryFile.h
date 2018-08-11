@@ -16,6 +16,8 @@
 #include <pp/architecture/riscv/replace_instructions.h>
 #include <pp/architecture/thumbv7m/info.h>
 
+Q_DECLARE_METATYPE(UpdateType)
+
 class PPBinaryFile
 {
   public:
@@ -31,6 +33,7 @@ class PPBinaryFile
 
     PPBinaryFile(std::string inputFile);
     ~PPBinaryFile();
+    void createIndex();
     void disassemble();
     bool calculateStates();
 
@@ -38,7 +41,8 @@ class PPBinaryFile
 
     std::set<std::shared_ptr<Annotation>> getAnnotationsAt(AddressType addr);
 
-    std::shared_ptr<Annotation> createAnnotation(AnnotationType type, AddressType anchorAddress);
+    std::shared_ptr<Annotation> createAnnotation(Annotation::Type type, AddressType anchorAddress);
+    void deleteAnnotation(std::shared_ptr<Annotation> annotation);
 
     std::set<AddressType> getAssociatedAddresses(AddressType addr);
 

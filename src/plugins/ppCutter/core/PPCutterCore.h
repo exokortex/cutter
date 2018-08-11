@@ -27,9 +27,9 @@ private:
     std::unique_ptr<PPBinaryFile> file;
 
     bool ready;
-    std::map<AnnotationType, std::string> annotationTypeToStringMap;
-    std::map<std::string, AnnotationType> stringToAnnotationTypeMap;
-    void addAnnotationType(AnnotationType, std::string);
+    std::map<Annotation::Type, std::string> annotationTypeToStringMap;
+    std::map<std::string, Annotation::Type> stringToAnnotationTypeMap;
+    void addAnnotationType(Annotation::Type, std::string);
 
     void applyAnnotations();
     void disassemble();
@@ -46,14 +46,16 @@ public:
     void saveProject(std::string filepath);
     void loadProject(std::string filepath);
 
+    static QString toString(const UpdateType updateType);
+    static QString addrToString(const AddressType addr);
+
     static InstructionType parseInstructionType(const std::string iType);
     static std::string instructionTypeToString(const InstructionType iType);
 
-    static QString addrToString(AddressType addr);
     static AddressType strToAddress(QString qstr, bool* ok = nullptr);
 
-    std::string annotationTypeToString(const AnnotationType aType);
-    AnnotationType annotationTypeFromString(const std::string str);
+    std::string annotationTypeToString(const Annotation::Type aType);
+    Annotation::Type annotationTypeFromString(const std::string str);
 
     static std::string updateTypeToString(const UpdateType updateType);
     static UpdateType updateTypeFromString(const std::string str);
@@ -62,7 +64,7 @@ public:
     std::set<const ::BasicBlock*> getBasicBlocksOfFunction(::Function& function, AddressType entrypointAddress);
     void getSuccessorsRecursive(std::set<const ::BasicBlock*>& collection, const ::BasicBlock& fragment);
 
-    std::map<AnnotationType, std::string>& getAnnotationTypes() {
+    std::map<Annotation::Type, std::string>& getAnnotationTypes() {
         return annotationTypeToStringMap;
     };
 

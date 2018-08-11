@@ -3,7 +3,9 @@
 #include <QList>
 #include <QVariant>
 #include <memory>
-#include "pp/annotations.h"
+#include "annotations/Annotation.h"
+#include "annotations/CommentAnnotation.h"
+#include "annotations/LoadRefAnnotation.h"
 
 // adapted from https://doc.qt.io/qt-5/qtwidgets-itemviews-simpletreemodel-example.html
 
@@ -11,10 +13,10 @@ class PPTreeItem
 {
   public:
     enum Type { ROOT, ANNOTATION, LEAF};
-    enum ValueType { STRING, ADDRESS, ENUM_UPDATE_TYPE };
+    enum ValueType { STRING, ADDRESS, ENUM_UPDATE_TYPE, ENUM_INSTRUCTION_TYPE };
 
     explicit PPTreeItem(Type _type, PPTreeItem *parentItem, QString key,
-                        const QString& value = "", ValueType valueType = STRING);
+                        const QVariant& value = "", ValueType valueType = STRING);
     ~PPTreeItem();
 
     void appendChild(PPTreeItem *child);
@@ -26,10 +28,16 @@ class PPTreeItem
     QVariant data(int column) const;
     int row() const;
     PPTreeItem *getParentItem();
+    bool removeChildren(int position, int count);
+    void deleteData();
 
     void print(std::ostream& out);
 
-    inline void setValue(const QString& _value) {
+    inline Type getType() {
+      return type;
+    }
+
+    inline void setValue(const QVariant& _value) {
       value = _value;
     }
 
@@ -54,7 +62,7 @@ class PPTreeItem
     PPTreeItem *parentItem;
 
     QString key;
-    QString value;
+    QVariant value;
     ValueType valueType;
 
     QList<PPTreeItem*> childItems;

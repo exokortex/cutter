@@ -24,6 +24,11 @@
 #include <pp/types.h>
 #include <pp/function.h>
 #include <pp/config.h>
+#include <pp/annotations/Annotation.h>
+#include <pp/annotations/CommentAnnotation.h>
+#include <pp/annotations/LoadRefAnnotation.h>
+#include <pp/annotations/AnnotationsHelper.h>
+#include <pp/annotations/AnnotationsSerializer.h>
 
 PPBinaryFile::PPBinaryFile(std::string inputFile)
 {
@@ -102,9 +107,14 @@ PPBinaryFile::PPBinaryFile(std::string inputFile)
     return;
 }
 
+void PPBinaryFile::createIndex()
+{
+  AnnotationsHelper::prepareAnnotations(*state, annotations);
+}
+
 void PPBinaryFile::disassemble()
 {
-  Annotations::prepareAnnotations(*state, annotations);
+  AnnotationsHelper::prepareAnnotations(*state, annotations);
 
   int num_rounds = 0;
   try {
@@ -157,24 +167,32 @@ std::set<std::shared_ptr<Annotation>> PPBinaryFile::getAnnotationsAt(AddressType
   return state->annotations_by_address[addr];
 }
 
-std::shared_ptr<Annotation> PPBinaryFile::createAnnotation(AnnotationType type, AddressType anchorAddress)
+std::shared_ptr<Annotation> PPBinaryFile::createAnnotation(Annotation::Type type, AddressType anchorAddress)
 {
   std::shared_ptr<Annotation> ret;
 
   switch (type) {
-    case AT_LOAD_REF:
-      ret = std::make_shared<LoadRefAnnotation>(UpdateType::CONSTANT_LOAD,  anchorAddress, anchorAddress, anchorAddress);
+    case Annotation::Type::COMMENT:
+      ret = std::make_shared<CommentAnnotation>(anchorAddress);
+      break;
+    case Annotation::Type::LOAD_REF:
+      ret = std::make_shared<LoadRefAnnotation>(anchorAddress);
       break;
     default:
-      std::cout << "Type not implemented " << type << std::endl;
+      std::cout << "Annotation::Type not implemented: no. " << static_cast<int>(type) << std::endl;
       assert(false);
   }
 
   annotations.push_back(ret);
 
-  Annotations::prepareAnnotations(*state, annotations);
+  AnnotationsHelper::prepareAnnotations(*state, annotations);
 
   return ret;
+}
+
+void PPBinaryFile::deleteAnnotation(std::shared_ptr<Annotation> annotation)
+{
+  annotations.erase(std::remove(annotations.begin(), annotations.end(), annotation), annotations.end());
 }
 
 std::set<AddressType> PPBinaryFile::getAssociatedAddresses(AddressType addr)
@@ -182,9 +200,9 @@ std::set<AddressType> PPBinaryFile::getAssociatedAddresses(AddressType addr)
   std::set<AddressType> res;
   for (auto& annotation : state->annotations_by_address[addr]) {
     if (const LoadRefAnnotation* a = llvm::dyn_cast<LoadRefAnnotation>(annotation.get())) {
-      res.insert(a->addrInstAddress);
-      res.insert(a->dataInstAddress);
-      res.insert(a->applyInstAddress);
+      res.insert(a->address);
+      res.insert(a->addrLoad);
+      res.insert(a->dataLoad);
     }
   }
   return res;

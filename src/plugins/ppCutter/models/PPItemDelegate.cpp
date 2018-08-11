@@ -13,22 +13,28 @@ PPItemDelegate::~PPItemDelegate()
 
 QWidget* PPItemDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
-  // ComboBox ony in column 2
-  if (index.column() != 1)
-    return QStyledItemDelegate::createEditor(parent, option, index);
-
-  if (index.data(Qt::UserRole) != PPTreeItem::ValueType::ENUM_UPDATE_TYPE) {
-    return QStyledItemDelegate::createEditor(parent, option, index);
+  if (index.data(Qt::UserRole) == PPTreeItem::ValueType::ENUM_UPDATE_TYPE) {
+    QComboBox* cb = new QComboBox(parent);
+    cb->addItem(QString("INVALID"));
+    cb->addItem(QString("CONSTANT_LOAD"));
+    cb->addItem(QString("SIGNATURE_LOAD"));
+    cb->addItem(QString("CONST_INJECTION"));
+    return cb;
+  } else if (index.data(Qt::UserRole) == PPTreeItem::ValueType::ENUM_INSTRUCTION_TYPE) {
+    QComboBox* cb = new QComboBox(parent);
+    cb->addItem(QString("UNKNOWN"));
+    cb->addItem(QString("SEQUENTIAL"));
+    cb->addItem(QString("DIRECT_CALL"));
+    cb->addItem(QString("INDIRECT_CALL"));
+    cb->addItem(QString("RETURN"));
+    cb->addItem(QString("TRAP"));
+    cb->addItem(QString("DIRECT_BRANCH"));
+    cb->addItem(QString("INDIRECT_BRANCH"));
+    return cb;
   }
 
-  // Create the combobox and populate it
-  QComboBox* cb = new QComboBox(parent);
-  int row = index.row();
-  cb->addItem(QString("INVALID"));
-  cb->addItem(QString("CONSTANT_LOAD"));
-  cb->addItem(QString("SIGNATURE_LOAD"));
-  cb->addItem(QString("CONST_INJECTION"));
-  return cb;
+  // create default editor
+  return QStyledItemDelegate::createEditor(parent, option, index);
 }
 
 void PPItemDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const

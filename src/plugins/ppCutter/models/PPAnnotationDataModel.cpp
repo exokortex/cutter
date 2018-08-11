@@ -171,7 +171,7 @@ bool PPAnnotationDataModel::setData(const QModelIndex &index, const QVariant &va
         case KeyColumn:
             return false;
         case ValueColumn:
-            item->setValue(value.toString());
+            item->setValue(value);
             save();
             return true;
         default:
@@ -186,42 +186,28 @@ PPTreeItem* PPAnnotationDataModel::treeFromAnnotation(PPTreeItem *parent, std::s
     PPTreeItem* annotationItem = new PPTreeItem(PPTreeItem::Type::ANNOTATION, parent, name);
     annotationItem->setAnnotationPtr(annotation);
 
+    new PPTreeItem(PPTreeItem::Type::LEAF, annotationItem, "address", PPCutterCore::addrToString(annotation->address), PPTreeItem::ValueType::ADDRESS);
+
     switch (annotation->getType()) {
-      case AT_LOAD_REF:
-      {
-          const LoadRefAnnotation* a = llvm::dyn_cast<LoadRefAnnotation>(annotation.get());
-          QString typeString = "";
-          switch (a->updateType) {
-            case UpdateType::INVALID:
-              typeString = "INVALID";
-              break;
-            case UpdateType::CONSTANT_LOAD:
-              typeString = "CONSTANT_LOAD";
-              break;
-            case UpdateType::SIGNATURE_LOAD:
-              typeString = "SIGNATURE_LOAD";
-              break;
-            case UpdateType::CONST_INJECTION:
-              typeString = "CONST_INJECTION";
-              break;
-          }
-          new PPTreeItem(PPTreeItem::Type::LEAF, annotationItem, "type", typeString, PPTreeItem::ValueType::ENUM_UPDATE_TYPE);
-          new PPTreeItem(PPTreeItem::Type::LEAF, annotationItem, "addr", PPCutterCore::addrToString(a->addrInstAddress), PPTreeItem::ValueType::ADDRESS);
-          new PPTreeItem(PPTreeItem::Type::LEAF, annotationItem, "data", PPCutterCore::addrToString(a->dataInstAddress), PPTreeItem::ValueType::ADDRESS);
-          new PPTreeItem(PPTreeItem::Type::LEAF, annotationItem, "apply", PPCutterCore::addrToString(a->applyInstAddress), PPTreeItem::ValueType::ADDRESS);
-          break;
-      }
-      case AT_COMMENT:
-      {
-          CommentAnnotation* a = llvm::dyn_cast<CommentAnnotation>(annotation.get());
-          new PPTreeItem(PPTreeItem::Type::LEAF, annotationItem, "addr", PPCutterCore::addrToString(a->addr), PPTreeItem::ValueType::ADDRESS);
-          new PPTreeItem(PPTreeItem::Type::LEAF, annotationItem, "comment", QString::fromStdString(a->comment), PPTreeItem::ValueType::STRING);
-      }
-      default:
-      {
-          assert(false);
-          break;
-      }
+        case Annotation::Type::COMMENT:
+        {
+            CommentAnnotation* a = llvm::dyn_cast<CommentAnnotation>(annotation.get());
+            new PPTreeItem(PPTreeItem::Type::LEAF, annotationItem, "comment", QString::fromStdString(a->comment), PPTreeItem::ValueType::STRING);
+            break;
+        }
+        case Annotation::Type::LOAD_REF:
+        {
+            const LoadRefAnnotation* a = llvm::dyn_cast<LoadRefAnnotation>(annotation.get());
+            new PPTreeItem(PPTreeItem::Type::LEAF, annotationItem, "updateType", PPCutterCore::toString(a->updateType), PPTreeItem::ValueType::ENUM_UPDATE_TYPE);
+            new PPTreeItem(PPTreeItem::Type::LEAF, annotationItem, "addrLoad", PPCutterCore::addrToString(a->addrLoad), PPTreeItem::ValueType::ADDRESS);
+            new PPTreeItem(PPTreeItem::Type::LEAF, annotationItem, "dataLoad", PPCutterCore::addrToString(a->dataLoad), PPTreeItem::ValueType::ADDRESS);
+            break;
+        }
+        default:
+        {
+            assert(false);
+            break;
+        }
     }
     return annotationItem;
 }
@@ -251,29 +237,30 @@ void PPAnnotationDataModel::save()
             QString key = valueItem->data(0).toString();
             QString value = valueItem->data(1).toString();
 
+            if (key == "address") {
+                annotation->address = PPCutterCore::strToAddress(value);
+                continue;
+            }
+
             switch (annotation->getType())
             {
-                case AT_LOAD_REF:
+                case Annotation::Type::COMMENT:
                 {
-                    LoadRefAnnotation* a = llvm::dyn_cast<LoadRefAnnotation>(annotation.get());
-                    if (key == "type") {
-                        a->updateType = PPCutterCore::updateTypeFromString(value.toStdString());
-                    } else if (key == "addr") {
-                        a->addrInstAddress = PPCutterCore::strToAddress(value);
-                    } else if (key == "data") {
-                        a->dataInstAddress = PPCutterCore::strToAddress(value);
-                    } else if (key == "apply") {
-                        a->applyInstAddress = PPCutterCore::strToAddress(value);
+                    CommentAnnotation* a = llvm::dyn_cast<CommentAnnotation>(annotation.get());
+                    if (key == "comment") {
+                        a->comment = value.toStdString();
                     }
                     break;
                 }
-                case AT_COMMENT:
+                case Annotation::Type::LOAD_REF:
                 {
-                    CommentAnnotation* a = llvm::dyn_cast<CommentAnnotation>(annotation.get());
-                    if (key == "addr") {
-                        a->addr = PPCutterCore::strToAddress(value);
-                    } else if (key == "comment") {
-                        a->comment = value.toStdString();
+                    LoadRefAnnotation* a = llvm::dyn_cast<LoadRefAnnotation>(annotation.get());
+                    if (key == "updateType") {
+                        a->updateType = PPCutterCore::updateTypeFromString(value.toStdString());
+                    } else if (key == "addrLoad") {
+                        a->addrLoad = PPCutterCore::strToAddress(value);
+                    } else if (key == "dataLoad") {
+                        a->dataLoad = PPCutterCore::strToAddress(value);
                     }
                     break;
                 }
@@ -282,39 +269,28 @@ void PPAnnotationDataModel::save()
             }
         }
     }
+
+    PPCore()->registerAnnotationChange();
 }
 
-//PPTreeItem* PPAnnotationDataModel::treeFromJson(QString key, PPTreeItem* parent, json json)
-//{
-//    std::cout << "treeFromJson " << key.toUtf8().constData() << std::endl;
-//    PPTreeItem* item = new PPTreeItem(key, parent);
-//    if (json.is_object()) {
-//        for (json::iterator it = json.begin(); it != json.end(); ++it) {
-//            item->appendChild(treeFromJson(QString::fromStdString(it.key()), item, it.value()));
-//        }
-//    } else if (json.is_string()){
-//        std::cout << "treeFromJson value " << json << std::endl;
-//        item->setValue(QString::fromStdString(json.get<std::string>()));
-//    } else {
-//        std::cout << "Warning: Json contains unexpected data: " << std::endl;
-//        std::cout << json.is_null() << json.is_boolean()<< json.is_number() << json.is_object() << json.is_array() << json.is_string() << std::endl;
-//    }
-//    return item;
-//}
-//
-//json PPAnnotationDataModel::jsonFromTree(PPTreeItem* parent)
-//{
-//    if (parent->isLeaf()) {
-//        std::cout << "leaf " << parent->data(1).toString().toStdString() << std::endl;
-//        return parent->data(1).toString().toStdString();
-//    } else {
-//        std::cout << "obj " << parent->data(0).toString().toStdString() << std::endl;
-//        json res;
-//        for (int i = 0; i < parent->childCount(); i++) {
-//            std::cout << "child"<< std::endl;
-//            PPTreeItem* child = parent->child(i);
-//            res[child->data(0).toString().toStdString()] = jsonFromTree(child);
-//        }
-//        return res;
-//    }
-//}
+bool PPAnnotationDataModel::removeRows(int position, int rows, const QModelIndex &parent)
+{
+    PPTreeItem *parentItem = getItem(parent);
+    if (parentItem->getType() != PPTreeItem::Type::ROOT) {
+        return removeRows(parent.row(), 1, parent.parent());
+    }
+
+    if (position < 0 || position + rows > parentItem->childCount())
+        return false;
+
+    bool success = true;
+
+    beginRemoveRows(parent, position, position + rows - 1);
+    for (int pos = position; pos < position + rows; pos++)
+        PPCore()->getFile().deleteAnnotation(parentItem->child(pos)->getAnnotationPtr());
+    PPCore()->getFile().createIndex();
+    success = parentItem->removeChildren(position, rows);
+    endRemoveRows();
+
+    return success;
+}

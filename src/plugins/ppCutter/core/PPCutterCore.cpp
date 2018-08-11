@@ -22,6 +22,7 @@
 #include <pp/types.h>
 #include <pp/function.h>
 #include <pp/config.h>
+#include <pp/annotations/AnnotationsHelper.h>
 
 #include "plugins/ppCutter/core/PPCutterCore.h"
 #include "Cutter.h"
@@ -31,9 +32,10 @@ Q_GLOBAL_STATIC(ppccClass, uniqueInstance)
 PPCutterCore::PPCutterCore(QObject *parent) :
         QObject(parent)
 {
-    addAnnotationType(AT_ENTRYPOINT, "entrypoint");
-    addAnnotationType(AT_INST_TYPE, "inst_type");
-    addAnnotationType(AT_LOAD_REF, "load_ref");
+    addAnnotationType(Annotation::Type::COMMENT, "comment");
+    addAnnotationType(Annotation::Type::ENTRYPOINT, "entrypoint");
+    addAnnotationType(Annotation::Type::INST_TYPE, "inst_type");
+    addAnnotationType(Annotation::Type::LOAD_REF, "load_ref");
 }
 
 PPCutterCore *PPCutterCore::getInstance()
@@ -79,7 +81,7 @@ void PPCutterCore::getSuccessorsRecursive(std::set<const ::BasicBlock*>& collect
     }
 }
 
-void PPCutterCore::addAnnotationType(AnnotationType type, std::string str)
+void PPCutterCore::addAnnotationType(Annotation::Type type, std::string str)
 {
     annotationTypeToStringMap[type] = str;
     stringToAnnotationTypeMap[str] = type;
@@ -133,7 +135,7 @@ std::string PPCutterCore::instructionTypeToString(const InstructionType iType)
     return "ERROR";
 }
 
-std::string PPCutterCore::annotationTypeToString(const AnnotationType aType)
+std::string PPCutterCore::annotationTypeToString(const Annotation::Type aType)
 {
     if (annotationTypeToStringMap.count(aType))
         return annotationTypeToStringMap[aType];
@@ -141,59 +143,43 @@ std::string PPCutterCore::annotationTypeToString(const AnnotationType aType)
         return "ERROR";
 }
 
-AnnotationType PPCutterCore::annotationTypeFromString(const std::string str)
+Annotation::Type PPCutterCore::annotationTypeFromString(const std::string str)
 {
     if (stringToAnnotationTypeMap.count(str))
         return stringToAnnotationTypeMap[str];
     else
-        return AT_INVALID;
+        return Annotation::Type::INVALID;
+}
+
+QString PPCutterCore::toString(const UpdateType updateType) {
+  switch (updateType) {
+    case UpdateType::CONSTANT_LOAD:
+        return "CONSTANT_LOAD";
+    case UpdateType::SIGNATURE_LOAD:
+        return "SIGNATURE_LOAD";
+    case UpdateType::CONST_INJECTION:
+        return "CONST_INJECTION";
+    default:
+        return "INVALID";
+  }
+}
+
+QString PPCutterCore::addrToString(const AddressType addr)
+{
+    return QString::asprintf("0x%08x", addr);
 }
 
 UpdateType PPCutterCore::updateTypeFromString(const std::string str)
 {
-    if (str =="INVALID") {
-        return UpdateType::INVALID;
-    } else if (str == "CONSTANT_LOAD") {
+    if (str == "CONSTANT_LOAD") {
         return UpdateType::CONSTANT_LOAD;
     } else if (str == "SIGNATURE_LOAD") {
         return UpdateType::SIGNATURE_LOAD;
     } else if (str == "CONST_INJECTION") {
         return UpdateType::CONST_INJECTION;
     }
+    return UpdateType::INVALID;
 }
-
-
-//void PPCutterCore::applyAnnotations()
-//{
-//    std::cout << "applying annotations: " << file->asJson() << std::endl;
-//    for (auto addr : file->annotations) {
-//        std::cout << "adding annotation @ " << std::hex << addr.first << std::endl;
-//        for (auto& type : addr.second) {
-//            PPAnnotation& annotation = type.second;
-//            switch (type.first) {
-//                case ENTRYPOINT:
-//                {
-//                    std::cout << "type: ENTRYPOINT, name=" << annotation.data["name"] << std::endl;
-//                    state->defineFunction(annotation.offset, annotation.data["name"]);
-//                    break;
-//                }
-//
-//                case INST_TYPE:
-//                {
-//                    std::cout << "type: INST_TYPE, itype=" << annotation.data["itype"] << std::endl;
-//                    DecodedInstruction& di = const_cast<DecodedInstruction&>(objDis->disassembleAddr(*state, annotation.offset));
-//                    di.type = parseInstructionType(annotation.data["itype"]);
-//                    state->defineFunction(annotation.offset, annotation.data["name"]);
-//                    break;
-//                }
-//
-//                default:
-//                    std::cout << "type: unknown" << std::endl;
-//                    break;
-//            }
-//        }
-//    }
-//}
 
 void PPCutterCore::disassembleAll()
 {
@@ -208,60 +194,19 @@ void PPCutterCore::calculateAll()
 
 void PPCutterCore::loadProject(std::string filepath)
 {
-    file->setAnnotations(AnnotationsIO::loadAnnotationsFromFile(*file->state, filepath));
+    get_logger()->set_level(spdlog::level::debug);
+    file->setAnnotations(AnnotationsHelper::loadAndMatchAnnotationsFromFile(*file->state, filepath));
     file->disassemble();
 }
 
 void PPCutterCore::saveProject(std::string filepath)
 {
-    AnnotationsIO::saveAnnotationsToFile(*file->state, filepath, file->getAnnotations());
+    AnnotationsSerializer::saveAnnotationsToFile(*file->state, filepath, file->getAnnotations());
 }
 
 void PPCutterCore::registerAnnotationChange()
 {
     emit annotationsChanged();
-}
-
-//QString PPCutterCore::jsonToQString(json json)
-//{
-//    QString data = "";
-//    for (auto it = json.begin(); it != json.end(); ++it) {
-//        if (data != "")
-//        data += ", ";
-//        std::string key = it.key();
-//        std::string value = it.value();
-//        data += QString::fromUtf8(key.c_str());
-//        data += "=";
-//        data += QString::fromUtf8(value.c_str());
-//    }
-//    return data;
-//}
-
-//void PPCutterCore::updateAnnotation(AddressType addr, json data)
-//{
-//    for (json::iterator it = data.begin(); it != data.end(); ++it) {
-//        std::string name = it.key();
-//        PPAnnotationType type = annotationTypeFromString(name);
-//        switch (type) {
-//            case ENTRYPOINT:
-//                if (!it.value()["name"].is_string())
-//                    assert(false);
-//                file->state->entrypoint_annotations[addr].name = it.value()["name"];
-//                break;
-//            case INST_TYPE:
-//                //file->state.entrypoint_annotations[addr].name = data["name"];
-//                break;
-//            default:
-//                assert(false);
-//                break;
-//        }
-//    }
-//    registerAnnotationChange();
-//}
-
-QString PPCutterCore::addrToString(AddressType addr)
-{
-    return QString::asprintf("0x%08x", addr);
 }
 
 AddressType PPCutterCore::strToAddress(QString qstr, bool* ok)
