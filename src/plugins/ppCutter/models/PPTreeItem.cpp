@@ -2,7 +2,7 @@
 
 #include "PPTreeItem.h"
 
-PPTreeItem::PPTreeItem(Type _type, PPTreeItem *parent, QString _key, const QString& value, ValueType valueType) :
+PPTreeItem::PPTreeItem(Type _type, PPTreeItem *parent, QString _key, const QVariant& value, ValueType valueType) :
   type(_type), parentItem(parent), key(_key), value(value), valueType(valueType)
 {
   if (parent != nullptr)
@@ -58,6 +58,18 @@ int PPTreeItem::row() const
     return parentItem->childItems.indexOf(const_cast<PPTreeItem*>(this));
 
   return 0;
+}
+
+bool PPTreeItem::removeChildren(int position, int count)
+{
+  if (position < 0 || position + count > childItems.size())
+    return false;
+
+  for (int row = 0; row < count; ++row) {
+    delete childItems.takeAt(position);
+  }
+
+  return true;
 }
 
 void PPTreeItem::print(std::ostream& out)

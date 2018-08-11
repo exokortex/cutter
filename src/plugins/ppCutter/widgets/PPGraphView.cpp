@@ -144,6 +144,8 @@ PPGraphView::PPGraphView(QWidget *parent)
     connect(&actionSyncOffset, SIGNAL(triggered(bool)), this, SLOT(toggleSync()));
     initFont();
     colorsUpdatedSlot();
+
+    connect(PPCore(), SIGNAL(annotationsChanged()), this, SLOT(seekLocal(seekable->getOffset())));
 }
 
 void PPGraphView::connectSeekChanged(bool disconn)
@@ -247,12 +249,8 @@ void PPGraphView::loadCurrentGraph()
 
     setEntry(entry);
 
-    std::cout << "PP: f.entry " << f.entry << std::endl;
-
     for (auto& bb : PPCore()->getBasicBlocksOfFunction(*ppFunction, f.entry))
     {
-        std::cout << "PP: bb " << bb->getStartAddress() << std::endl;
-
         // get address of first instruction (= address of block)
         RVA block_entry = bb->inst_begin()->address;
 
@@ -276,7 +274,6 @@ void PPGraphView::loadCurrentGraph()
             if (entrypoint.address != block_entry)
                 continue;
 
-            std::cout << "PP: adding entry point marker..." << std::endl;
             Instr i;
             i.addr = block_entry;
             i.size = 1;
@@ -296,7 +293,6 @@ void PPGraphView::loadCurrentGraph()
 
         for (auto dii = bb->inst_begin(); dii != bb->inst_end(); ++dii) {
             const DecodedInstruction di = *dii;
-            std::cout << "PP: instr " << di.type << std::endl;
 
             Instr i;
             i.addr = di.address;
@@ -308,7 +304,10 @@ void PPGraphView::loadCurrentGraph()
             //    color = "#2080d0";
             //}
             const PPBinaryFile& f = PPCore()->getFile();
-            bool annotated = false;//f.annotations.find(di.address) != f.annotations.end();
+            bool annotated = false;
+            if (f.getState().annotations_by_address.count(di.address))
+                annotated = f.getState().annotations_by_address.at(di.address).size() != 0;
+            //f.annotations.find(di.address) != f.annotations.end();
 
             //i.associatedInstructions = PPCore()->getFile().getAssociatedAddresses(seekable->getOffset());
 
@@ -350,14 +349,6 @@ void PPGraphView::loadCurrentGraph()
         f.blocks.push_back(db);
 
         addBlock(gb);
-    }
-
-    for (auto& block : blocks)
-    {
-        std::cout << "@" << std::hex << block.first << " => ";
-        for (auto& exit : block.second.exits)
-            std::cout << exit << ", ";
-        std::cout << std::endl;
     }
 
     /*for (QJsonValueRef blockRef : func["blocks"].toArray()) {

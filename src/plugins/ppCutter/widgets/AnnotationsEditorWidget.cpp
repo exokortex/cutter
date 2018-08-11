@@ -34,6 +34,8 @@ AnnotationsEditorWidget::AnnotationsEditorWidget(QWidget *parent, AddressType ad
     dataModel = new PPAnnotationDataModel(this);
     ui->annotationsTreeView->setModel(dataModel);
 
+    connect(ui->deleteButton, SIGNAL(clicked()), this, SLOT(deleteAnnotationTriggered()));
+
     setAddress(addr);
 }
 
@@ -59,11 +61,16 @@ void AnnotationsEditorWidget::expandAll()
     ui->annotationsTreeView->expand(index);
 }
 
-
-void AnnotationsEditorWidget::addAnnotationTriggered(AnnotationType type)
+void AnnotationsEditorWidget::addAnnotationTriggered(Annotation::Type type)
 {
     std::shared_ptr<Annotation> annotation = PPCore()->getFile().createAnnotation(type, addr);
     dataModel->addAnnotation(annotation);
     ui->annotationsTreeView->reset();
     expandAll();
+}
+
+void AnnotationsEditorWidget::deleteAnnotationTriggered()
+{
+    QModelIndex index = ui->annotationsTreeView->selectionModel()->currentIndex();
+    dataModel->removeRow(index.row(), index.parent());
 }

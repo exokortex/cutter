@@ -29,7 +29,10 @@ private:
     AddressType addr;
     PPAnnotationDataModel* dataModel;
 
-    void addAnnotationTriggered(AnnotationType type);
+    void addAnnotationTriggered(Annotation::Type type);
+
+public slots:
+    void deleteAnnotationTriggered();
 };
 
 #endif // ANNOTATIONSEDITORWIDGET_H

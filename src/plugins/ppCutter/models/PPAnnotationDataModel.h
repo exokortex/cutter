@@ -30,6 +30,9 @@ public:
     bool setData(const QModelIndex &index, const QVariant &value,
                  int role = Qt::EditRole) override;
 
+    bool removeRows(int position, int rows,
+                    const QModelIndex &parent = QModelIndex()) override;
+
     void setAnnotations(std::set<std::shared_ptr<Annotation>> annotations);
 
     void addAnnotation(std::shared_ptr<Annotation> annotation);
