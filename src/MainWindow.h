@@ -17,7 +17,7 @@
 #include <QMainWindow>
 #include <QList>
 
-class PPAnnotationsWidget;
+class AnnotationsWidget;
 class PPGraphView;
 class AnnotationsEditorDockWidget;
 class CutterCore;
@@ -214,7 +214,7 @@ private:
     SymbolsWidget      *symbolsDock = nullptr;
     RelocsWidget       *relocsDock = nullptr;
     CommentsWidget     *commentsDock = nullptr;
-    PPAnnotationsWidget *ppAnnotationsDock = nullptr;
+    AnnotationsWidget *ppAnnotationsDock = nullptr;
     AnnotationsEditorDockWidget *annotationsEditorDock = nullptr;
     StringsWidget      *stringsDock = nullptr;
     FlagsWidget        *flagsDock = nullptr;

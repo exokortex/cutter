@@ -145,7 +145,8 @@ PPGraphView::PPGraphView(QWidget *parent)
     initFont();
     colorsUpdatedSlot();
 
-    connect(PPCore(), SIGNAL(annotationsChanged()), this, SLOT(seekLocal(seekable->getOffset())));
+    connect(PPCore(), SIGNAL(annotationsChanged()), this, SLOT(refreshSeek()));
+    connect(PPCore(), SIGNAL(stateChanged()), this, SLOT(refreshView()));
 }
 
 void PPGraphView::connectSeekChanged(bool disconn)
@@ -185,14 +186,14 @@ void PPGraphView::refreshView()
 void PPGraphView::loadCurrentGraph()
 {
 
-    TempConfig tempConfig;
-    tempConfig.set("scr.html", true)
-    .set("scr.color", COLOR_MODE_16M)
-    .set("asm.bbline", false)
-    .set("asm.lines", false)
-    .set("asm.lines.fcn", false);
-    QJsonDocument functionsDoc = Core()->cmdj("agJ " + RAddressString(seekable->getOffset()));
-    QJsonArray functions = functionsDoc.array();
+//    TempConfig tempConfig;
+//    tempConfig.set("scr.html", true)
+//    .set("scr.color", COLOR_MODE_16M)
+//    .set("asm.bbline", false)
+//    .set("asm.lines", false)
+//    .set("asm.lines.fcn", false);
+//    QJsonDocument functionsDoc = Core()->cmdj("agJ " + RAddressString(seekable->getOffset()));
+//    QJsonArray functions = functionsDoc.array();
 
     disassembly_blocks.clear();
     blocks.clear();
@@ -200,43 +201,48 @@ void PPGraphView::loadCurrentGraph()
     if (!PPCore()->isReady())
         return;
 
-    bool emptyGraph = functions.isEmpty();
-    if (emptyGraph) {
-        // If there's no function to print, just move to disassembly and add a message
-        if (Core()->getMemoryWidgetPriority() == CutterCore::MemoryWidgetType::PPGraph) {
-            Core()->setMemoryWidgetPriority(CutterCore::MemoryWidgetType::Disassembly);
-        }
-        if (!emptyText) {
-            QVBoxLayout *layout = new QVBoxLayout(this);
-            emptyText = new QLabel(this);
-            emptyText->setText(tr("No function detected. Cannot display graph."));
-            emptyText->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Maximum);
-            layout->addWidget(emptyText);
-            layout->setAlignment(emptyText, Qt::AlignHCenter);
-        }
-        emptyText->setVisible(true);
-    } else if (emptyText) {
-        emptyText->setVisible(false);
-    }
+//    bool emptyGraph = functions.isEmpty();
+//    if (emptyGraph) {
+//        // If there's no function to print, just move to disassembly and add a message
+//        if (Core()->getMemoryWidgetPriority() == CutterCore::MemoryWidgetType::PPGraph) {
+//            Core()->setMemoryWidgetPriority(CutterCore::MemoryWidgetType::Disassembly);
+//        }
+//        if (!emptyText) {
+//            QVBoxLayout *layout = new QVBoxLayout(this);
+//            emptyText = new QLabel(this);
+//            emptyText->setText(tr("No function detected. Cannot display graph."));
+//            emptyText->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Maximum);
+//            layout->addWidget(emptyText);
+//            layout->setAlignment(emptyText, Qt::AlignHCenter);
+//        }
+//        emptyText->setVisible(true);
+//    } else if (emptyText) {
+//        emptyText->setVisible(false);
+//    }
+
+    const PPBinaryFile& file = PPCore()->getFile();
+    ::Function *ppFunction = file.getFunctionAt(seekable->getOffset());
+
+    if (!ppFunction)
+        return;
 
     Analysis anal;
     anal.ready = true;
 
-    QJsonValue funcRef = functions.first();
-    QJsonObject func = funcRef.toObject();
+//    QJsonValue funcRef = functions.first();
+//    QJsonObject func = funcRef.toObject();
     Function f;
     f.ready = true;
-    f.entry = func["offset"].toVariant().toULongLong();
+    f.entry = file.getEntrypointAt(seekable->getOffset()).address;
 
-    const PPBinaryFile& file = PPCore()->getFile();
-    ::Function *ppFunction = file.getFunctionAt(f.entry);
+  //ppFunction->getEntryPoints().at(0).address;//func["offset"].toVariant().toULongLong();
 
     if (!ppFunction) {
         return;
     }
 
     windowTitle = tr("PP-Graph");
-    QString funcName = func["name"].toString().trimmed();
+//    QString funcName = func["name"].toString().trimmed();
     if (ppFunction == NULL) {
         windowTitle += " (Empty)";
     } else {
@@ -245,11 +251,11 @@ void PPGraphView::loadCurrentGraph()
     }
     parentWidget()->setWindowTitle(windowTitle);
 
-    RVA entry = func["offset"].toVariant().toULongLong();
+//    RVA entry = func["offset"].toVariant().toULongLong();
 
-    setEntry(entry);
+    setEntry(f.entry);
 
-    for (auto& bb : PPCore()->getBasicBlocksOfFunction(*ppFunction, f.entry))
+    for (auto& bb : PPCore()->getBasicBlocksOfFunction(*ppFunction, f.entry, false))
     {
         // get address of first instruction (= address of block)
         RVA block_entry = bb->inst_begin()->address;
@@ -314,19 +320,34 @@ void PPGraphView::loadCurrentGraph()
             std::string asmString = PPCore()->getObjDis().getInfo().printInstrunction(di.instruction);
             QString asmQString = QString::fromUtf8(asmString.c_str());
 
+            int size = di.instruction.size() / 2; // size is in nibble?
+
+            BinaryDataViewType instBytes = PPCore()->getState().getData(di.address, size);
+
+            QString qbytes = "";
+
+            for (int b = 0; b < size; b++)
+                qbytes += QString("%1").arg((quint8)instBytes[b], 2, 16, QChar('0'));
+
+            qbytes = qbytes.leftJustified(2*12, ' ');
+            qbytes = qbytes.replace(" ", "&nbsp;");
+            qbytes = QString("%1:%2").arg(size).arg(qbytes);
+
             QString comment = "";
             if (di.type != InstructionType::SEQUENTIAL)
                 comment = QString(" (%1)").arg(QString::fromStdString(toString(di.type)).trimmed());
 
+
             QString states = QString::fromStdString(PPCore()->getFile().getStates(di.address));
 
-            QString disas = QString("<font color='#000000'>%1%2</font>&nbsp;<font color='%4'>%6&nbsp;&nbsp;%3%5")
+            QString disas = QString("<font color='#000000'>%1%2&nbsp;%8</font>&nbsp;<font color='%4'>%6&nbsp;&nbsp;%3%5")
                     .arg(di.address, 8, 16, QChar('0'))
                     .arg(annotated ? "*" : "&nbsp;")
                     .arg(asmQString)
                     .arg(color)
                     .arg(comment)
-                    .arg(states.replace(" ", "&nbsp;"));
+                    .arg(states.replace(" ", "&nbsp;"))
+                    .arg(qbytes);
 
             QTextDocument textDoc;
             textDoc.setHtml(disas);
@@ -422,12 +443,12 @@ void PPGraphView::loadCurrentGraph()
     anal.status = "Ready.";
     anal.entry = f.entry;
 
-    if (func["blocks"].toArray().size() > 0) {
-        computeGraph(entry);
+    if (true) { // func["blocks"].toArray().size() > 0) {
+        computeGraph(f.entry);
         viewport()->update();
 
         if (first_draw) {
-            showBlock(blocks[entry]);
+            showBlock(blocks[f.entry]);
             first_draw = false;
         }
     }
@@ -785,6 +806,11 @@ void PPGraphView::nextInstr()
 void PPGraphView::prevInstr()
 {
     seekInstruction(true);
+}
+
+void PPGraphView::refreshSeek()
+{
+    seekLocal(seekable->getOffset());
 }
 
 void PPGraphView::seekLocal(RVA addr, bool update_viewport)

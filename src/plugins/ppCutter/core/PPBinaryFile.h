@@ -20,6 +20,12 @@ Q_DECLARE_METATYPE(UpdateType)
 
 class PPBinaryFile
 {
+  private:
+    struct EntryPointRange {
+      AddressType start;
+      AddressType end;
+      std::string functionName;
+    };
   public:
     std::string path;
     std::string md5sum;
@@ -31,13 +37,19 @@ class PPBinaryFile
 
     std::vector<std::shared_ptr<Annotation>> annotations;
 
+    std::vector<EntryPointRange> entrypoint_ranges;
+
     PPBinaryFile(std::string inputFile);
     ~PPBinaryFile();
     void createIndex();
     void disassemble();
     bool calculateStates();
+    void buildFunctionCache();
 
     ::Function* getFunctionAt(AddressType addr) const;
+    ::Function::EntryPoint& getEntrypointAt(AddressType addr) const;
+    AddressType getStartAddressOfFunction(const ::Function& function) const;
+    AddressType getEndAddressOfFunction(const ::Function& function) const;
 
     std::set<std::shared_ptr<Annotation>> getAnnotationsAt(AddressType addr);
 

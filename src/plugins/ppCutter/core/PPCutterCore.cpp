@@ -23,6 +23,8 @@
 #include <pp/function.h>
 #include <pp/config.h>
 #include <pp/annotations/AnnotationsHelper.h>
+#include <pp/annotations/LoadRefAnnotation.h>
+#include <pp/annotations/CommentAnnotation.h>
 
 #include "plugins/ppCutter/core/PPCutterCore.h"
 #include "Cutter.h"
@@ -54,7 +56,7 @@ void PPCutterCore::loadFile(std::string path)
     ready = true;
 }
 
-std::set<const ::BasicBlock*> PPCutterCore::getBasicBlocksOfFunction(::Function& function, AddressType entrypointAddress)
+std::set<const ::BasicBlock*> PPCutterCore::getBasicBlocksOfFunction(::Function& function, AddressType entrypointAddress, bool stopAtEntrypoints)
 {
     std::set<const ::BasicBlock*> res;
     for (auto& frag : function) {
@@ -63,20 +65,22 @@ std::set<const ::BasicBlock*> PPCutterCore::getBasicBlocksOfFunction(::Function&
             const BasicBlock *bb = llvm::dyn_cast_or_null<BasicBlock>(frag);
             if (bb == nullptr)
                 continue;
-            getSuccessorsRecursive(res, *bb);
+            getSuccessorsRecursive(function, res, *bb, stopAtEntrypoints);
             break;
         }
     }
     return res;
 }
 
-void PPCutterCore::getSuccessorsRecursive(std::set<const ::BasicBlock*>& collection, const ::BasicBlock& bb)
+void PPCutterCore::getSuccessorsRecursive(::Function& function, std::set<const ::BasicBlock*>& collection, const ::BasicBlock& bb, bool stopAtEntrypoints)
 {
     // if it was not visited before, add all successors
     if (collection.insert(&bb).second) {
         for (auto successor = bb.succ_begin(); successor < bb.succ_end(); successor++)
         {
-            getSuccessorsRecursive(collection, **successor);
+            if (stopAtEntrypoints && function.isEntryPoint((**successor).getStartAddress()))
+                continue;
+            getSuccessorsRecursive(function, collection, **successor, stopAtEntrypoints);
         }
     }
 }
@@ -135,12 +139,26 @@ std::string PPCutterCore::instructionTypeToString(const InstructionType iType)
     return "ERROR";
 }
 
-std::string PPCutterCore::annotationTypeToString(const Annotation::Type aType)
+std::string PPCutterCore::toString(const Annotation::Type aType)
 {
     if (annotationTypeToStringMap.count(aType))
         return annotationTypeToStringMap[aType];
     else
         return "ERROR";
+}
+
+QString PPCutterCore::annotationDataToString(const Annotation* annotation)
+{
+    if (const LoadRefAnnotation* a = llvm::dyn_cast_or_null<LoadRefAnnotation>(annotation)) {
+        return "updateType=" + toString(a->updateType)
+        + ", addrLoad=" + addrToString(a->addrLoad)
+        + ", dataLoad=" + addrToString(a->dataLoad);
+    }
+
+    if (const CommentAnnotation* a = llvm::dyn_cast_or_null<CommentAnnotation>(annotation)) {
+        return QString::fromStdString(a->comment);
+    }
+    return "ERROR";
 }
 
 Annotation::Type PPCutterCore::annotationTypeFromString(const std::string str)
@@ -197,6 +215,7 @@ void PPCutterCore::loadProject(std::string filepath)
     get_logger()->set_level(spdlog::level::debug);
     file->setAnnotations(AnnotationsHelper::loadAndMatchAnnotationsFromFile(*file->state, filepath));
     file->disassemble();
+    emit annotationsChanged();
 }
 
 void PPCutterCore::saveProject(std::string filepath)
@@ -207,6 +226,11 @@ void PPCutterCore::saveProject(std::string filepath)
 void PPCutterCore::registerAnnotationChange()
 {
     emit annotationsChanged();
+}
+
+void PPCutterCore::registerStateChange()
+{
+    emit stateChanged();
 }
 
 AddressType PPCutterCore::strToAddress(QString qstr, bool* ok)

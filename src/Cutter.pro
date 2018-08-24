@@ -107,7 +107,7 @@ SOURCES += \
     plugins/ppCutter/models/PPItemDelegate.cpp \
     plugins/ppCutter/widgets/PPGraphView.cpp \
     plugins/ppCutter/dialogs/PPAnnotationsDialog.cpp \
-    plugins/ppCutter/widgets/PPAnnotationsWidget.cpp \
+    plugins/ppCutter/widgets/AnnotationsWidget.cpp \
     plugins/ppCutter/widgets/PPGraphWidget.cpp \
     Main.cpp \
     Cutter.cpp \
@@ -202,7 +202,7 @@ HEADERS  += \
     plugins/ppCutter/models/PPItemDelegate.h \
     plugins/ppCutter/widgets/PPGraphView.h \
     plugins/ppCutter/dialogs/PPAnnotationsDialog.h \
-    plugins/ppCutter/widgets/PPAnnotationsWidget.h \
+    plugins/ppCutter/widgets/AnnotationsWidget.h \
     plugins/ppCutter/widgets/PPGraphWidget.h \
     Cutter.h \
     widgets/DisassemblerGraphView.h \
@@ -292,7 +292,7 @@ HEADERS  += \
 
 FORMS    += \
     plugins/ppCutter/dialogs/PPAnnotationsDialog.ui \
-    plugins/ppCutter/widgets/PPAnnotationsWidget.ui \
+    plugins/ppCutter/widgets/AnnotationsWidget.ui \
     plugins/ppCutter/widgets/AnnotationsEditorWidget.ui \
     dialogs/AboutDialog.ui \
     dialogs/preferences/AsmOptionsWidget.ui \

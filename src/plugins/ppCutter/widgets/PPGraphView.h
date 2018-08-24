@@ -171,6 +171,8 @@ public slots:
     void nextInstr();
     void prevInstr();
 
+    void refreshSeek();
+
 protected:
     virtual void wheelEvent(QWheelEvent *event) override;
 

@@ -1,25 +1,26 @@
-#ifndef PPANNOTATIONSWIDGET_H
-#define PPANNOTATIONSWIDGET_H
+#ifndef AnnotationsWidget_H
+#define AnnotationsWidget_H
 
 #include <memory>
 
 #include "widgets/CutterDockWidget.h"
+#include "pp/annotations/Annotation.h"
 
 class MainWindow;
 class QTreeWidgetItem;
 
 namespace Ui
 {
-    class PPAnnotationsWidget;
+    class AnnotationsWidget;
 }
 
-class PPAnnotationsWidget : public CutterDockWidget
+class AnnotationsWidget : public CutterDockWidget
 {
     Q_OBJECT
 
 public:
-    explicit PPAnnotationsWidget(MainWindow *main, QAction *action = nullptr);
-    ~PPAnnotationsWidget();
+    explicit AnnotationsWidget(MainWindow *main, QAction *action = nullptr);
+    ~AnnotationsWidget();
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
@@ -40,8 +41,8 @@ private slots:
     void refreshTree();
 
 private:
-    std::unique_ptr<Ui::PPAnnotationsWidget> ui;
+    std::unique_ptr<Ui::AnnotationsWidget> ui;
     MainWindow      *main;
 };
 
-#endif // PPANNOTATIONSWIDGET_H
+#endif // AnnotationsWidget_H
