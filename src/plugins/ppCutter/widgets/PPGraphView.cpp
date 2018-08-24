@@ -297,29 +297,24 @@ void PPGraphView::loadCurrentGraph()
         }
 
         for (auto dii = bb->inst_begin(); dii != bb->inst_end(); ++dii) {
-            const DecodedInstruction di = *dii;
+            const DecodedInstruction& di = *dii;
 
             Instr i;
             i.addr = di.address;
-            // Skip last byte, otherwise it will overlap with next instruction
-            i.size = di.instruction.size() - 1;
 
-            QString color = instructionColors[di.type];//"#000000";
-            //if (di.isTerminator(PPCore()->getState()) == CERTAIN) {
-            //    color = "#2080d0";
-            //}
             const PPBinaryFile& f = PPCore()->getFile();
+
+            int size = f.getState().archInfo.getInstructionSize(di.instruction);
+
+            // Skip last byte, otherwise it will overlap with next instruction
+            i.size = size - 1;
+
+            QString color = instructionColors[di.type];
             bool annotated = false;
             if (f.getState().annotations_by_address.count(di.address))
                 annotated = f.getState().annotations_by_address.at(di.address).size() != 0;
-            //f.annotations.find(di.address) != f.annotations.end();
-
-            //i.associatedInstructions = PPCore()->getFile().getAssociatedAddresses(seekable->getOffset());
-
             std::string asmString = PPCore()->getObjDis().getInfo().printInstrunction(di.instruction);
             QString asmQString = QString::fromUtf8(asmString.c_str());
-
-            int size = di.instruction.size() / 2; // size is in nibble?
 
             BinaryDataViewType instBytes = PPCore()->getState().getData(di.address, size);
 
@@ -328,9 +323,8 @@ void PPGraphView::loadCurrentGraph()
             for (int b = 0; b < size; b++)
                 qbytes += QString("%1").arg((quint8)instBytes[b], 2, 16, QChar('0'));
 
-            qbytes = qbytes.leftJustified(2*12, ' ');
+            qbytes = qbytes.leftJustified(2*6, ' '); // 6 bytes maximum
             qbytes = qbytes.replace(" ", "&nbsp;");
-            qbytes = QString("%1:%2").arg(size).arg(qbytes);
 
             QString comment = "";
             if (di.type != InstructionType::SEQUENTIAL)
