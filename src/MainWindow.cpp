@@ -49,7 +49,7 @@
 
 #include "plugins/ppCutter/widgets/PPGraphWidget.h"
 #include "plugins/ppCutter/widgets/PPGraphView.h"
-#include "plugins/ppCutter/widgets/PPAnnotationsWidget.h"
+#include "plugins/ppCutter/widgets/AnnotationsWidget.h"
 #include "plugins/ppCutter/widgets/AnnotationsEditorDockWidget.h"
 
 #include "widgets/DisassemblerGraphView.h"
@@ -224,7 +224,7 @@ void MainWindow::initUI()
     relocsDock = new RelocsWidget(this, ui->actionRelocs);
     commentsDock = new CommentsWidget(this, ui->actionComments);
 
-    ppAnnotationsDock = new PPAnnotationsWidget(this, ui->actionComments);
+    ppAnnotationsDock = new AnnotationsWidget(this, ui->actionComments);
     annotationsEditorDock = new AnnotationsEditorDockWidget(this, ui->actionComments);
 
     stringsDock = new StringsWidget(this, ui->actionStrings);

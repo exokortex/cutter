@@ -2,17 +2,17 @@
 #include <QMenu>
 #include <QResizeEvent>
 
-#include "PPAnnotationsWidget.h"
-#include "ui_PPAnnotationsWidget.h"
+#include "AnnotationsWidget_old.h"
+#include "ui_AnnotationsWidget.h"
 #include "MainWindow.h"
 #include "utils/Helpers.h"
 
 #include "plugins/ppCutter/core/PPCutterCore.h"
 #include <pp/disassemblerstate.h>
 
-PPAnnotationsWidget::PPAnnotationsWidget(MainWindow *main, QAction *action) :
+AnnotationsWidget::AnnotationsWidget(MainWindow *main, QAction *action) :
         CutterDockWidget(main, action),
-        ui(new Ui::PPAnnotationsWidget),
+        ui(new Ui::AnnotationsWidget),
         main(main)
 {
     ui->setupUi(this);
@@ -36,15 +36,15 @@ PPAnnotationsWidget::PPAnnotationsWidget(MainWindow *main, QAction *action) :
     ui->frame->hide();
 }
 
-PPAnnotationsWidget::~PPAnnotationsWidget() {}
+AnnotationsWidget::~AnnotationsWidget() {}
 
-void PPAnnotationsWidget::on_commentsTreeWidget_itemDoubleClicked(QTreeWidgetItem */*item*/, int)
+void AnnotationsWidget::on_commentsTreeWidget_itemDoubleClicked(QTreeWidgetItem */*item*/, int)
 {
 //    PPAnnotation annotation = item->data(0, Qt::UserRole).value<PPAnnotation>();
 //    CutterCore::getInstance()->seek(annotation.offset);
 }
 
-void PPAnnotationsWidget::on_nestedCmtsTreeWidget_itemDoubleClicked(QTreeWidgetItem *item, int)
+void AnnotationsWidget::on_nestedCmtsTreeWidget_itemDoubleClicked(QTreeWidgetItem *item, int)
 {
     // don't react on top-level items
     if (item->parent() == nullptr)
@@ -184,7 +184,7 @@ void PPAnnotationsWidget::refreshTree()
             QTreeWidgetItem *item = new QTreeWidgetItem();
             item->setText(0, RAddressString(annotation.offset));
             item->setText(1, fcn_name);
-            item->setText(2, QString::fromUtf8(PPCutterCore::annotationTypeToString(annotation.type).c_str()));
+            item->setText(2, QString::fromUtf8(PPCutterCore::toString(annotation.type).c_str()));
             //item->setText(3, QString::fromUtf8(annotation.data.dump().c_str()));
 
             data = PPCore()->jsonToQstring(annotation.data);

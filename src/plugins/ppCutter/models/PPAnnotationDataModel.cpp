@@ -182,7 +182,7 @@ bool PPAnnotationDataModel::setData(const QModelIndex &index, const QVariant &va
 
 PPTreeItem* PPAnnotationDataModel::treeFromAnnotation(PPTreeItem *parent, std::shared_ptr<Annotation> annotation)
 {
-    QString name = QString::fromStdString(PPCore()->annotationTypeToString(annotation->getType()));
+    QString name = QString::fromStdString(PPCore()->toString(annotation->getType()));
     PPTreeItem* annotationItem = new PPTreeItem(PPTreeItem::Type::ANNOTATION, parent, name);
     annotationItem->setAnnotationPtr(annotation);
 

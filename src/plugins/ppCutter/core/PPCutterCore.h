@@ -47,6 +47,7 @@ public:
     void loadProject(std::string filepath);
 
     static QString toString(const UpdateType updateType);
+    static QString annotationDataToString(const Annotation* annotation);
     static QString addrToString(const AddressType addr);
 
     static InstructionType parseInstructionType(const std::string iType);
@@ -54,15 +55,23 @@ public:
 
     static AddressType strToAddress(QString qstr, bool* ok = nullptr);
 
-    std::string annotationTypeToString(const Annotation::Type aType);
+    std::string toString(const Annotation::Type aType);
     Annotation::Type annotationTypeFromString(const std::string str);
 
     static std::string updateTypeToString(const UpdateType updateType);
     static UpdateType updateTypeFromString(const std::string str);
 
 
-    std::set<const ::BasicBlock*> getBasicBlocksOfFunction(::Function& function, AddressType entrypointAddress);
-    void getSuccessorsRecursive(std::set<const ::BasicBlock*>& collection, const ::BasicBlock& fragment);
+    std::set<const ::BasicBlock*> getBasicBlocksOfFunction(
+            ::Function& function,
+            AddressType entrypointAddress,
+            bool stopAtEntrypoints);
+
+    void getSuccessorsRecursive(
+            ::Function& function,
+            std::set<const ::BasicBlock*>& collection,
+            const ::BasicBlock& bb,
+            bool stopAtEntrypoints);
 
     std::map<Annotation::Type, std::string>& getAnnotationTypes() {
         return annotationTypeToStringMap;
@@ -86,9 +95,11 @@ public:
     }
 
     void registerAnnotationChange();
+    void registerStateChange();
 
 signals:
     void annotationsChanged();
+    void stateChanged();
 
 public slots:
 

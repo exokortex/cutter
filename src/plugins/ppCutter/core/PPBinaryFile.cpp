@@ -30,6 +30,8 @@
 #include <pp/annotations/AnnotationsHelper.h>
 #include <pp/annotations/AnnotationsSerializer.h>
 
+#include "PPCutterCore.h"
+
 PPBinaryFile::PPBinaryFile(std::string inputFile)
 {
   std::cout << "inputFile: " << inputFile << std::endl;
@@ -131,6 +133,9 @@ void PPBinaryFile::disassemble()
   } catch (const Exception &e) {
     std::cout << "PP: could not prepare state due to: " << e.what() << std::endl;
   }
+
+  buildFunctionCache();
+  PPCore()->registerStateChange();
 }
 
 bool PPBinaryFile::calculateStates()
@@ -142,24 +147,93 @@ bool PPBinaryFile::calculateStates()
     std::cout << "Aborted calculation due to: " << e.what() << std::endl;
     return false;
   }
+  PPCore()->registerStateChange();
   return true;
+}
+
+void PPBinaryFile::buildFunctionCache()
+{
+  entrypoint_ranges.clear();
+  for (auto &&function : state->functions) {
+    for (auto &&entrypoint : function.getEntryPoints()) {
+      AddressType end = 0;
+      for (auto &&bb : PPCore()->getBasicBlocksOfFunction(function, entrypoint.address, true)) {
+        if (end < bb->getEndAddress())
+          end = bb->getEndAddress();
+      }
+      entrypoint_ranges.push_back({entrypoint.address, end, entrypoint.name});
+    }
+  }
 }
 
 PPBinaryFile::~PPBinaryFile()
 {
-
 }
 
 ::Function* PPBinaryFile::getFunctionAt(AddressType addr) const
 {
+  std::string name;
+  for (const EntryPointRange& epr : entrypoint_ranges) {
+    if (addr >= epr.start && addr <= epr.end) {
+      name = epr.functionName;
+      break;
+    }
+  }
   for (auto &&function : state->functions) {
-    for (auto &entrypoint : function.getEntryPoints()) {
-      if (addr == entrypoint.address) {
+//    if (function.getJoinedName() == name)
+//      return &function;
+
+    for (::Function::EntryPoint& ep : function.getEntryPoints()) {
+      if (ep.name == name) {
         return &function;
       }
     }
   }
   return nullptr;
+}
+
+::Function::EntryPoint& PPBinaryFile::getEntrypointAt(AddressType addr) const
+{
+  std::string name;
+  for (const EntryPointRange& epr : entrypoint_ranges) {
+    if (addr >= epr.start && addr <= epr.end) {
+      name = epr.functionName;
+      break;
+    }
+  }
+  for (auto &&function : state->functions) {
+    for (::Function::EntryPoint& ep : function.getEntryPoints()) {
+      if (ep.name == name) {
+        return ep;
+      }
+    }
+  }
+}
+
+AddressType PPBinaryFile::getStartAddressOfFunction(const ::Function& function) const
+{
+  //return (*function.begin())->getStartAddress();
+
+  AddressType start = 0;
+
+  for (auto& fragment : function) {
+    if (start > fragment->getEndAddress())
+      start = fragment->getStartAddress();
+  }
+
+  return start;
+}
+
+AddressType PPBinaryFile::getEndAddressOfFunction(const ::Function& function) const
+{
+  AddressType end = 0;
+
+  for (auto& fragment : function) {
+    if (end < fragment->getEndAddress())
+      end = fragment->getEndAddress();
+  }
+
+  return end;
 }
 
 std::set<std::shared_ptr<Annotation>> PPBinaryFile::getAnnotationsAt(AddressType addr)
@@ -187,12 +261,15 @@ std::shared_ptr<Annotation> PPBinaryFile::createAnnotation(Annotation::Type type
 
   AnnotationsHelper::prepareAnnotations(*state, annotations);
 
+  PPCore()->registerAnnotationChange();
+
   return ret;
 }
 
 void PPBinaryFile::deleteAnnotation(std::shared_ptr<Annotation> annotation)
 {
   annotations.erase(std::remove(annotations.begin(), annotations.end(), annotation), annotations.end());
+  PPCore()->registerAnnotationChange();
 }
 
 std::set<AddressType> PPBinaryFile::getAssociatedAddresses(AddressType addr)
@@ -221,8 +298,4 @@ std::string PPBinaryFile::getStates(AddressType addr)
   else
     res << "           ";
   return res.str();
-//  if (machine == EM_ARM) {
-//    PureSwUpdateStateCalculator* stateCalculator = static_cast<PureSwUpdateStateCalculator>(stateCalc);
-//    if (stateCalculator.)
-//  }
 }
