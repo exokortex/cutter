@@ -185,13 +185,12 @@ void PPGraphView::refreshView()
 
 void PPGraphView::loadCurrentGraph()
 {
-
-//    TempConfig tempConfig;
-//    tempConfig.set("scr.html", true)
-//    .set("scr.color", COLOR_MODE_16M)
-//    .set("asm.bbline", false)
-//    .set("asm.lines", false)
-//    .set("asm.lines.fcn", false);
+    TempConfig tempConfig;
+    tempConfig.set("scr.html", true)
+    .set("scr.color", COLOR_MODE_16M)
+    .set("asm.bbline", false)
+    .set("asm.lines", false)
+    .set("asm.lines.fcn", false);
 //    QJsonDocument functionsDoc = Core()->cmdj("agJ " + RAddressString(seekable->getOffset()));
 //    QJsonArray functions = functionsDoc.array();
 
@@ -418,6 +417,7 @@ void PPGraphView::loadCurrentGraph()
 
             QTextDocument textDoc;
             textDoc.setHtml(disas);
+            i.plainText = textDoc.toPlainText();
 
             RichTextPainter::List richText = RichTextPainter::fromTextDocument(textDoc);
             //Colors::colorizeAssembly(richText, textDoc.toPlainText(), 0);
@@ -523,12 +523,13 @@ void PPGraphView::drawBlock(QPainter & p, GraphView::GraphBlock &block)
     } else if (db.indirectcall) {
         p.setBrush(indirectcallShadowColor);
     } else {
-        p.setBrush(QColor(0, 0, 0, 128));
+        p.setBrush(QColor(0, 0, 0, 100));
     }
 
-    p.drawRect(block.x + 4, block.y + 4,
-               block.width + 4, block.height + 4);
-    p.setPen(graphNodeColor);
+    // Node's shadow effect
+    p.drawRect(block.x + 2, block.y + 2,
+               block.width, block.height);
+    p.setPen(QPen(graphNodeColor, 1));
 
     if (block_selected) {
         p.setBrush(disassemblySelectedBackgroundColor);
@@ -543,6 +544,9 @@ void PPGraphView::drawBlock(QPainter & p, GraphView::GraphBlock &block)
     /*if (selected_instruction != RVA_INVALID)*/ {
         int y = block.y + (2 * charWidth) + (db.header_text.lines.size() * charHeight);
         for (Instr &instr : db.instrs) {
+            if (instr.addr > selected_instruction) {
+                break;
+            }
             auto selected = instr.addr == selected_instruction;
             //auto traceCount = dbgfunctions->GetTraceRecordHitCount(instr.addr);
             auto traceCount = 0;
@@ -575,7 +579,6 @@ void PPGraphView::drawBlock(QPainter & p, GraphView::GraphBlock &block)
             y += int(instr.text.lines.size()) * charHeight;
         }
     }
-
 
     // Render node text
     auto x = block.x + (2 * charWidth);
@@ -828,8 +831,7 @@ void PPGraphView::seekPrev()
 {
     if (seekable->getSyncWithCore()) {
         Core()->seekPrev();
-    }
-    else {
+    } else {
         seekable->seek(seekable->getPrevIndependentOffset());
     }
 }
@@ -907,7 +909,7 @@ void PPGraphView::on_actionExportGraph_triggered()
         return;
     }
     QTextStream fileOut(&file);
-    fileOut << Core()->cmd("ag -");
+    fileOut << Core()->cmd("agfd $FB");
 }
 
 void PPGraphView::wheelEvent(QWheelEvent *event)
