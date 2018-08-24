@@ -316,7 +316,7 @@ void PPGraphView::loadCurrentGraph()
             std::string asmString = PPCore()->getObjDis().getInfo().printInstrunction(di.instruction);
             QString asmQString = QString::fromUtf8(asmString.c_str());
 
-            BinaryDataViewType instBytes = PPCore()->getState().getData(di.address, size);
+            BinaryDataViewType instBytes = f.getState().getData(di.address, size);
 
             QString qbytes = "";
 
@@ -333,14 +333,23 @@ void PPGraphView::loadCurrentGraph()
 
             QString states = QString::fromStdString(PPCore()->getFile().getStates(di.address));
 
-            QString disas = QString("<font color='#000000'>%1%2&nbsp;%8</font>&nbsp;<font color='%4'>%6&nbsp;&nbsp;%3%5")
+            QString qCPE = "";
+            if (CERTAIN == PPCore()->getObjDis().getInfo().isConstantLoad(di.instruction)) {
+                DisassemblerState& ds = const_cast<DisassemblerState&>(PPCore()->getState());
+                const ConstantPoolEntry & cpe = PPCore()->getObjDis().getInfo().extractConstant(ds, di);
+                qCPE = "<font color='#ff7878'> ; = " + PPCore()->addrToString(cpe.value) + "</font>";
+            }
+
+
+            QString disas = QString("<font color='#000000'>%1%2&nbsp;%8</font>&nbsp;<font color='%4'>%6&nbsp;&nbsp;%3%5%9")
                     .arg(di.address, 8, 16, QChar('0'))
                     .arg(annotated ? "*" : "&nbsp;")
                     .arg(asmQString)
                     .arg(color)
                     .arg(comment)
                     .arg(states.replace(" ", "&nbsp;"))
-                    .arg(qbytes);
+                    .arg(qbytes)
+                    .arg(qCPE);
 
             QTextDocument textDoc;
             textDoc.setHtml(disas);
@@ -568,7 +577,7 @@ void PPGraphView::drawBlock(QPainter & p, GraphView::GraphBlock &block)
                                   std::max(0, std::min(256, disassemblyTracedColor.blue() + colorDiff))));
             } else if (associatedAddresses.count(instr.addr)) {
                 p.fillRect(QRect(block.x + charWidth, y, block.width - (10 + 2 * charWidth),
-                                 int(instr.text.lines.size()) * charHeight), QColor(0xff, 0x53, 0x53));
+                                 int(instr.text.lines.size()) * charHeight), QColor(0x8f, 0xf0, 0x82));
             }
             y += int(instr.text.lines.size()) * charHeight;
         }
