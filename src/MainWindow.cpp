@@ -832,12 +832,36 @@ void MainWindow::on_actionNew_triggered()
 
 void MainWindow::on_actionPPProjectLoad_triggered()
 {
-  PPCore()->loadProject("annotations.json");
+    QFileDialog dialog(this);
+    dialog.setFileMode(QFileDialog::ExistingFile);
+    dialog.setViewMode(QFileDialog::Detail);
+    dialog.setAcceptMode(QFileDialog::AcceptOpen);
+    QStringList fileNames;
+
+    if (dialog.exec()) {
+        fileNames = dialog.selectedFiles();
+    }
+
+    if (fileNames.size() >= 1) {
+        PPCore()->loadProject(fileNames[0].toStdString());
+    }
 }
 
 void MainWindow::on_actionPPProjectSave_triggered()
 {
-  PPCore()->saveProject("annotations.json");
+    QFileDialog dialog(this);
+    dialog.setFileMode(QFileDialog::AnyFile);
+    dialog.setViewMode(QFileDialog::Detail);
+    dialog.setAcceptMode(QFileDialog::AcceptSave);
+    QStringList fileNames;
+
+    if (dialog.exec()) {
+        fileNames = dialog.selectedFiles();
+    }
+
+    if (fileNames.size() >= 1) {
+        PPCore()->saveProject(fileNames[0].toStdString());
+    }
 }
 
 void MainWindow::on_actionPPReload_triggered()
