@@ -47,11 +47,11 @@ public:
     void loadProject(std::string filepath);
 
     static QString toString(const UpdateType updateType);
+    static QString toString(const InstructionType instructionType);
     static QString annotationDataToString(const Annotation* annotation);
     static QString addrToString(const AddressType addr);
 
     static InstructionType parseInstructionType(const std::string iType);
-    static std::string instructionTypeToString(const InstructionType iType);
 
     static AddressType strToAddress(QString qstr, bool* ok = nullptr);
 
@@ -60,6 +60,7 @@ public:
 
     static std::string updateTypeToString(const UpdateType updateType);
     static UpdateType updateTypeFromString(const std::string str);
+    static InstructionType instTypeFromString(const std::string str);
 
 
     std::set<const ::BasicBlock*> getBasicBlocksOfFunction(

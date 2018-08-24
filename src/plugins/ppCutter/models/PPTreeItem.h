@@ -4,8 +4,6 @@
 #include <QVariant>
 #include <memory>
 #include "annotations/Annotation.h"
-#include "annotations/CommentAnnotation.h"
-#include "annotations/LoadRefAnnotation.h"
 
 // adapted from https://doc.qt.io/qt-5/qtwidgets-itemviews-simpletreemodel-example.html
 

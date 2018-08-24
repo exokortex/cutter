@@ -23,8 +23,10 @@
 #include <pp/function.h>
 #include <pp/config.h>
 #include <pp/annotations/AnnotationsHelper.h>
-#include <pp/annotations/LoadRefAnnotation.h>
 #include <pp/annotations/CommentAnnotation.h>
+#include <pp/annotations/EntrypointAnnotation.h>
+#include <pp/annotations/InstructionTypeAnnotation.h>
+#include <pp/annotations/LoadRefAnnotation.h>
 
 #include "plugins/ppCutter/core/PPCutterCore.h"
 #include "Cutter.h"
@@ -51,7 +53,12 @@ PPCutterCore::~PPCutterCore()
 
 void PPCutterCore::loadFile(std::string path)
 {
+    std::vector<std::shared_ptr<Annotation>> annotations;
+    if (file != nullptr) {
+        annotations = file->getAnnotations();
+    }
     file = std::make_unique<PPBinaryFile>(path);
+    file->setAnnotations(annotations);
     file->disassemble();
     ready = true;
 }
@@ -115,28 +122,30 @@ InstructionType PPCutterCore::parseInstructionType(const std::string iType)
     return UNKNOWN;
 }
 
-std::string PPCutterCore::instructionTypeToString(const InstructionType iType)
+QString PPCutterCore::toString(const InstructionType iType)
 {
-    if (iType == UNKNOWN)
-        return "unknown";
-    else if (iType == SEQUENTIAL)
-        return "sequential";
-    else if (iType == DIRECT_CALL)
-        return "call.direct";
-    else if (iType == INDIRECT_CALL)
-        return "call.indirect";
-    else if (iType == RETURN)
-        return "return";
-    else if (iType == TRAP)
-        return "trap";
-    else if (iType == DIRECT_BRANCH)
-        return "branch.direct";
-    else if (iType == INDIRECT_BRANCH)
-        return "branch.indirect";
-    else if (iType == COND_BRANCH)
-        return "branch.conditional";
-    //assert(false && "missing case");
-    return "ERROR";
+    switch(iType) {
+        case UNKNOWN:
+            return "UNKNOWN";
+        case SEQUENTIAL:
+            return "SEQUENTIAL";
+        case DIRECT_CALL:
+            return "DIRECT_CALL";
+        case INDIRECT_CALL:
+            return "INDIRECT_CALL";
+        case RETURN:
+            return "RETURN";
+        case TRAP:
+            return "TRAP";
+        case DIRECT_BRANCH:
+            return "DIRECT_BRANCH";
+        case INDIRECT_BRANCH:
+            return "INDIRECT_BRANCH";
+        case COND_BRANCH:
+            return "CONDITIONAL_BRANCH";
+        default:
+            return "ERROR";
+    }
 }
 
 std::string PPCutterCore::toString(const Annotation::Type aType)
@@ -149,15 +158,24 @@ std::string PPCutterCore::toString(const Annotation::Type aType)
 
 QString PPCutterCore::annotationDataToString(const Annotation* annotation)
 {
-    if (const LoadRefAnnotation* a = llvm::dyn_cast_or_null<LoadRefAnnotation>(annotation)) {
-        return "updateType=" + toString(a->updateType)
-        + ", addrLoad=" + addrToString(a->addrLoad)
-        + ", dataLoad=" + addrToString(a->dataLoad);
-    }
-
     if (const CommentAnnotation* a = llvm::dyn_cast_or_null<CommentAnnotation>(annotation)) {
         return QString::fromStdString(a->comment);
     }
+
+    if (const EntrypointAnnotation* a = llvm::dyn_cast_or_null<EntrypointAnnotation>(annotation)) {
+        return QString::fromStdString(a->name);
+    }
+
+    if (const InstructionTypeAnnotation* a = llvm::dyn_cast_or_null<InstructionTypeAnnotation>(annotation)) {
+        return toString(a->instructionType);
+    }
+
+    if (const LoadRefAnnotation* a = llvm::dyn_cast_or_null<LoadRefAnnotation>(annotation)) {
+        return "updateType=" + toString(a->updateType)
+               + ", addrLoad=" + addrToString(a->addrLoad)
+               + ", dataLoad=" + addrToString(a->dataLoad);
+    }
+
     return "ERROR";
 }
 
@@ -197,6 +215,26 @@ UpdateType PPCutterCore::updateTypeFromString(const std::string str)
         return UpdateType::CONST_INJECTION;
     }
     return UpdateType::INVALID;
+}
+
+InstructionType PPCutterCore::instTypeFromString(const std::string str)
+{
+    if (str == "SEQUENTIAL") {
+        return InstructionType::SEQUENTIAL;
+    } else if (str == "DIRECT_CALL") {
+        return InstructionType::DIRECT_CALL;
+    } else if (str == "INDIRECT_CALL") {
+        return InstructionType::INDIRECT_CALL;
+    } else if (str == "RETURN") {
+        return InstructionType::RETURN;
+    } else if (str == "TRAP") {
+        return InstructionType::TRAP;
+    } else if (str == "DIRECT_BRANCH") {
+        return InstructionType::INDIRECT_BRANCH;
+    } else if (str == "INDIRECT_BRANCH") {
+        return InstructionType::COND_BRANCH;
+    }
+    return InstructionType::UNKNOWN;
 }
 
 void PPCutterCore::disassembleAll()

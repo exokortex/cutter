@@ -27,8 +27,6 @@ class PPBinaryFile
       std::string functionName;
     };
   public:
-    std::string path;
-    std::string md5sum;
     ELFIO::Elf_Half machine;
 
     std::unique_ptr<DisassemblerState> state;
@@ -59,10 +57,6 @@ class PPBinaryFile
     std::set<AddressType> getAssociatedAddresses(AddressType addr);
 
     std::string getStates(AddressType addr);
-
-    inline std::string getPath() {
-      return path;
-    }
 
     inline const DisassemblerState &getState() const {
       return *state;

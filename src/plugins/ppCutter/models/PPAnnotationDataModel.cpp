@@ -12,6 +12,11 @@
 #include "plugins/ppCutter/core/PPCutterCore.h"
 #include "PPTreeItem.h"
 
+#include "annotations/CommentAnnotation.h"
+#include "annotations/EntrypointAnnotation.h"
+#include "annotations/InstructionTypeAnnotation.h"
+#include "annotations/LoadRefAnnotation.h"
+
 PPAnnotationDataModel::PPAnnotationDataModel(QObject *parent)
         : QAbstractItemModel(parent)
 {
@@ -22,21 +27,6 @@ PPAnnotationDataModel::~PPAnnotationDataModel()
 {
     delete rootItem;
 }
-
-//void PPAnnotationDataModel::setJsonData(json data)
-//{
-//    // TODO inform the view about this before manipulating data
-//    delete rootItem;
-//    rootItem = treeFromJson("Annotations", nullptr, data);
-//    std::cout << "PPAnnotationDataModel::setJsonData: " << data << std::endl;
-//    std::cout << "PPAnnotationDataModel::setJsonData: " << jsonFromTree(rootItem) << std::endl;
-//    emit dataChanged(QModelIndex(), QModelIndex());
-//}
-
-//json PPAnnotationDataModel::getJsonData()
-//{
-//  return jsonFromTree(rootItem);
-//}
 
 int PPAnnotationDataModel::columnCount(const QModelIndex &/*parent*/) const
 {
@@ -147,12 +137,9 @@ int PPAnnotationDataModel::rowCount(const QModelIndex &index) const
     else
         item = rootItem;
 
-    //std::cout << index.isValid() << " @ " << item << std::endl;
-
     if (!item)
         return 0;
 
-    //std::cout << "rowCount " << item->childCount() << std::endl;
     return item->childCount();
 }
 
@@ -193,6 +180,18 @@ PPTreeItem* PPAnnotationDataModel::treeFromAnnotation(PPTreeItem *parent, std::s
         {
             CommentAnnotation* a = llvm::dyn_cast<CommentAnnotation>(annotation.get());
             new PPTreeItem(PPTreeItem::Type::LEAF, annotationItem, "comment", QString::fromStdString(a->comment), PPTreeItem::ValueType::STRING);
+            break;
+        }
+        case Annotation::Type::ENTRYPOINT:
+        {
+            EntrypointAnnotation* a = llvm::dyn_cast<EntrypointAnnotation>(annotation.get());
+            new PPTreeItem(PPTreeItem::Type::LEAF, annotationItem, "name", QString::fromStdString(a->name), PPTreeItem::ValueType::STRING);
+            break;
+        }
+        case Annotation::Type::INST_TYPE:
+        {
+            InstructionTypeAnnotation* a = llvm::dyn_cast<InstructionTypeAnnotation>(annotation.get());
+            new PPTreeItem(PPTreeItem::Type::LEAF, annotationItem, "instType", PPCutterCore::toString(a->instructionType), PPTreeItem::ValueType::ENUM_INSTRUCTION_TYPE);
             break;
         }
         case Annotation::Type::LOAD_REF:
@@ -249,6 +248,22 @@ void PPAnnotationDataModel::save()
                     CommentAnnotation* a = llvm::dyn_cast<CommentAnnotation>(annotation.get());
                     if (key == "comment") {
                         a->comment = value.toStdString();
+                    }
+                    break;
+                }
+                case Annotation::Type::ENTRYPOINT:
+                {
+                    EntrypointAnnotation* a = llvm::dyn_cast<EntrypointAnnotation>(annotation.get());
+                    if (key == "name") {
+                        a->name = value.toStdString();
+                    }
+                    break;
+                }
+                case Annotation::Type::INST_TYPE:
+                {
+                    InstructionTypeAnnotation* a = llvm::dyn_cast<InstructionTypeAnnotation>(annotation.get());
+                    if (key == "instType") {
+                        a->instructionType = PPCutterCore::instTypeFromString(value.toStdString());
                     }
                     break;
                 }

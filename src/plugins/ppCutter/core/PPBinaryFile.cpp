@@ -26,6 +26,8 @@
 #include <pp/config.h>
 #include <pp/annotations/Annotation.h>
 #include <pp/annotations/CommentAnnotation.h>
+#include <pp/annotations/EntrypointAnnotation.h>
+#include <pp/annotations/InstructionTypeAnnotation.h>
 #include <pp/annotations/LoadRefAnnotation.h>
 #include <pp/annotations/AnnotationsHelper.h>
 #include <pp/annotations/AnnotationsSerializer.h>
@@ -208,6 +210,7 @@ PPBinaryFile::~PPBinaryFile()
       }
     }
   }
+  assert(false);
 }
 
 AddressType PPBinaryFile::getStartAddressOfFunction(const ::Function& function) const
@@ -248,6 +251,12 @@ std::shared_ptr<Annotation> PPBinaryFile::createAnnotation(Annotation::Type type
   switch (type) {
     case Annotation::Type::COMMENT:
       ret = std::make_shared<CommentAnnotation>(anchorAddress);
+      break;
+    case Annotation::Type::ENTRYPOINT:
+      ret = std::make_shared<EntrypointAnnotation>(anchorAddress);
+      break;
+    case Annotation::Type::INST_TYPE:
+      ret = std::make_shared<InstructionTypeAnnotation>(anchorAddress);
       break;
     case Annotation::Type::LOAD_REF:
       ret = std::make_shared<LoadRefAnnotation>(anchorAddress);

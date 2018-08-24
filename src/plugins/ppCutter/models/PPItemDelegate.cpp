@@ -28,6 +28,7 @@ QWidget* PPItemDelegate::createEditor(QWidget* parent, const QStyleOptionViewIte
     cb->addItem(QString("INDIRECT_CALL"));
     cb->addItem(QString("RETURN"));
     cb->addItem(QString("TRAP"));
+    cb->addItem(QString("JUMP"));
     cb->addItem(QString("DIRECT_BRANCH"));
     cb->addItem(QString("INDIRECT_BRANCH"));
     return cb;
