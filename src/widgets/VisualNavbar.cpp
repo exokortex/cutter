@@ -1,9 +1,7 @@
 #include "VisualNavbar.h"
+#include "core/MainWindow.h"
+#include "common/TempConfig.h"
 
-#include "MainWindow.h"
-#include "utils/TempConfig.h"
-
-#include <cmath>
 #include <QGraphicsView>
 #include <QComboBox>
 #include <QGraphicsScene>
@@ -13,11 +11,16 @@
 #include <QJsonArray>
 #include <QJsonParseError>
 #include <QToolTip>
+#include <QMouseEvent>
+
+#include <array>
+#include <cmath>
 
 VisualNavbar::VisualNavbar(MainWindow *main, QWidget *parent) :
     QToolBar(main),
     graphicsView(new QGraphicsView),
-    cursorGraphicsItem(nullptr),
+    seekGraphicsItem(nullptr),
+    PCGraphicsItem(nullptr),
     main(main)
 {
     Q_UNUSED(parent);
@@ -40,6 +43,7 @@ VisualNavbar::VisualNavbar(MainWindow *main, QWidget *parent) :
     //addWidget(addsCombo);
 
     connect(Core(), SIGNAL(seekChanged(RVA)), this, SLOT(on_seekChanged(RVA)));
+    connect(Core(), SIGNAL(registersChanged()), this, SLOT(drawPCCursor()));
     connect(Core(), SIGNAL(refreshAll()), this, SLOT(fetchAndPaintData()));
     connect(Core(), SIGNAL(functionsChanged()), this, SLOT(fetchAndPaintData()));
     connect(Core(), SIGNAL(flagsChanged()), this, SLOT(fetchAndPaintData()));
@@ -51,8 +55,8 @@ VisualNavbar::VisualNavbar(MainWindow *main, QWidget *parent) :
     graphicsScene->setBackgroundBrush(bg);
 
     this->graphicsView->setAlignment(Qt::AlignLeft);
-    this->graphicsView->setMinimumHeight(20);
-    this->graphicsView->setMaximumHeight(20);
+    this->graphicsView->setMinimumHeight(15);
+    this->graphicsView->setMaximumHeight(15);
     this->graphicsView->setFrameShape(QFrame::NoFrame);
     this->graphicsView->setRenderHints(0);
     this->graphicsView->setScene(graphicsScene);
@@ -86,7 +90,7 @@ void VisualNavbar::paintEvent(QPaintEvent *event)
     if (statsWidth < w) {
         statsWidth = nextPow2(w);
         fetch = true;
-    } else if (statsWidth > w*4) {
+    } else if (statsWidth > w * 4) {
         statsWidth = statsWidth > 0 ? statsWidth / 2 : 0;
         fetch = true;
     }
@@ -110,14 +114,14 @@ void VisualNavbar::fetchStats()
     stats = Core()->getBlockStatistics(statsWidth);
 }
 
-enum class DataType: int { Empty, Code, String, Symbol, Count };
+enum class DataType : int { Empty, Code, String, Symbol, Count };
 
 void VisualNavbar::updateGraphicsScene()
 {
     graphicsScene->clear();
     xToAddress.clear();
-    cursorGraphicsItem = nullptr;
-
+    seekGraphicsItem = nullptr;
+    PCGraphicsItem = nullptr;
     graphicsScene->setBackgroundBrush(QBrush(Config()->getColor("gui.navbar.empty")));
 
     if (stats.to <= stats.from) {
@@ -191,33 +195,42 @@ void VisualNavbar::updateGraphicsScene()
     // Update scene width
     graphicsScene->setSceneRect(0, 0, w, h);
 
-    drawCursor();
+    drawSeekCursor();
 }
 
-void VisualNavbar::drawCursor()
+void VisualNavbar::drawCursor(RVA addr, QColor color, QGraphicsRectItem *&graphicsItem)
 {
-    RVA offset = Core()->getOffset();
-    double cursor_x = addressToLocalX(offset);
-    if (cursorGraphicsItem != nullptr) {
-        graphicsScene->removeItem(cursorGraphicsItem);
-        delete cursorGraphicsItem;
-        cursorGraphicsItem = nullptr;
+    double cursor_x = addressToLocalX(addr);
+    if (graphicsItem != nullptr) {
+        graphicsScene->removeItem(graphicsItem);
+        delete graphicsItem;
+        graphicsItem = nullptr;
     }
     if (std::isnan(cursor_x)) {
         return;
     }
     int h = this->graphicsView->height();
-    cursorGraphicsItem = new QGraphicsRectItem(cursor_x, 0, 2, h);
-    cursorGraphicsItem->setPen(Qt::NoPen);
-    cursorGraphicsItem->setBrush(QBrush(Config()->getColor("gui.navbar.err")));
-    graphicsScene->addItem(cursorGraphicsItem);
+    graphicsItem = new QGraphicsRectItem(cursor_x, 0, 2, h);
+    graphicsItem->setPen(Qt::NoPen);
+    graphicsItem->setBrush(QBrush(color));
+    graphicsScene->addItem(graphicsItem);
+}
+
+void VisualNavbar::drawPCCursor()
+{
+    drawCursor(Core()->getProgramCounterValue(), Config()->getColor("gui.navbar.pc"), PCGraphicsItem);
+}
+
+void VisualNavbar::drawSeekCursor()
+{
+    drawCursor(Core()->getOffset(), Config()->getColor("gui.navbar.seek"), seekGraphicsItem);
 }
 
 void VisualNavbar::on_seekChanged(RVA addr)
 {
     Q_UNUSED(addr);
     // Update cursor
-    this->drawCursor();
+    this->drawSeekCursor();
 }
 
 void VisualNavbar::mousePressEvent(QMouseEvent *event)
@@ -241,7 +254,7 @@ void VisualNavbar::mouseMoveEvent(QMouseEvent *event)
 
 RVA VisualNavbar::localXToAddress(double x)
 {
-    for (auto x2a : xToAddress) {
+    for (const XToAddress &x2a : xToAddress) {
         if ((x2a.x_start <= x) && (x <= x2a.x_end)) {
             double offset = (x - x2a.x_start) / (x2a.x_end - x2a.x_start);
             double size = x2a.address_to - x2a.address_from;
@@ -253,7 +266,7 @@ RVA VisualNavbar::localXToAddress(double x)
 
 double VisualNavbar::addressToLocalX(RVA address)
 {
-    for (auto x2a : xToAddress) {
+    for (const XToAddress &x2a : xToAddress) {
         if ((x2a.address_from <= address) && (address < x2a.address_to)) {
             double offset = (double)(address - x2a.address_from) / (double)(x2a.address_to - x2a.address_from);
             double size = x2a.x_end - x2a.x_start;
@@ -267,7 +280,7 @@ QList<QString> VisualNavbar::sectionsForAddress(RVA address)
 {
     QList<QString> ret;
     QList<SectionDescription> sections = Core()->getAllSections();
-    for (const auto &section : sections) {
+    for (const SectionDescription &section : sections) {
         if (address >= section.vaddr && address < section.vaddr + section.vsize) {
             ret << section.name;
         }
@@ -282,9 +295,9 @@ QString VisualNavbar::toolTipForAddress(RVA address)
     if (sections.count()) {
         ret += "\nSections: \n";
         bool first = true;
-        for (auto section : sections) {
+        for (const QString &section : sections) {
             if (!first) {
-                ret += "\n";
+                ret.append(QLatin1Char('\n'));
             } else {
                 first = false;
             }

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>700</width>
-    <height>350</height>
+    <width>1131</width>
+    <height>567</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -52,7 +52,7 @@
        <item>
         <widget class="QTreeWidget" name="toTreeWidget">
          <property name="frameShape">
-          <enum>QFrame::NoFrame</enum>
+          <enum>QFrame::Box</enum>
          </property>
          <property name="frameShadow">
           <enum>QFrame::Plain</enum>
@@ -90,7 +90,7 @@
        <item>
         <widget class="QTreeWidget" name="fromTreeWidget">
          <property name="frameShape">
-          <enum>QFrame::NoFrame</enum>
+          <enum>QFrame::Box</enum>
          </property>
          <property name="frameShadow">
           <enum>QFrame::Plain</enum>
@@ -131,12 +131,6 @@
        </item>
        <item>
         <widget class="QPlainTextEdit" name="previewTextEdit">
-         <property name="font">
-          <font>
-           <family>Anonymous Pro</family>
-           <pointsize>13</pointsize>
-          </font>
-         </property>
          <property name="frameShape">
           <enum>QFrame::NoFrame</enum>
          </property>

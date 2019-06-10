@@ -4,8 +4,8 @@
 #include <QDialog>
 #include <QTreeWidgetItem>
 #include <memory>
-#include "utils/Highlighter.h"
-#include "Cutter.h"
+#include "common/Highlighter.h"
+#include "core/Cutter.h"
 
 class MainWindow;
 
@@ -42,7 +42,6 @@ private:
     QString func_name;
 
     std::unique_ptr<Ui::XrefsDialog> ui;
-    CutterCore *core;
 
     void fillRefs(QList<XrefDescription> refs, QList<XrefDescription> xrefs);
     void updateLabels(QString name);

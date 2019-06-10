@@ -1,5 +1,5 @@
 #include "Omnibar.h"
-#include "MainWindow.h"
+#include "core/MainWindow.h"
 
 #include <QStringListModel>
 #include <QCompleter>
@@ -50,6 +50,9 @@ void Omnibar::refresh(const QStringList &flagList)
 void Omnibar::restoreCompleter()
 {
     QCompleter *completer = this->completer();
+    if (!completer) {
+        return;
+    }
     completer->setFilterMode(Qt::MatchContains);
 }
 

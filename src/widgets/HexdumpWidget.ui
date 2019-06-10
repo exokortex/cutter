@@ -21,197 +21,24 @@
   </property>
   <widget class="QWidget" name="dockWidgetContents">
    <layout class="QHBoxLayout" name="horizontalLayout">
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
     <item>
      <widget class="QSplitter" name="splitter">
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
       </property>
-      <widget class="QScrollArea" name="scrollArea">
+      <widget class="HexWidget" name="hexTextView">
        <property name="frameShape">
         <enum>QFrame::NoFrame</enum>
        </property>
        <property name="widgetResizable">
         <bool>true</bool>
        </property>
-       <widget class="QWidget" name="scrollAreaWidgetContents">
-        <property name="geometry">
-         <rect>
-          <x>0</x>
-          <y>0</y>
-          <width>553</width>
-          <height>764</height>
-         </rect>
-        </property>
-        <layout class="QGridLayout" name="gridLayout_2" columnstretch="0,0,0,0,1">
-         <property name="leftMargin">
-          <number>0</number>
-         </property>
-         <property name="topMargin">
-          <number>0</number>
-         </property>
-         <property name="rightMargin">
-          <number>0</number>
-         </property>
-         <property name="bottomMargin">
-          <number>0</number>
-         </property>
-         <property name="spacing">
-          <number>0</number>
-         </property>
-         <item row="1" column="2">
-          <widget class="QTextEdit" name="hexHexText">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="acceptDrops">
-            <bool>false</bool>
-           </property>
-           <property name="frameShape">
-            <enum>QFrame::NoFrame</enum>
-           </property>
-           <property name="lineWidth">
-            <number>0</number>
-           </property>
-           <property name="verticalScrollBarPolicy">
-            <enum>Qt::ScrollBarAlwaysOff</enum>
-           </property>
-           <property name="horizontalScrollBarPolicy">
-            <enum>Qt::ScrollBarAlwaysOff</enum>
-           </property>
-           <property name="sizeAdjustPolicy">
-            <enum>QAbstractScrollArea::AdjustToContents</enum>
-           </property>
-           <property name="lineWrapMode">
-            <enum>QTextEdit::NoWrap</enum>
-           </property>
-           <property name="cursorWidth">
-            <number>3</number>
-           </property>
-           <property name="textInteractionFlags">
-            <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="3">
-          <widget class="Line" name="line_2">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="2">
-          <widget class="QLabel" name="hexHeaderLabel">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="text">
-            <string>0  1  2  3 ...</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0">
-          <widget class="QTextEdit" name="hexOffsetText">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="acceptDrops">
-            <bool>false</bool>
-           </property>
-           <property name="frameShape">
-            <enum>QFrame::NoFrame</enum>
-           </property>
-           <property name="lineWidth">
-            <number>0</number>
-           </property>
-           <property name="verticalScrollBarPolicy">
-            <enum>Qt::ScrollBarAlwaysOff</enum>
-           </property>
-           <property name="horizontalScrollBarPolicy">
-            <enum>Qt::ScrollBarAlwaysOff</enum>
-           </property>
-           <property name="sizeAdjustPolicy">
-            <enum>QAbstractScrollArea::AdjustToContents</enum>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="4">
-          <widget class="QLabel" name="asciiHeaderLabel">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Ignored" vsizetype="Preferred">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="text">
-            <string>0123...</string>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="0">
-          <widget class="QLabel" name="offsetHeaderLabel">
-           <property name="text">
-            <string>Offset</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="4">
-          <widget class="QTextEdit" name="hexASCIIText">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="MinimumExpanding" vsizetype="Expanding">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="font">
-            <font>
-             <family>Anonymous Pro</family>
-             <pointsize>13</pointsize>
-            </font>
-           </property>
-           <property name="acceptDrops">
-            <bool>false</bool>
-           </property>
-           <property name="frameShape">
-            <enum>QFrame::NoFrame</enum>
-           </property>
-           <property name="lineWidth">
-            <number>0</number>
-           </property>
-           <property name="verticalScrollBarPolicy">
-            <enum>Qt::ScrollBarAlwaysOff</enum>
-           </property>
-           <property name="horizontalScrollBarPolicy">
-            <enum>Qt::ScrollBarAlwaysOff</enum>
-           </property>
-           <property name="sizeAdjustPolicy">
-            <enum>QAbstractScrollArea::AdjustToContents</enum>
-           </property>
-           <property name="lineWrapMode">
-            <enum>QTextEdit::NoWrap</enum>
-           </property>
-           <property name="cursorWidth">
-            <number>3</number>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="1">
-          <widget class="Line" name="line">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
       </widget>
       <widget class="QTabWidget" name="hexSideTab_2">
        <property name="sizePolicy">
@@ -237,6 +64,9 @@
          <string>Parsing</string>
         </attribute>
         <layout class="QVBoxLayout" name="verticalLayout_23">
+         <property name="spacing">
+          <number>6</number>
+         </property>
          <property name="leftMargin">
           <number>0</number>
          </property>
@@ -651,215 +481,57 @@
       </widget>
      </widget>
     </item>
+    <item>
+     <widget class="QToolButton" name="openSideViewB">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>24</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="styleSheet">
+       <string notr="true"/>
+      </property>
+      <property name="text">
+       <string notr="true"/>
+      </property>
+      <property name="icon">
+       <iconset resource="../resources.qrc">
+        <normaloff>:/img/icons/previous.svg</normaloff>:/img/icons/previous.svg</iconset>
+      </property>
+      <property name="iconSize">
+       <size>
+        <width>16</width>
+        <height>12</height>
+       </size>
+      </property>
+      <property name="autoRaise">
+       <bool>true</bool>
+      </property>
+      <property name="arrowType">
+       <enum>Qt::NoArrow</enum>
+      </property>
+     </widget>
+    </item>
    </layout>
   </widget>
-  <action name="actionHideHexdump_side_panel">
-   <property name="text">
-    <string>Hexdump side panel</string>
-   </property>
-   <property name="toolTip">
-    <string>Hexdump side panel</string>
-   </property>
-  </action>
-  <action name="actionFunctionsUndefine">
-   <property name="text">
-    <string>Undefine</string>
-   </property>
-   <property name="toolTip">
-    <string>Undefine</string>
-   </property>
-  </action>
-  <action name="actionDisasCopy_All">
-   <property name="text">
-    <string>Copy all</string>
-   </property>
-   <property name="toolTip">
-    <string>Copy all</string>
-   </property>
-  </action>
-  <action name="actionDisasCopy_Bytes">
-   <property name="text">
-    <string>Copy bytes</string>
-   </property>
-   <property name="toolTip">
-    <string>Copy bytes</string>
-   </property>
-  </action>
-  <action name="actionDisasCopy_Disasm">
-   <property name="text">
-    <string>Copy disasm</string>
-   </property>
-   <property name="toolTip">
-    <string>Copy disasm</string>
-   </property>
-  </action>
-  <action name="actionHexCopy_Hexpair">
-   <property name="text">
-    <string>Copy Hexpair</string>
-   </property>
-   <property name="toolTip">
-    <string>Copy Hexpair</string>
-   </property>
-  </action>
-  <action name="actionHexCopy_ASCII">
-   <property name="text">
-    <string>Copy ASCII</string>
-   </property>
-   <property name="toolTip">
-    <string>Copy ASCII</string>
-   </property>
-  </action>
-  <action name="actionHexCopy_Text">
-   <property name="text">
-    <string>Copy Text</string>
-   </property>
-   <property name="toolTip">
-    <string>Copy Text</string>
-   </property>
-  </action>
-  <action name="action1column">
-   <property name="text">
-    <string>1</string>
-   </property>
-   <property name="toolTip">
-    <string>1</string>
-   </property>
-  </action>
-  <action name="action2columns">
-   <property name="text">
-    <string>2</string>
-   </property>
-   <property name="toolTip">
-    <string>2</string>
-   </property>
-  </action>
-  <action name="action4columns">
-   <property name="text">
-    <string>4</string>
-   </property>
-   <property name="toolTip">
-    <string>4</string>
-   </property>
-  </action>
-  <action name="action8columns">
-   <property name="text">
-    <string>8</string>
-   </property>
-   <property name="toolTip">
-    <string>8</string>
-   </property>
-  </action>
-  <action name="action16columns">
-   <property name="text">
-    <string>16</string>
-   </property>
-   <property name="toolTip">
-    <string>16</string>
-   </property>
-  </action>
-  <action name="action32columns">
-   <property name="text">
-    <string>32</string>
-   </property>
-   <property name="toolTip">
-    <string>32</string>
-   </property>
-  </action>
-  <action name="action64columns">
-   <property name="text">
-    <string>64</string>
-   </property>
-   <property name="toolTip">
-    <string>64</string>
-   </property>
-  </action>
-  <action name="actionHexEdit">
-   <property name="text">
-    <string>Edit</string>
-   </property>
-   <property name="toolTip">
-    <string>Edit</string>
-   </property>
-  </action>
-  <action name="actionHexPaste">
-   <property name="text">
-    <string>Paste</string>
-   </property>
-   <property name="toolTip">
-    <string>Paste</string>
-   </property>
-  </action>
-  <action name="actionHexInsert_Hex">
-   <property name="text">
-    <string>Insert Hex</string>
-   </property>
-   <property name="toolTip">
-    <string>Insert Hex</string>
-   </property>
-  </action>
-  <action name="actionHexInsert_String">
-   <property name="text">
-    <string>Insert String</string>
-   </property>
-   <property name="toolTip">
-    <string>Insert String</string>
-   </property>
-  </action>
-  <action name="actionFormatHex">
-   <property name="text">
-    <string>Hex</string>
-   </property>
-  </action>
-  <action name="actionFormatOctal">
-   <property name="text">
-    <string>Octal</string>
-   </property>
-  </action>
-  <action name="actionFormatHalfWord">
-   <property name="text">
-    <string>Half-word</string>
-   </property>
-  </action>
-  <action name="actionFormatWord">
-   <property name="text">
-    <string>Word</string>
-   </property>
-  </action>
-  <action name="actionFormatQuadWord">
-   <property name="text">
-    <string>Quad-word</string>
-   </property>
-  </action>
-  <action name="actionFormatEmoji">
-   <property name="text">
-    <string>Emoji</string>
-   </property>
-  </action>
-  <action name="actionFormatSignedInt1">
-   <property name="text">
-    <string>1 byte</string>
-   </property>
-   <property name="toolTip">
-    <string>1 byte</string>
-   </property>
-  </action>
-  <action name="actionFormatSignedInt2">
-   <property name="text">
-    <string>2 bytes</string>
-   </property>
-   <property name="toolTip">
-    <string>2 bytes</string>
-   </property>
-  </action>
-  <action name="actionFormatSignedInt4">
-   <property name="text">
-    <string>4 bytes</string>
-   </property>
-   <property name="toolTip">
-    <string>4 bytes</string>
-   </property>
-  </action>
  </widget>
- <resources/>
+ <customwidgets>
+  <customwidget>
+   <class>HexWidget</class>
+   <extends>QScrollArea</extends>
+   <header>HexWidget.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
+ <resources>
+  <include location="../resources.qrc"/>
+ </resources>
  <connections/>
 </ui>

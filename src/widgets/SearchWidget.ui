@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>463</width>
+    <width>548</width>
     <height>300</height>
    </rect>
   </property>
@@ -31,9 +31,9 @@
      <number>0</number>
     </property>
     <item>
-     <widget class="QTreeView" name="searchTreeView">
+     <widget class="CutterTreeView" name="searchTreeView">
       <property name="styleSheet">
-       <string notr="true">QTreeView::item
+       <string notr="true">CutterTreeView::item
 {
     padding-top: 1px;
     padding-bottom: 1px;
@@ -94,11 +94,36 @@
       <item>
        <widget class="QComboBox" name="searchspaceCombo"/>
       </item>
+      <item>
+       <widget class="QLabel" name="searchInLabel">
+        <property name="text">
+         <string>Search in:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="searchInCombo">
+        <property name="maximumSize">
+         <size>
+          <width>16777215</width>
+          <height>300</height>
+         </size>
+        </property>
+       </widget>
+      </item>
      </layout>
     </item>
    </layout>
   </widget>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>CutterTreeView</class>
+   <extends>QTreeView</extends>
+   <header>widgets/CutterTreeView.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

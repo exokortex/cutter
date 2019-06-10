@@ -1,9 +1,12 @@
 #include "RegistersWidget.h"
 #include "ui_RegistersWidget.h"
-#include "utils/JsonModel.h"
+#include "common/JsonModel.h"
 
-#include "MainWindow.h"
-#include "QPushButton"
+#include "core/MainWindow.h"
+
+#include <QCollator>
+#include <QLabel>
+#include <QLineEdit>
 
 RegistersWidget::RegistersWidget(MainWindow *main, QAction *action) :
     CutterDockWidget(main, action),
@@ -12,41 +15,23 @@ RegistersWidget::RegistersWidget(MainWindow *main, QAction *action) :
     ui->setupUi(this);
 
     // setup register layout
+    registerLayout->setVerticalSpacing(0);
     ui->verticalLayout->addLayout(registerLayout);
 
-    buttonSetRegisters = new QPushButton("Set registers", this);
-    connect(buttonSetRegisters, &QPushButton::clicked, this, &RegistersWidget::handleButton);
+    refreshDeferrer = createRefreshDeferrer([this]() {
+        updateContents();
+    });
 
-    ui->verticalLayout->addWidget(buttonSetRegisters);
     connect(Core(), &CutterCore::refreshAll, this, &RegistersWidget::updateContents);
     connect(Core(), &CutterCore::registersChanged, this, &RegistersWidget::updateContents);
 }
 
-RegistersWidget::~RegistersWidget() {}
+RegistersWidget::~RegistersWidget() = default;
 
 void RegistersWidget::updateContents()
 {
-    setRegisterGrid();
-}
-
-void RegistersWidget::handleButton()
-{
-    int j = 0;
-    int i = 0;
-    int col = 0;
-    for (j = 0; j < registerLen; j++) {
-        QWidget *regName = registerLayout->itemAtPosition(i, col)->widget();
-        QWidget *regValue = registerLayout->itemAtPosition(i, col + 1)->widget();
-        QLabel *regLabel = qobject_cast<QLabel *>(regName);
-        QLineEdit *regLine = qobject_cast<QLineEdit *>(regValue);
-        QString regNameString = regLabel->text();
-        QString regValueString = regLine->text();
-        Core()->setRegister(regNameString, regValueString);
-        i++;
-        if (i >= registerLen / numCols + 1) {
-            i = 0;
-            col += 2;
-        }
+    if (!refreshDeferrer->attemptRefresh(nullptr)) {
+        return;
     }
     setRegisterGrid();
 }
@@ -61,6 +46,11 @@ void RegistersWidget::setRegisterGrid()
     QJsonObject registerValues = Core()->getRegisterValues().object();
     QJsonObject registerRefs = Core()->getRegisterJson();
     QStringList registerNames = registerValues.keys();
+
+    QCollator collator;
+    collator.setNumericMode(true);
+    std::sort(registerNames.begin(), registerNames.end(), collator);
+
     registerLen = registerValues.size();
     for (const QString &key : registerNames) {
         regValue = RAddressString(registerValues[key].toVariant().toULongLong());
@@ -76,7 +66,7 @@ void RegistersWidget::setRegisterGrid()
             // add label and register value to grid
             registerLayout->addWidget(registerLabel, i, col);
             registerLayout->addWidget(registerEditValue, i, col + 1);
-            connect(registerEditValue, &QLineEdit::editingFinished, [=]() {
+            connect(registerEditValue, &QLineEdit::editingFinished, [ = ]() {
                 QString regNameString = registerLabel->text();
                 QString regValueString = registerEditValue->text();
                 Core()->setRegister(regNameString, regValueString);
@@ -91,7 +81,7 @@ void RegistersWidget::setRegisterGrid()
         }
         // decide to highlight QLine Box in case of change of register value
         if (regValue != registerEditValue->text() && registerEditValue->text() != 0) {
-            registerEditValue->setStyleSheet("QLineEdit {border: 1px solid green;} QLineEdit:hover { border: 1px solid #3daee9; color: #eff0f1;}");
+            registerEditValue->setStyleSheet("border: 1px solid green;");
         } else {
             // reset stylesheet
             registerEditValue->setStyleSheet("");

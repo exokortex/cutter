@@ -31,9 +31,9 @@
      <number>0</number>
     </property>
     <item>
-     <widget class="QTreeView" name="classesTreeView">
+     <widget class="CutterTreeView" name="classesTreeView">
       <property name="styleSheet">
-       <string notr="true">QTreeView::item
+       <string notr="true">CutterTreeView::item
 {
     padding-top: 1px;
     padding-bottom: 1px;
@@ -95,7 +95,7 @@
         </item>
         <item>
          <property name="text">
-          <string>Flags (Editable)</string>
+          <string>Analysis (Editable)</string>
          </property>
         </item>
        </widget>
@@ -104,7 +104,45 @@
     </item>
    </layout>
   </widget>
+  <action name="seekToVTableAction">
+   <property name="text">
+    <string>Seek to VTable</string>
+   </property>
+  </action>
+  <action name="editMethodAction">
+   <property name="text">
+    <string>Edit Method</string>
+   </property>
+  </action>
+  <action name="addMethodAction">
+   <property name="text">
+    <string>Add Method</string>
+   </property>
+  </action>
+  <action name="newClassAction">
+   <property name="text">
+    <string>Create new Class</string>
+   </property>
+  </action>
+  <action name="renameClassAction">
+   <property name="text">
+    <string>Rename Class</string>
+   </property>
+  </action>
+  <action name="deleteClassAction">
+   <property name="text">
+    <string>Delete Class</string>
+   </property>
+  </action>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>CutterTreeView</class>
+   <extends>QTreeView</extends>
+   <header>widgets/CutterTreeView.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

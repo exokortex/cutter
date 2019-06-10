@@ -1,7 +1,7 @@
 #include "MemoryMapWidget.h"
 #include "ui_MemoryMapWidget.h"
-#include "MainWindow.h"
-#include "utils/Helpers.h"
+#include "core/MainWindow.h"
+#include "common/Helpers.h"
 
 MemoryMapModel::MemoryMapModel(QList<MemoryMapDescription> *memoryMaps, QObject *parent)
     : QAbstractListModel(parent),
@@ -68,16 +68,6 @@ QVariant MemoryMapModel::headerData(int section, Qt::Orientation, int role) cons
     }
 }
 
-void MemoryMapModel::beginReloadMemoryMap()
-{
-    beginResetModel();
-}
-
-void MemoryMapModel::endReloadMemoryMap()
-{
-    endResetModel();
-}
-
 MemoryProxyModel::MemoryProxyModel(MemoryMapModel *sourceModel, QObject *parent)
     : QSortFilterProxyModel(parent)
 {
@@ -87,14 +77,17 @@ MemoryProxyModel::MemoryProxyModel(MemoryMapModel *sourceModel, QObject *parent)
 bool MemoryProxyModel::filterAcceptsRow(int row, const QModelIndex &parent) const
 {
     QModelIndex index = sourceModel()->index(row, 0, parent);
-    MemoryMapDescription item = index.data(MemoryMapModel::MemoryDescriptionRole).value<MemoryMapDescription>();
+    MemoryMapDescription item = index.data(
+                                    MemoryMapModel::MemoryDescriptionRole).value<MemoryMapDescription>();
     return item.name.contains(filterRegExp());
 }
 
 bool MemoryProxyModel::lessThan(const QModelIndex &left, const QModelIndex &right) const
 {
-    MemoryMapDescription leftMemMap = left.data(MemoryMapModel::MemoryDescriptionRole).value<MemoryMapDescription>();
-    MemoryMapDescription rightMemMap = right.data(MemoryMapModel::MemoryDescriptionRole).value<MemoryMapDescription>();
+    MemoryMapDescription leftMemMap = left.data(
+                                          MemoryMapModel::MemoryDescriptionRole).value<MemoryMapDescription>();
+    MemoryMapDescription rightMemMap = right.data(
+                                           MemoryMapModel::MemoryDescriptionRole).value<MemoryMapDescription>();
 
     switch (left.column()) {
     case MemoryMapModel::AddrStartColumn:
@@ -125,17 +118,25 @@ MemoryMapWidget::MemoryMapWidget(MainWindow *main, QAction *action) :
 
     setScrollMode();
 
+    refreshDeferrer = createRefreshDeferrer([this]() {
+        refreshMemoryMap();
+    });
+
     connect(Core(), &CutterCore::refreshAll, this, &MemoryMapWidget::refreshMemoryMap);
     connect(Core(), &CutterCore::registersChanged, this, &MemoryMapWidget::refreshMemoryMap);
 }
 
-MemoryMapWidget::~MemoryMapWidget() {}
+MemoryMapWidget::~MemoryMapWidget() = default;
 
 void MemoryMapWidget::refreshMemoryMap()
 {
-    memoryModel->beginReloadMemoryMap();
+    if (!refreshDeferrer->attemptRefresh(nullptr)) {
+        return;
+    }
+
+    memoryModel->beginResetModel();
     memoryMaps = Core()->getMemoryMap();
-    memoryModel->endReloadMemoryMap();
+    memoryModel->endResetModel();
 
     ui->memoryTreeView->resizeColumnToContents(0);
     ui->memoryTreeView->resizeColumnToContents(1);
@@ -149,6 +150,7 @@ void MemoryMapWidget::setScrollMode()
 
 void MemoryMapWidget::on_memoryTreeView_doubleClicked(const QModelIndex &index)
 {
-    MemoryMapDescription item = index.data(MemoryMapModel::MemoryDescriptionRole).value<MemoryMapDescription>();
+    MemoryMapDescription item = index.data(
+                                    MemoryMapModel::MemoryDescriptionRole).value<MemoryMapDescription>();
     Core()->seek(item.addrStart);
 }

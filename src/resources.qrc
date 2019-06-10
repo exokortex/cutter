@@ -1,9 +1,11 @@
 <RCC>
     <qresource prefix="/">
-        <file>img/icons/arrow_left_light.svg</file>
+        <file>img/icons/dark/arrow_left.svg</file>
+        <file>img/icons/dark/arrow_right.svg</file>
         <file>img/icons/arrow_left.svg</file>
-        <file>img/icons/arrow_right_light.svg</file>
         <file>img/icons/arrow_right.svg</file>
+        <file>img/icons/light/arrow_right.svg</file>
+        <file>img/icons/light/arrow_left.svg</file>
         <file>img/icons/sidebar.svg</file>
         <file>img/icons/undo.svg</file>
         <file>img/icons/redo.svg</file>
@@ -29,6 +31,7 @@
         <file>img/icons/continue_until_syscall.svg</file>
         <file>img/icons/step_light.svg</file>
         <file>img/icons/step_over_light.svg</file>
+        <file>img/icons/step_out_light.svg</file>
         <file>img/icons/cloud.svg</file>
         <file>img/icons/down.svg</file>
         <file>img/icons/down_white.svg</file>
@@ -38,21 +41,23 @@
         <file>img/icons/load_light.svg</file>
         <file>img/icons/save_light.svg</file>
         <file>img/icons/trash_light.svg</file>
-        <file>img/icons/disas_light.svg</file>
-        <file>img/icons/disas_white.svg</file>
         <file>img/icons/disas.svg</file>
-        <file>img/icons/graph_light.svg</file>
+        <file>img/icons/light/disas.svg</file>
+        <file>img/icons/disas_white.svg</file>
         <file>img/icons/graph_white.svg</file>
         <file>img/icons/graph.svg</file>
+        <file>img/icons/light/graph.svg</file>
         <file>img/icons/hexdump_light.svg</file>
         <file>img/icons/hexdump_white.svg</file>
-        <file>img/icons/bug_light.svg</file>
+        <file>img/icons/bug.svg</file>
+        <file>img/icons/light/bug.svg</file>
         <file>img/icons/cog_light.svg</file>
         <file>img/icons/cog_white.svg</file>
         <file>img/icons/new_light.svg</file>
         <file>img/icons/run_light.svg</file>
         <file>img/icons/edit_light.svg</file>
-        <file>img/icons/polar_light.svg</file>
+        <file>img/icons/polar.svg</file>
+        <file>img/icons/light/polar.svg</file>
         <file>img/icons/radar_light.svg</file>
         <file>img/icons/polar_white.svg</file>
         <file>img/icons/radar_white.svg</file>
@@ -76,8 +81,21 @@
         <file>img/cutter_plain.svg</file>
         <file>img/cutter_white_plain.svg</file>
         <file>img/cutter.svg</file>
-
-        <file>python/cutter_jupyter.py</file>
-        <file>python/cutter_ipykernel.py</file>
+        <file>img/icons/copy.svg</file>
+        <file>img/icons/delete.svg</file>
+        <file>img/icons/previous.svg</file>
+        <file>img/icons/list.svg</file>
+        <file>img/icons/fork.svg</file>
+        <file>img/icons/plugins.svg</file>
+        <file>img/icons/light/plugins.svg</file>
+        <file>python/cutter.py</file>
+        <file>python/reg_qtres_importer.py</file>
+        <file>img/icons/download_black.svg</file>
+        <file>img/icons/pencil_thin.svg</file>
+        <file>img/icons/save_black.svg</file>
+        <file>img/icons/trash_bin.svg</file>
+        <file>img/icons/upload_black.svg</file>
+        <file>img/icons/rename.svg</file>
+        <file>img/icons/reset.svg</file>
     </qresource>
 </RCC>

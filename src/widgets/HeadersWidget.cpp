@@ -1,7 +1,7 @@
 #include "HeadersWidget.h"
 #include "ui_HeadersWidget.h"
-#include "MainWindow.h"
-#include "utils/Helpers.h"
+#include "core/MainWindow.h"
+#include "common/Helpers.h"
 
 HeadersModel::HeadersModel(QList<HeaderDescription> *headers, QObject *parent)
     : QAbstractListModel(parent),
@@ -64,16 +64,6 @@ QVariant HeadersModel::headerData(int section, Qt::Orientation, int role) const
     }
 }
 
-void HeadersModel::beginReloadHeaders()
-{
-    beginResetModel();
-}
-
-void HeadersModel::endReloadHeaders()
-{
-    endResetModel();
-}
-
 HeadersProxyModel::HeadersProxyModel(HeadersModel *sourceModel, QObject *parent)
     : QSortFilterProxyModel(parent)
 {
@@ -89,8 +79,10 @@ bool HeadersProxyModel::filterAcceptsRow(int row, const QModelIndex &parent) con
 
 bool HeadersProxyModel::lessThan(const QModelIndex &left, const QModelIndex &right) const
 {
-    HeaderDescription leftHeader = left.data(HeadersModel::HeaderDescriptionRole).value<HeaderDescription>();
-    HeaderDescription rightHeader = right.data(HeadersModel::HeaderDescriptionRole).value<HeaderDescription>();
+    HeaderDescription leftHeader = left.data(
+                                       HeadersModel::HeaderDescriptionRole).value<HeaderDescription>();
+    HeaderDescription rightHeader = right.data(
+                                        HeadersModel::HeaderDescriptionRole).value<HeaderDescription>();
 
     switch (left.column()) {
     case HeadersModel::OffsetColumn:
@@ -126,9 +118,9 @@ HeadersWidget::~HeadersWidget() {}
 
 void HeadersWidget::refreshHeaders()
 {
-    headersModel->beginReloadHeaders();
+    headersModel->beginResetModel();
     headers = Core()->getAllHeaders();
-    headersModel->endReloadHeaders();
+    headersModel->endResetModel();
 
     ui->headersTreeView->resizeColumnToContents(0);
     ui->headersTreeView->resizeColumnToContents(1);

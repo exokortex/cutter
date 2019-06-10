@@ -1,12 +1,13 @@
 #include "ImportsWidget.h"
 #include "ui_ImportsWidget.h"
+#include "WidgetShortcuts.h"
+#include "core/MainWindow.h"
+#include "common/Helpers.h"
 
-#include "MainWindow.h"
-#include "utils/Helpers.h"
-
-#include <QTreeWidget>
-#include <QPen>
 #include <QPainter>
+#include <QPen>
+#include <QShortcut>
+#include <QTreeWidget>
 
 ImportsModel::ImportsModel(QList<ImportDescription> *imports, QObject *parent) :
     QAbstractTableModel(parent),
@@ -15,10 +16,10 @@ ImportsModel::ImportsModel(QList<ImportDescription> *imports, QObject *parent) :
 
 int ImportsModel::rowCount(const QModelIndex &parent) const
 {
-    return parent.isValid()? 0 : imports->count();
+    return parent.isValid() ? 0 : imports->count();
 }
 
-int ImportsModel::columnCount(const QModelIndex&) const
+int ImportsModel::columnCount(const QModelIndex &) const
 {
     return ImportsModel::ColumnCount;
 }
@@ -26,23 +27,25 @@ int ImportsModel::columnCount(const QModelIndex&) const
 QVariant ImportsModel::data(const QModelIndex &index, int role) const
 {
     const ImportDescription &import = imports->at(index.row());
-    switch (role)
-    {
+    switch (role) {
     case Qt::ForegroundRole:
         if (index.column() < ImportsModel::ColumnCount) {
+            // Red color for unsafe functions
             if (banned.match(import.name).hasMatch())
-                return QColor(255, 129, 123);
+                return Config()->getColor("gui.item_unsafe");
+            // Grey color for symbols at offset 0 which can only be filled at runtime
+            if (import.plt == 0)
+                return Config()->getColor("gui.item_invalid");
         }
         break;
     case Qt::DisplayRole:
-        switch(index.column())
-        {
+        switch (index.column()) {
         case ImportsModel::AddressColumn:
             return RAddressString(import.plt);
         case ImportsModel::TypeColumn:
             return import.type;
         case ImportsModel::SafetyColumn:
-            return banned.match(import.name).hasMatch()? tr("Unsafe") : QStringLiteral("");
+            return banned.match(import.name).hasMatch() ? tr("Unsafe") : QStringLiteral("");
         case ImportsModel::NameColumn:
             return import.name;
         default:
@@ -61,10 +64,8 @@ QVariant ImportsModel::data(const QModelIndex &index, int role) const
 
 QVariant ImportsModel::headerData(int section, Qt::Orientation, int role) const
 {
-    if(role == Qt::DisplayRole)
-    {
-        switch(section)
-        {
+    if (role == Qt::DisplayRole) {
+        switch (section) {
         case ImportsModel::AddressColumn:
             return tr("Address");
         case ImportsModel::TypeColumn:
@@ -78,16 +79,6 @@ QVariant ImportsModel::headerData(int section, Qt::Orientation, int role) const
         }
     }
     return QVariant();
-}
-
-void ImportsModel::beginReload()
-{
-    beginResetModel();
-}
-
-void ImportsModel::endReload()
-{
-    endResetModel();
 }
 
 ImportsProxyModel::ImportsProxyModel(ImportsModel *sourceModel, QObject *parent)
@@ -141,12 +132,22 @@ ImportsWidget::ImportsWidget(MainWindow *main, QAction *action) :
     CutterDockWidget(main, action),
     ui(new Ui::ImportsWidget),
     importsModel(new ImportsModel(&imports, this)),
-    importsProxyModel(new ImportsProxyModel(importsModel, this))
+    importsProxyModel(new ImportsProxyModel(importsModel, this)),
+    tree(new CutterTreeWidget(this))
 {
     ui->setupUi(this);
 
+    // Add Status Bar footer
+    tree->addStatusBar(ui->verticalLayout);
+
     ui->importsTreeView->setModel(importsProxyModel);
     ui->importsTreeView->sortByColumn(ImportsModel::NameColumn, Qt::AscendingOrder);
+
+    QShortcut *toggle_shortcut = new QShortcut(widgetShortcuts["ImportsWidget"], main);
+    connect(toggle_shortcut, &QShortcut::activated, this, [=] (){ 
+            toggleDockWidget(true); 
+            main->updateDockActionChecked(action);
+            } );
 
     // Ctrl-F to show/hide the filter entry
     QShortcut *searchShortcut = new QShortcut(QKeySequence::Find, this);
@@ -162,6 +163,10 @@ ImportsWidget::ImportsWidget(MainWindow *main, QAction *action) :
             importsProxyModel, SLOT(setFilterWildcard(const QString &)));
     connect(ui->quickFilterView, SIGNAL(filterClosed()), ui->importsTreeView, SLOT(setFocus()));
 
+    connect(ui->quickFilterView, &QuickFilterView::filterTextChanged, this, [this] {
+        tree->showItemsNumber(importsProxyModel->rowCount());
+    });
+    
     setScrollMode();
 
     connect(Core(), SIGNAL(refreshAll()), this, SLOT(refreshImports()));
@@ -171,10 +176,12 @@ ImportsWidget::~ImportsWidget() {}
 
 void ImportsWidget::refreshImports()
 {
-    importsModel->beginReload();
+    importsModel->beginResetModel();
     imports = Core()->getAllImports();
-    importsModel->endReload();
+    importsModel->endResetModel();
     qhelpers::adjustColumns(ui->importsTreeView, 4, 0);
+
+    tree->showItemsNumber(importsProxyModel->rowCount());
 }
 
 void ImportsWidget::setScrollMode()

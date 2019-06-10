@@ -1,8 +1,9 @@
 #include "SymbolsWidget.h"
 #include "ui_SymbolsWidget.h"
+#include "core/MainWindow.h"
+#include "common/Helpers.h"
 
-#include "MainWindow.h"
-#include "utils/Helpers.h"
+#include <QShortcut>
 
 SymbolsModel::SymbolsModel(QList<SymbolDescription> *symbols, QObject *parent)
     : QAbstractListModel(parent),
@@ -22,8 +23,9 @@ int SymbolsModel::columnCount(const QModelIndex &) const
 
 QVariant SymbolsModel::data(const QModelIndex &index, int role) const
 {
-    if (index.row() >= symbols->count())
+    if (index.row() >= symbols->count()) {
         return QVariant();
+    }
 
     const SymbolDescription &symbol = symbols->at(index.row());
 
@@ -65,16 +67,6 @@ QVariant SymbolsModel::headerData(int section, Qt::Orientation, int role) const
     }
 }
 
-void SymbolsModel::beginReloadSymbols()
-{
-    beginResetModel();
-}
-
-void SymbolsModel::endReloadSymbols()
-{
-    endResetModel();
-}
-
 SymbolsProxyModel::SymbolsProxyModel(SymbolsModel *sourceModel, QObject *parent)
     : QSortFilterProxyModel(parent)
 {
@@ -112,9 +104,13 @@ bool SymbolsProxyModel::lessThan(const QModelIndex &left, const QModelIndex &rig
 
 SymbolsWidget::SymbolsWidget(MainWindow *main, QAction *action) :
     CutterDockWidget(main, action),
-    ui(new Ui::SymbolsWidget)
+    ui(new Ui::SymbolsWidget),
+    tree(new CutterTreeWidget(this))
 {
     ui->setupUi(this);
+
+    // Add Status Bar footer
+    tree->addStatusBar(ui->verticalLayout);
 
     symbolsModel = new SymbolsModel(&symbols, this);
     symbolsProxyModel = new SymbolsProxyModel(symbolsModel, this);
@@ -135,6 +131,10 @@ SymbolsWidget::SymbolsWidget(MainWindow *main, QAction *action) :
             symbolsProxyModel, SLOT(setFilterWildcard(const QString &)));
     connect(ui->quickFilterView, SIGNAL(filterClosed()), ui->symbolsTreeView, SLOT(setFocus()));
 
+    connect(ui->quickFilterView, &QuickFilterView::filterTextChanged, this, [this] {
+        tree->showItemsNumber(symbolsProxyModel->rowCount());
+    });
+    
     setScrollMode();
 
     connect(Core(), SIGNAL(refreshAll()), this, SLOT(refreshSymbols()));
@@ -145,8 +145,9 @@ SymbolsWidget::~SymbolsWidget() {}
 
 void SymbolsWidget::on_symbolsTreeView_doubleClicked(const QModelIndex &index)
 {
-    if (!index.isValid())
+    if (!index.isValid()) {
         return;
+    }
 
     auto symbol = index.data(SymbolsModel::SymbolDescriptionRole).value<SymbolDescription>();
     Core()->seek(symbol.vaddr);
@@ -154,11 +155,13 @@ void SymbolsWidget::on_symbolsTreeView_doubleClicked(const QModelIndex &index)
 
 void SymbolsWidget::refreshSymbols()
 {
-    symbolsModel->beginReloadSymbols();
+    symbolsModel->beginResetModel();
     symbols = Core()->getAllSymbols();
-    symbolsModel->endReloadSymbols();
+    symbolsModel->endResetModel();
 
     qhelpers::adjustColumns(ui->symbolsTreeView, SymbolsModel::ColumnCount, 0);
+
+    tree->showItemsNumber(symbolsProxyModel->rowCount());
 }
 
 void SymbolsWidget::setScrollMode()

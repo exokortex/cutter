@@ -2,32 +2,42 @@
 #define SECTIONSWIDGET_H
 
 #include <memory>
+#include <map>
 
+#include <QtWidgets/QToolButton>
 #include <QAbstractListModel>
 #include <QSortFilterProxyModel>
+#include <QGraphicsScene>
+#include <QLabel>
+#include <QHash>
 
-#include "Cutter.h"
+#include "core/Cutter.h"
 #include "CutterDockWidget.h"
 
-class QSplitter;
-class QTreeView;
+class CutterTreeView;
 class QAbstractItemView;
-class QResizeEvent;
 class MainWindow;
-
-namespace Ui {
 class SectionsWidget;
-}
+class AbstractAddrDock;
+class AddrDockScene;
+class QGraphicsSceneMouseEvent;
+class RawAddrDock;
+class VirtualAddrDock;
+class QuickFilterView;
+class QGraphicsView;
+class QGraphicsRectItem;
 
 class SectionsModel : public QAbstractListModel
 {
     Q_OBJECT
 
+    friend SectionsWidget;
+
 private:
     QList<SectionDescription> *sections;
 
 public:
-    enum Column { NameColumn = 0, SizeColumn, AddressColumn, EndAddressColumn, EntropyColumn, ColumnCount };
+    enum Column { NameColumn = 0, SizeColumn, AddressColumn, EndAddressColumn, PermissionsColumn, EntropyColumn, ColumnCount };
     enum Role { SectionDescriptionRole = Qt::UserRole };
 
     SectionsModel(QList<SectionDescription> *sections, QObject *parent = nullptr);
@@ -37,9 +47,6 @@ public:
 
     QVariant data(const QModelIndex &index, int role) const;
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
-
-    void beginReloadSections();
-    void endReloadSections();
 };
 
 class SectionsProxyModel : public QSortFilterProxyModel
@@ -48,10 +55,6 @@ class SectionsProxyModel : public QSortFilterProxyModel
 
 public:
     SectionsProxyModel(SectionsModel *sourceModel, QObject *parent = nullptr);
-
-private slots:
-    void onSourceModelDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight,
-                                  const QVector<int>& roles);
 
 protected:
     bool lessThan(const QModelIndex &left, const QModelIndex &right) const override;
@@ -65,28 +68,139 @@ public:
     explicit SectionsWidget(MainWindow *main, QAction *action = nullptr);
     ~SectionsWidget();
 
+private slots:
+    void refreshSections();
+    void refreshDocks();
+
+    void onSectionsDoubleClicked(const QModelIndex &index);
+
 protected:
     void resizeEvent(QResizeEvent *event) override;
 
-private slots:
-    void refreshSections();
-    void showSectionsContextMenu(const QPoint &pt);
-    void on_actionVertical_triggered();
-    void on_actionHorizontal_triggered();
-    void onSectionsDoubleClicked(const QModelIndex &index);
-
 private:
-    std::unique_ptr<Ui::SectionsWidget> ui;
-
     QList<SectionDescription> sections;
     SectionsModel *sectionsModel;
-    SectionsProxyModel *sectionsProxyModel;
-    QSplitter *splitter;
-    QTreeView *sectionsTable;
-    QAbstractItemView *sectionsPieChart;
+    SectionsProxyModel *proxyModel;
+    CutterTreeView *sectionsTable;
     MainWindow *main;
+    QWidget *dockWidgetContents;
+    QuickFilterView *quickFilterView;
 
-    void setupViews();
+    QWidget *addrDockWidget;
+    RawAddrDock *rawAddrDock;
+    VirtualAddrDock *virtualAddrDock;
+    QToolButton *toggleButton;
+
+    /**
+     * RefreshDeferrer for loading the section data
+     */
+    RefreshDeferrer *sectionsRefreshDeferrer;
+
+    /**
+     * RefreshDeferrer for updating the visualization docks
+     */
+    RefreshDeferrer *dockRefreshDeferrer;
+
+    void initSectionsTable();
+    void initQuickFilter();
+    void initConnects();
+    void initAddrMapDocks();
+    void drawIndicatorOnAddrDocks();
+    void updateToggle();
+};
+
+class AbstractAddrDock : public QDockWidget
+{
+    Q_OBJECT
+
+    friend SectionsWidget;
+
+public:
+    explicit AbstractAddrDock(SectionsModel *model, QWidget *parent = nullptr);
+    ~AbstractAddrDock();
+
+    virtual void updateDock();
+
+protected:
+    int indicatorHeight;
+    int indicatorParamPosY;
+    float heightThreshold;
+    float heightDivisor;
+    int rectOffset;
+    int rectWidthMin;
+    int rectWidthMax;
+    QColor indicatorColor;
+    QColor textColor;
+    AddrDockScene *addrDockScene;
+    QGraphicsView *graphicsView;
+    SectionsProxyModel *proxyModel;
+
+    void addTextItem(QColor color, QPoint pos, QString string);
+    int getAdjustedSize(int size, int validMinSize);
+    int getRectWidth();
+    int getIndicatorWidth();
+    int getValidMinSize();
+
+    virtual RVA getSizeOfSection(const SectionDescription &section) =0;
+    virtual RVA getAddressOfSection(const SectionDescription &section) =0;
+
+private:
+    void drawIndicator(QString name, float ratio);
+};
+
+class AddrDockScene : public QGraphicsScene
+{
+    Q_OBJECT
+
+public:
+    explicit AddrDockScene(QWidget *parent = nullptr);
+    ~AddrDockScene();
+
+    bool disableCenterOn;
+
+    QHash<QString, RVA> nameAddrMap;
+    QHash<QString, RVA> nameAddrSizeMap;
+    QHash<QString, RVA> seekAddrMap;
+    QHash<QString, RVA> seekAddrSizeMap;
+    QHash<QString, int> namePosYMap;
+    QHash<QString, int> nameHeightMap;
+
+protected:
+    void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
+    void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
+
+private:
+    RVA getAddrFromPos(int posY, bool seek);
+};
+
+class RawAddrDock : public AbstractAddrDock
+{
+    Q_OBJECT
+
+public:
+    explicit RawAddrDock(SectionsModel *model, QWidget *parent = nullptr);
+    ~RawAddrDock() = default;
+
+    void updateDock() override;
+
+protected:
+    RVA getSizeOfSection(const SectionDescription &section) override { return section.size; };
+    RVA getAddressOfSection(const SectionDescription &section) override { return section.paddr; };
+};
+
+class VirtualAddrDock : public AbstractAddrDock
+{
+    Q_OBJECT
+
+public:
+    explicit VirtualAddrDock(SectionsModel *model, QWidget *parent = nullptr);
+    ~VirtualAddrDock() = default;
+
+    void updateDock() override;
+
+protected:
+    RVA getSizeOfSection(const SectionDescription &section) override { return section.vsize; };
+    RVA getAddressOfSection(const SectionDescription &section) override { return section.vaddr; };
 };
 
 #endif // SECTIONSWIDGET_H

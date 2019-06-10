@@ -3,7 +3,7 @@
 
 #include <memory>
 
-#include "Cutter.h"
+#include "core/Cutter.h"
 #include "CutterDockWidget.h"
 
 #include <QAbstractListModel>
@@ -12,19 +12,21 @@
 class MainWindow;
 class QTreeWidget;
 
-namespace Ui
-{
-    class HeadersWidget;
+namespace Ui {
+class HeadersWidget;
 }
 
 
 class MainWindow;
 class QTreeWidgetItem;
+class HeadersWidget;
 
 
 class HeadersModel: public QAbstractListModel
 {
     Q_OBJECT
+
+    friend HeadersWidget;
 
 private:
     QList<HeaderDescription> *headers;
@@ -40,9 +42,6 @@ public:
 
     QVariant data(const QModelIndex &index, int role) const;
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
-
-    void beginReloadHeaders();
-    void endReloadHeaders();
 };
 
 

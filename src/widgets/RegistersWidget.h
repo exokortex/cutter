@@ -6,7 +6,7 @@
 #include <QJsonObject>
 #include <memory>
 
-#include "Cutter.h"
+#include "core/Cutter.h"
 #include "CutterDockWidget.h"
 
 class MainWindow;
@@ -26,12 +26,11 @@ public:
 private slots:
     void updateContents();
     void setRegisterGrid();
-    void handleButton();
 
 private:
     std::unique_ptr<Ui::RegistersWidget> ui;
     QGridLayout *registerLayout = new QGridLayout;
     int numCols = 2;
     int registerLen = 0;
-    QPushButton *buttonSetRegisters;
+    RefreshDeferrer *refreshDeferrer;
 };

@@ -5,7 +5,7 @@
 #include <QStandardItem>
 #include <QTableView>
 
-#include "Cutter.h"
+#include "core/Cutter.h"
 #include "CutterDockWidget.h"
 
 class MainWindow;
@@ -37,4 +37,5 @@ private:
     QStandardItemModel *modelStack = new QStandardItemModel(1, 3, this);
     QAction *seekAction;
     QAction *editAction;
+    RefreshDeferrer *refreshDeferrer;
 };

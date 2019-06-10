@@ -1,8 +1,10 @@
-#include <QTreeWidget>
 #include "RelocsWidget.h"
 #include "ui_RelocsWidget.h"
-#include "MainWindow.h"
-#include "utils/Helpers.h"
+#include "core/MainWindow.h"
+#include "common/Helpers.h"
+
+#include <QShortcut>
+#include <QTreeWidget>
 
 RelocsModel::RelocsModel(QList<RelocDescription> *relocs, QObject *parent) :
     QAbstractTableModel(parent),
@@ -14,7 +16,7 @@ int RelocsModel::rowCount(const QModelIndex &parent) const
     return parent.isValid() ? 0 : relocs->count();
 }
 
-int RelocsModel::columnCount(const QModelIndex&) const
+int RelocsModel::columnCount(const QModelIndex &) const
 {
     return RelocsModel::ColumnCount;
 }
@@ -22,11 +24,9 @@ int RelocsModel::columnCount(const QModelIndex&) const
 QVariant RelocsModel::data(const QModelIndex &index, int role) const
 {
     const RelocDescription &reloc = relocs->at(index.row());
-    switch (role)
-    {
+    switch (role) {
     case Qt::DisplayRole:
-        switch (index.column())
-        {
+        switch (index.column()) {
         case RelocsModel::VAddrColumn:
             return RAddressString(reloc.vaddr);
         case RelocsModel::TypeColumn:
@@ -50,8 +50,7 @@ QVariant RelocsModel::data(const QModelIndex &index, int role) const
 QVariant RelocsModel::headerData(int section, Qt::Orientation, int role) const
 {
     if (role == Qt::DisplayRole)
-        switch (section)
-        {
+        switch (section) {
         case RelocsModel::VAddrColumn:
             return tr("Address");
         case RelocsModel::TypeColumn:
@@ -60,16 +59,6 @@ QVariant RelocsModel::headerData(int section, Qt::Orientation, int role) const
             return tr("Name");
         }
     return QVariant();
-}
-
-void RelocsModel::beginReload()
-{
-    beginResetModel();
-}
-
-void RelocsModel::endReload()
-{
-    endResetModel();
 }
 
 RelocsProxyModel::RelocsProxyModel(RelocsModel *sourceModel, QObject *parent)
@@ -117,9 +106,13 @@ RelocsWidget::RelocsWidget(MainWindow *main, QAction *action) :
     CutterDockWidget(main, action),
     ui(new Ui::RelocsWidget),
     relocsModel(new RelocsModel(&relocs, this)),
-    relocsProxyModel(new RelocsProxyModel(relocsModel, this))
+    relocsProxyModel(new RelocsProxyModel(relocsModel, this)),
+    tree(new CutterTreeWidget(this))
 {
     ui->setupUi(this);
+
+    // Add Status Bar footer
+    tree->addStatusBar(ui->verticalLayout);
 
     ui->relocsTreeView->setModel(relocsProxyModel);
     ui->relocsTreeView->sortByColumn(RelocsModel::NameColumn, Qt::AscendingOrder);
@@ -138,6 +131,10 @@ RelocsWidget::RelocsWidget(MainWindow *main, QAction *action) :
             relocsProxyModel, SLOT(setFilterWildcard(const QString &)));
     connect(ui->quickFilterView, SIGNAL(filterClosed()), ui->relocsTreeView, SLOT(setFocus()));
 
+    connect(ui->quickFilterView, &QuickFilterView::filterTextChanged, this, [this] {
+        tree->showItemsNumber(relocsProxyModel->rowCount());
+    });
+    
     setScrollMode();
 
     connect(Core(), SIGNAL(refreshAll()), this, SLOT(refreshRelocs()));
@@ -155,10 +152,12 @@ void RelocsWidget::on_relocsTreeView_doubleClicked(const QModelIndex &index)
 
 void RelocsWidget::refreshRelocs()
 {
-    relocsModel->beginReload();
+    relocsModel->beginResetModel();
     relocs = Core()->getAllRelocs();
-    relocsModel->endReload();
+    relocsModel->endResetModel();
     qhelpers::adjustColumns(ui->relocsTreeView, 3, 0);
+
+    tree->showItemsNumber(relocsProxyModel->rowCount());
 }
 
 void RelocsWidget::setScrollMode()

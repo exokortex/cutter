@@ -1,8 +1,8 @@
 #include "EntrypointWidget.h"
 #include "ui_EntrypointWidget.h"
 
-#include "MainWindow.h"
-#include "utils/Helpers.h"
+#include "core/MainWindow.h"
+#include "common/Helpers.h"
 
 #include <QTreeWidget>
 #include <QPen>
@@ -28,7 +28,7 @@ EntrypointWidget::~EntrypointWidget() {}
 void EntrypointWidget::fillEntrypoint()
 {
     ui->entrypointTreeWidget->clear();
-    for (auto i : Core()->getAllEntrypoint()) {
+    for (const EntrypointDescription &i : Core()->getAllEntrypoint()) {
         QTreeWidgetItem *item = new QTreeWidgetItem();
         item->setText(0, RAddressString(i.vaddr));
         item->setText(1, i.type);

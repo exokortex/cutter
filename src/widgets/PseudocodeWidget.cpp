@@ -3,13 +3,13 @@
 
 #include <QTextEdit>
 
-#include "utils/Configuration.h"
-#include "utils/Helpers.h"
-#include "utils/SyntaxHighlighter.h"
-#include "utils/TempConfig.h"
+#include "common/Configuration.h"
+#include "common/Helpers.h"
+#include "common/SyntaxHighlighter.h"
+#include "common/TempConfig.h"
 
 PseudocodeWidget::PseudocodeWidget(MainWindow *main, QAction *action) :
-    CutterDockWidget(main, action),
+    MemoryDockWidget(CutterCore::MemoryWidgetType::Pseudocode, main, action),
     ui(new Ui::PseudocodeWidget)
 {
     ui->setupUi(this);
@@ -22,32 +22,51 @@ PseudocodeWidget::PseudocodeWidget(MainWindow *main, QAction *action) :
     connect(Config(), SIGNAL(fontsUpdated()), this, SLOT(fontsUpdated()));
     connect(Config(), SIGNAL(colorsUpdated()), this, SLOT(colorsUpdatedSlot()));
 
-    connect(Core(), SIGNAL(raisePrioritizedMemoryWidget(CutterCore::MemoryWidgetType)), this,
-            SLOT(raisePrioritizedMemoryWidget(CutterCore::MemoryWidgetType)));
     connect(this, &QDockWidget::visibilityChanged, this, [](bool visibility) {
         if (visibility) {
             Core()->setMemoryWidgetPriority(CutterCore::MemoryWidgetType::Pseudocode);
         }
     });
 
+    // TODO Use RefreshDeferrer and remove the refresh button
     connect(ui->refreshButton, &QAbstractButton::clicked, this, [this]() {
-        refresh(Core()->getOffset());
+        doRefresh(Core()->getOffset());
     });
 
-    refresh(RVA_INVALID);
+    if (Core()->getR2DecAvailable()) {
+        ui->decompilerComboBox->setEnabled(true);
+        ui->decompilerComboBox->setCurrentIndex(DecompilerCBR2Dec);
+    } else {
+        ui->decompilerComboBox->setEnabled(false);
+        ui->decompilerComboBox->setCurrentIndex(DecompilerCBPdc);
+    }
+
+    doRefresh(RVA_INVALID);
 }
 
-PseudocodeWidget::~PseudocodeWidget() {}
+PseudocodeWidget::~PseudocodeWidget() = default;
 
 
-void PseudocodeWidget::refresh(RVA addr)
+void PseudocodeWidget::doRefresh(RVA addr)
 {
     if (addr == RVA_INVALID) {
         ui->textEdit->setText(tr("Click Refresh to generate Pseudocode from current offset."));
         return;
     }
 
-    const QString &decompiledCode = Core()->getDecompiledCode(addr);
+    QString decompiledCode;
+    switch (ui->decompilerComboBox->currentIndex()) {
+    case DecompilerCBR2Dec:
+        if (Core()->getR2DecAvailable()) {
+            decompiledCode = Core()->getDecompiledCodeR2Dec(addr);
+            break;
+        } // else fallthrough
+    case DecompilerCBPdc:
+    default:
+        decompiledCode = Core()->getDecompiledCodePDC(addr);
+        break;
+    }
+
     if (decompiledCode.length() == 0) {
         ui->textEdit->setText(tr("Cannot decompile at") + " " + RAddressString(
                                   addr) + " " + tr("(Not a function?)"));
@@ -58,14 +77,7 @@ void PseudocodeWidget::refresh(RVA addr)
 
 void PseudocodeWidget::refreshPseudocode()
 {
-    refresh(Core()->getOffset());
-}
-
-void PseudocodeWidget::raisePrioritizedMemoryWidget(CutterCore::MemoryWidgetType type)
-{
-    if (type == CutterCore::MemoryWidgetType::Pseudocode) {
-        raise();
-    }
+    doRefresh(Core()->getOffset());
 }
 
 void PseudocodeWidget::setupFonts()

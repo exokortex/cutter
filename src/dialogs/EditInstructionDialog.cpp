@@ -1,15 +1,17 @@
 #include "EditInstructionDialog.h"
 #include "ui_EditInstructionDialog.h"
+#include "core/Cutter.h"
 
-EditInstructionDialog::EditInstructionDialog(QWidget *parent) :
+EditInstructionDialog::EditInstructionDialog(InstructionEditMode editMode, QWidget *parent) :
     QDialog(parent),
-    ui(new Ui::EditInstructionDialog)
+    ui(new Ui::EditInstructionDialog),
+    editMode(editMode)
 {
     ui->setupUi(this);
     setWindowFlags(windowFlags() & (~Qt::WindowContextHelpButtonHint));
 
-    // Event filter for capturing Ctrl/Cmd+Return
-    ui->lineEdit->installEventFilter(this);
+    connect(ui->lineEdit, SIGNAL(textEdited(const QString &)), this,
+            SLOT(updatePreview(const QString &)));
 }
 
 EditInstructionDialog::~EditInstructionDialog() {}
@@ -23,32 +25,35 @@ void EditInstructionDialog::on_buttonBox_rejected()
     close();
 }
 
-QString EditInstructionDialog::getInstruction()
+QString EditInstructionDialog::getInstruction() const
 {
-    QString ret = ui->lineEdit->text();
-    return ret;
+    return ui->lineEdit->text();
 }
 
 void EditInstructionDialog::setInstruction(const QString &instruction)
 {
     ui->lineEdit->setText(instruction);
+    updatePreview(instruction);
 }
 
-bool EditInstructionDialog::eventFilter(QObject *obj, QEvent *event)
+void EditInstructionDialog::updatePreview(const QString &input)
 {
-    Q_UNUSED(obj);
+    QString result;
 
-    if (event -> type() == QEvent::KeyPress) {
-        QKeyEvent *keyEvent = static_cast <QKeyEvent *>(event);
-
-        // Confirm comment by pressing Ctrl/Cmd+Return
-        if ((keyEvent -> modifiers() & Qt::ControlModifier) &&
-                ((keyEvent -> key() == Qt::Key_Enter) || (keyEvent -> key() == Qt::Key_Return))) {
-            this->accept();
-            return true;
-        }
+    if (editMode == EDIT_NONE) {
+        ui->instructionLabel->setText("");
+        return;
+    } else if (editMode == EDIT_BYTES) {
+        QByteArray data = CutterCore::hexStringToBytes(input);
+        result = Core()->disassemble(data).trimmed();
+    } else if (editMode == EDIT_TEXT) {
+        QByteArray data = Core()->assemble(input);
+        result = CutterCore::bytesToHexString(data).trimmed();
     }
 
-
-    return false;
+    if (result.isEmpty() || result.contains(QLatin1Char('\n'))) {
+        ui->instructionLabel->setText("Unknown Instruction");
+    } else {
+        ui->instructionLabel->setText(result);
+    }
 }

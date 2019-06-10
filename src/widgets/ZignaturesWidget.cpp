@@ -1,7 +1,7 @@
 #include "ZignaturesWidget.h"
 #include "ui_ZignaturesWidget.h"
-#include "MainWindow.h"
-#include "utils/Helpers.h"
+#include "core/MainWindow.h"
+#include "common/Helpers.h"
 
 ZignaturesModel::ZignaturesModel(QList<ZignatureDescription> *zignatures, QObject *parent)
     : QAbstractListModel(parent),
@@ -44,11 +44,11 @@ QVariant ZignaturesModel::data(const QModelIndex &index, int role) const
 
     case Qt::ToolTipRole: {
         QString tmp = QString("Graph:\n\n    Cyclomatic complexity: " + RSizeString(zignature.cc) +
-                       "\n    Nodes / basicblocks: " + RSizeString(zignature.nbbs) +
-                       "\n    Edges: " + RSizeString(zignature.edges) +
-                       "\n    Ebbs: " + RSizeString(zignature.ebbs) +
-                       "\n\nRefs:\n");
-        for (QString ref : zignature.refs) {
+                              "\n    Nodes / basicblocks: " + RSizeString(zignature.nbbs) +
+                              "\n    Edges: " + RSizeString(zignature.edges) +
+                              "\n    Ebbs: " + RSizeString(zignature.ebbs) +
+                              "\n\nRefs:\n");
+        for (const QString &ref : zignature.refs) {
             tmp.append("\n    " + ref);
         }
         return tmp;
@@ -78,16 +78,6 @@ QVariant ZignaturesModel::headerData(int section, Qt::Orientation, int role) con
     }
 }
 
-void ZignaturesModel::beginReloadZignatures()
-{
-    beginResetModel();
-}
-
-void ZignaturesModel::endReloadZignatures()
-{
-    endResetModel();
-}
-
 ZignaturesProxyModel::ZignaturesProxyModel(ZignaturesModel *sourceModel, QObject *parent)
     : QSortFilterProxyModel(parent)
 {
@@ -97,14 +87,17 @@ ZignaturesProxyModel::ZignaturesProxyModel(ZignaturesModel *sourceModel, QObject
 bool ZignaturesProxyModel::filterAcceptsRow(int row, const QModelIndex &parent) const
 {
     QModelIndex index = sourceModel()->index(row, 0, parent);
-    ZignatureDescription item = index.data(ZignaturesModel::ZignatureDescriptionRole).value<ZignatureDescription>();
+    ZignatureDescription item = index.data(
+                                    ZignaturesModel::ZignatureDescriptionRole).value<ZignatureDescription>();
     return item.name.contains(filterRegExp());
 }
 
 bool ZignaturesProxyModel::lessThan(const QModelIndex &left, const QModelIndex &right) const
 {
-    ZignatureDescription leftZignature = left.data(ZignaturesModel::ZignatureDescriptionRole).value<ZignatureDescription>();
-    ZignatureDescription rightZignature = right.data(ZignaturesModel::ZignatureDescriptionRole).value<ZignatureDescription>();
+    ZignatureDescription leftZignature = left.data(
+                                             ZignaturesModel::ZignatureDescriptionRole).value<ZignatureDescription>();
+    ZignatureDescription rightZignature = right.data(
+                                              ZignaturesModel::ZignatureDescriptionRole).value<ZignatureDescription>();
 
     switch (left.column()) {
     case ZignaturesModel::OffsetColumn:
@@ -140,9 +133,9 @@ ZignaturesWidget::~ZignaturesWidget() {}
 
 void ZignaturesWidget::refreshZignatures()
 {
-    zignaturesModel->beginReloadZignatures();
+    zignaturesModel->beginResetModel();
     zignatures = Core()->getAllZignatures();
-    zignaturesModel->endReloadZignatures();
+    zignaturesModel->endResetModel();
 
     ui->zignaturesTreeView->resizeColumnToContents(0);
     ui->zignaturesTreeView->resizeColumnToContents(1);
@@ -156,6 +149,7 @@ void ZignaturesWidget::setScrollMode()
 
 void ZignaturesWidget::on_zignaturesTreeView_doubleClicked(const QModelIndex &index)
 {
-    ZignatureDescription item = index.data(ZignaturesModel::ZignatureDescriptionRole).value<ZignatureDescription>();
+    ZignatureDescription item = index.data(
+                                    ZignaturesModel::ZignatureDescriptionRole).value<ZignatureDescription>();
     Core()->seek(item.offset);
 }

@@ -343,7 +343,27 @@
                      <string>Autorename functions based on context (aan)</string>
                     </property>
                     <property name="checked">
-                     <bool>true</bool>
+                     <bool>false</bool>
+                    </property>
+                   </widget>
+                  </item>
+		  <item>
+                   <widget class="QCheckBox" name="aao_objc">
+                    <property name="text">
+                     <string> Analyze all objc references (aao)</string>
+                    </property>
+                    <property name="checked">
+                     <bool>false</bool>
+                    </property>
+                   </widget>
+                  </item>
+		  <item>
+                   <widget class="QCheckBox" name="avrr_vtables">
+                    <property name="text">
+                     <string> Recover class information (avrr)</string>
+                    </property>
+                    <property name="checked">
+                     <bool>false</bool>
                     </property>
                    </widget>
                   </item>
@@ -931,38 +951,6 @@
                       </widget>
                      </item>
                     </layout>
-                   </widget>
-                  </item>
-                  <item row="4" column="0">
-                   <widget class="QLabel" name="analbbLabel">
-                    <property name="sizePolicy">
-                     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                      <horstretch>0</horstretch>
-                      <verstretch>0</verstretch>
-                     </sizepolicy>
-                    </property>
-                    <property name="minimumSize">
-                     <size>
-                      <width>0</width>
-                      <height>0</height>
-                     </size>
-                    </property>
-                    <property name="text">
-                     <string>BasicBlock maxsize:</string>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="4" column="1">
-                   <widget class="QLineEdit" name="entry_analbb">
-                    <property name="text">
-                     <string>1024</string>
-                    </property>
-                    <property name="frame">
-                     <bool>false</bool>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                    </property>
                    </widget>
                   </item>
                  </layout>

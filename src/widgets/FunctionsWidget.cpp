@@ -1,12 +1,13 @@
 #include "FunctionsWidget.h"
 #include "ui_FunctionsWidget.h"
 
-#include "MainWindow.h"
-#include "utils/Helpers.h"
+#include "core/MainWindow.h"
+#include "common/Helpers.h"
 #include "dialogs/CommentsDialog.h"
 #include "dialogs/RenameDialog.h"
 #include "dialogs/XrefsDialog.h"
-#include "utils/FunctionsTask.h"
+#include "common/FunctionsTask.h"
+#include "common/TempConfig.h"
 
 #include <algorithm>
 #include <QMenu>
@@ -14,7 +15,16 @@
 #include <QString>
 #include <QResource>
 #include <QShortcut>
+#include <QJsonArray>
 #include <QJsonObject>
+
+namespace {
+
+static const int kMaxTooltipWidth = 400;
+static const int kMaxTooltipDisasmPreviewLines = 10;
+static const int kMaxTooltipHighlightsLines = 5;
+
+}
 
 FunctionModel::FunctionModel(QList<FunctionDescription> *functions, QSet<RVA> *importAddresses,
                              ut64 *mainAdress, bool nested, QFont default_font, QFont highlight_font, QObject *parent)
@@ -60,7 +70,7 @@ int FunctionModel::rowCount(const QModelIndex &parent) const
 
     if (nested) {
         if (parent.internalId() == 0)
-            return 8; // sub-nodes for nested functions
+            return ColumnCount - 1; // sub-nodes for nested functions
         return 0;
     } else
         return 0;
@@ -122,9 +132,11 @@ QVariant FunctionModel::data(const QModelIndex &index, int role) const
                 case 5:
                     return tr("Nlocals: %1").arg(RSizeString(function.nlocals));
                 case 6:
-                    return tr("Cyclomatic complexity: %1").arg(RSizeString(function.cc));
-                case 7:
                     return tr("Call type: %1").arg(function.calltype);
+                case 7:
+                    return tr("Edges: %1").arg(function.edges);
+                case 8:
+                    return tr("StackFrame: %1").arg(function.stackframe);
                 default:
                     return QVariant();
                 }
@@ -140,14 +152,16 @@ QVariant FunctionModel::data(const QModelIndex &index, int role) const
                 return RAddressString(function.offset);
             case NargsColumn:
                 return function.nargs;
-            case NbbsColumn:
-                return function.nbbs;
             case NlocalsColumn:
                 return function.nlocals;
-            case CcColumn:
-                return function.cc;
+            case NbbsColumn:
+                return function.nbbs;
             case CalltypeColumn:
                 return function.calltype;
+            case EdgesColumn:
+                return function.edges;
+            case FrameColumn:
+                return function.stackframe;
             default:
                 return QVariant();
             }
@@ -155,8 +169,10 @@ QVariant FunctionModel::data(const QModelIndex &index, int role) const
 
     case Qt::DecorationRole:
         if (importAddresses->contains(function.offset) &&
-                (nested ? false : index.column() == ImportColumn))
-            return QIcon(":/img/icons/import_light.svg");
+                (nested ? false : index.column() == ImportColumn)) {
+            const static QIcon importIcon(":/img/icons/import_light.svg");
+            return importIcon;
+        }
         return QVariant();
 
     case Qt::FontRole:
@@ -170,18 +186,38 @@ QVariant FunctionModel::data(const QModelIndex &index, int role) const
         return static_cast<int>(Qt::AlignLeft | Qt::AlignVCenter);
 
     case Qt::ToolTipRole: {
-        QList<QString> info = Core()->cmd("afi @ " + function.name).split("\n");
-        if (info.length() > 2) {
-            QString size = info[4].split(" ")[1];
-            QString complex = info[8].split(" ")[1];
-            QString bb = info[11].split(" ")[1];
-            return QString("Summary:\n\n    Size: " + size +
-                           "\n    Cyclomatic complexity: " + complex +
-                           "\n    Basic blocks: " + bb +
-                           "\n\nDisasm preview:\n\n" + Core()->cmd("pdi 10 @ " + function.name) +
-                           "\nStrings:\n\n" + Core()->cmd("pdsf @ " + function.name));
+
+        QStringList disasmPreview = Core()->getDisassemblyPreview(function.offset, kMaxTooltipDisasmPreviewLines);
+        const QStringList &summary = Core()->cmdList(QString("pdsf @ %1").arg(function.offset));
+        const QFont &fnt = Config()->getFont();
+        QFontMetrics fm{ fnt };
+
+        // elide long strings using current disasm font metrics
+        QStringList highlights;
+        for (const QString &s : summary) {
+            highlights << fm.elidedText(s, Qt::ElideRight, kMaxTooltipWidth);
+            if (highlights.length() > kMaxTooltipHighlightsLines) {
+                highlights << "...";
+                break;
+            }
         }
-        return QVariant();
+        if (disasmPreview.isEmpty() && highlights.isEmpty())
+            return QVariant();
+
+        QString toolTipContent = QString("<html><div style=\"font-family: %1; font-size: %2pt; white-space: nowrap;\">")
+                .arg(fnt.family())
+                .arg(qMax(6, fnt.pointSize() - 1)); // slightly decrease font size, to keep more text in the same box
+
+        if (!disasmPreview.isEmpty())
+            toolTipContent += tr("<div style=\"margin-bottom: 10px;\"><strong>Disassembly preview</strong>:<br>%1</div>")
+                .arg(disasmPreview.join("<br>"));
+
+        if (!highlights.isEmpty()) {
+            toolTipContent += tr("<div><strong>Highlights</strong>:<br>%1</div>")
+                .arg(highlights.join(QLatin1Char('\n')).toHtmlEscaped().replace(QLatin1Char('\n'), "<br>"));
+        }
+        toolTipContent += "</div></html>";
+        return toolTipContent;
     }
 
     case Qt::ForegroundRole:
@@ -219,14 +255,16 @@ QVariant FunctionModel::headerData(int section, Qt::Orientation orientation, int
                 return tr("Offset");
             case NargsColumn:
                 return tr("Nargs");
-            case NbbsColumn:
-                return tr("Nbbs");
             case NlocalsColumn:
                 return tr("Nlocals");
-            case CcColumn:
-                return tr("Cyclo. Comp.");
+            case NbbsColumn:
+                return tr("Nbbs");
             case CalltypeColumn:
                 return tr("Call type");
+            case EdgesColumn:
+                return tr("Edges");
+            case FrameColumn:
+                return tr("StackFrame");
             default:
                 return QVariant();
             }
@@ -234,17 +272,6 @@ QVariant FunctionModel::headerData(int section, Qt::Orientation orientation, int
     }
 
     return QVariant();
-}
-
-void FunctionModel::beginReloadFunctions()
-{
-    beginResetModel();
-}
-
-void FunctionModel::endReloadFunctions()
-{
-    updateCurrentIndex();
-    endResetModel();
 }
 
 void FunctionModel::setNested(bool nested)
@@ -354,24 +381,27 @@ bool FunctionSortFilterProxyModel::lessThan(const QModelIndex &left, const QMode
         case FunctionModel::NameColumn:
             return left_function.name < right_function.name;
         case FunctionModel::NargsColumn:
-          if (left_function.nargs != right_function.nargs)
-              return left_function.nargs < right_function.nargs;
-          break;
-        case FunctionModel::NbbsColumn:
-          if (left_function.nbbs != right_function.nbbs)
-              return left_function.nbbs < right_function.nbbs;
-          break;
+            if (left_function.nargs != right_function.nargs)
+                return left_function.nargs < right_function.nargs;
+            break;
         case FunctionModel::NlocalsColumn:
-          if (left_function.nlocals != right_function.nlocals)
-              return left_function.nlocals < right_function.nlocals;
-          break;
-        case FunctionModel::CcColumn:
-          if (left_function.cc != right_function.cc)
-              return left_function.cc < right_function.cc;
-          break;
+            if (left_function.nlocals != right_function.nlocals)
+                return left_function.nlocals < right_function.nlocals;
+            break;
+        case FunctionModel::NbbsColumn:
+            if (left_function.nbbs != right_function.nbbs)
+                return left_function.nbbs < right_function.nbbs;
+            break;
         case FunctionModel::CalltypeColumn:
-          return left_function.calltype < right_function.calltype;
-          break;
+            return left_function.calltype < right_function.calltype;
+        case FunctionModel::EdgesColumn:
+            if (left_function.edges != right_function.edges)
+                return left_function.edges < right_function.edges;
+            break;
+        case FunctionModel::FrameColumn:
+            if (left_function.stackframe != right_function.stackframe)
+                return left_function.stackframe < right_function.stackframe;
+            break;
         default:
             return false;
         }
@@ -382,12 +412,19 @@ bool FunctionSortFilterProxyModel::lessThan(const QModelIndex &left, const QMode
 
 FunctionsWidget::FunctionsWidget(MainWindow *main, QAction *action) :
     CutterDockWidget(main, action),
-    ui(new Ui::FunctionsWidget)
+    ui(new Ui::FunctionsWidget),
+    tree(new CutterTreeWidget(this))
 {
     ui->setupUi(this);
 
+    // Add Status Bar footer 
+    tree->addStatusBar(ui->verticalLayout);
+
     // Radare core found in:
     this->main = main;
+    setTooltipStylesheet();
+    connect(Config(), SIGNAL(colorsUpdated()), this, SLOT(setTooltipStylesheet()));
+
 
     // leave the filter visible by default so users know it exists
     //ui->filterLineEdit->setVisible(false);
@@ -416,6 +453,10 @@ FunctionsWidget::FunctionsWidget(MainWindow *main, QAction *action) :
             SLOT(setFilterWildcard(const QString &)));
     connect(ui->quickFilterView, SIGNAL(filterClosed()), ui->functionsTreeView, SLOT(setFocus()));
 
+    connect(ui->quickFilterView, &QuickFilterView::filterTextChanged, this, [this] {
+        tree->showItemsNumber(functionProxyModel->rowCount());
+    });
+    
     setScrollMode();
 
     // Set Functions context menu
@@ -445,24 +486,33 @@ void FunctionsWidget::refreshTree()
     }
 
     task = QSharedPointer<FunctionsTask>(new FunctionsTask());
-    connect(task.data(), &FunctionsTask::fetchFinished, this, [this] (const QList<FunctionDescription> &functions) {
-        functionModel->beginReloadFunctions();
+    connect(task.data(), &FunctionsTask::fetchFinished,
+    this, [this] (const QList<FunctionDescription> &functions) {
+        functionModel->beginResetModel();
 
         this->functions = functions;
 
         importAddresses.clear();
-        for (ImportDescription import : Core()->getAllImports()) {
+        for (const ImportDescription &import : Core()->getAllImports()) {
             importAddresses.insert(import.plt);
         }
 
         mainAdress = (ut64)Core()->cmdj("iMj").object()["vaddr"].toInt();
 
-        functionModel->endReloadFunctions();
+        functionModel->updateCurrentIndex();
+        functionModel->endResetModel();
 
         // resize offset and size columns
         qhelpers::adjustColumns(ui->functionsTreeView, 3, 0);
+
+        tree->showItemsNumber(functionProxyModel->rowCount());
     });
     Core()->getAsyncTaskManager()->start(task);
+}
+
+void FunctionsWidget::changeSizePolicy(QSizePolicy::Policy hor, QSizePolicy::Policy ver)
+{
+    ui->dockWidgetContents->setSizePolicy(hor, ver);
 }
 
 void FunctionsWidget::onFunctionsDoubleClicked(const QModelIndex &index)
@@ -498,11 +548,11 @@ void FunctionsWidget::on_actionDisasAdd_comment_triggered()
                                        FunctionModel::FunctionDescriptionRole).value<FunctionDescription>();
 
     // Create dialog
-    CommentsDialog *c = new CommentsDialog(this);
+    CommentsDialog c(this);
 
-    if (c->exec()) {
+    if (c.exec()) {
         // Get new function name
-        QString comment = c->getComment();
+        QString comment = c.getComment();
         // Rename function in r2 core
         Core()->setComment(function.offset, comment);
         // Seek to new renamed function
@@ -518,14 +568,14 @@ void FunctionsWidget::on_actionFunctionsRename_triggered()
                                        FunctionModel::FunctionDescriptionRole).value<FunctionDescription>();
 
     // Create dialog
-    RenameDialog *r = new RenameDialog(this);
+    RenameDialog r(this);
 
     // Set function name in dialog
-    r->setName(function.name);
+    r.setName(function.name);
     // If user accepted
-    if (r->exec()) {
+    if (r.exec()) {
         // Get new function name
-        QString new_name = r->getName();
+        QString new_name = r.getName();
 
         // Rename function in r2 core
         Core()->renameFunction(function.name, new_name);
@@ -547,9 +597,9 @@ void FunctionsWidget::on_action_References_triggered()
     // Get selected item in functions tree view
     FunctionDescription function = ui->functionsTreeView->selectionModel()->currentIndex().data(
                                        FunctionModel::FunctionDescriptionRole).value<FunctionDescription>();
-    XrefsDialog *x = new XrefsDialog(this);
-    x->fillRefsForAddress(function.offset, function.name, true);
-    x->exec();
+    XrefsDialog x(nullptr);
+    x.fillRefsForAddress(function.offset, function.name, true);
+    x.exec();
 }
 
 void FunctionsWidget::showTitleContextMenu(const QPoint &pt)
@@ -603,4 +653,17 @@ void FunctionsWidget::resizeEvent(QResizeEvent *event)
 void FunctionsWidget::setScrollMode()
 {
     qhelpers::setVerticalScrollMode(ui->functionsTreeView);
+}
+
+/**
+ * @brief a SLOT to set the stylesheet for a tooltip
+ */ 
+void FunctionsWidget::setTooltipStylesheet()
+{
+    setStyleSheet(QString("QToolTip { border-width: 1px; max-width: %1px;" \
+                          "opacity: 230; background-color: %2;" \
+                          "color: %3; border-color: %3;}")
+                  .arg(kMaxTooltipWidth)
+                  .arg(Config()->getColor("gui.tooltip.background").name())
+                  .arg(Config()->getColor("gui.tooltip.foreground").name()));
 }

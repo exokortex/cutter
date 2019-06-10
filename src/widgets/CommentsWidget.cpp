@@ -1,10 +1,11 @@
-#include <QMenu>
-#include <QResizeEvent>
-
 #include "CommentsWidget.h"
 #include "ui_CommentsWidget.h"
-#include "MainWindow.h"
-#include "utils/Helpers.h"
+#include "core/MainWindow.h"
+#include "common/Helpers.h"
+
+#include <QMenu>
+#include <QResizeEvent>
+#include <QShortcut>
 
 CommentsModel::CommentsModel(QList<CommentDescription> *comments,
                              QMap<QString, QList<CommentDescription> > *nestedComments,
@@ -29,17 +30,18 @@ void CommentsModel::setNested(bool nested)
 
 QModelIndex CommentsModel::index(int row, int column, const QModelIndex &parent) const
 {
-    if (!parent.isValid())
-        return createIndex(row, column, (quintptr)0);
+    if (!parent.isValid()) {
+        return createIndex(row, column, (quintptr) 0);
+    }
 
     return createIndex(row, column, (quintptr)(parent.row() + 1));
 }
 
-QModelIndex CommentsModel::parent(const QModelIndex &index) const
-{
+QModelIndex CommentsModel::parent(const QModelIndex &index) const {
     /* Ignore invalid indexes and root nodes */
-    if (!index.isValid() || index.internalId() == 0)
+    if (!index.isValid() || index.internalId() == 0) {
         return QModelIndex();
+    }
 
     return this->index((int)(index.internalId() - 1), 0);
 }
@@ -57,7 +59,7 @@ int CommentsModel::rowCount(const QModelIndex &parent) const
     return 0;
 }
 
-int CommentsModel::columnCount(const QModelIndex&) const
+int CommentsModel::columnCount(const QModelIndex &) const
 {
     return (isNested()
             ? static_cast<int>(CommentsModel::NestedColumnCount)
@@ -92,8 +94,7 @@ QVariant CommentsModel::data(const QModelIndex &index, int role) const
         comment = comments->at(commentIndex);
     }
 
-    switch (role)
-    {
+    switch (role) {
     case Qt::DisplayRole:
         if (isNested()) {
             if (isSubnode) {
@@ -162,16 +163,6 @@ QVariant CommentsModel::headerData(int section, Qt::Orientation, int role) const
     return QVariant();
 }
 
-void CommentsModel::beginReloadComments()
-{
-    beginResetModel();
-}
-
-void CommentsModel::endReloadComments()
-{
-    endResetModel();
-}
-
 CommentsProxyModel::CommentsProxyModel(CommentsModel *sourceModel, QObject *parent)
     : QSortFilterProxyModel(parent)
 {
@@ -228,9 +219,13 @@ bool CommentsProxyModel::lessThan(const QModelIndex &left, const QModelIndex &ri
 CommentsWidget::CommentsWidget(MainWindow *main, QAction *action) :
     CutterDockWidget(main, action),
     ui(new Ui::CommentsWidget),
-    main(main)
+    main(main),
+    tree(new CutterTreeWidget(this))
 {
     ui->setupUi(this);
+
+    // Add Status Bar footer
+    tree->addStatusBar(ui->verticalLayout);
 
     commentsModel = new CommentsModel(&comments, &nestedComments, this);
     commentsProxyModel = new CommentsProxyModel(commentsModel, this);
@@ -251,6 +246,10 @@ CommentsWidget::CommentsWidget(MainWindow *main, QAction *action) :
             commentsProxyModel, SLOT(setFilterWildcard(const QString &)));
     connect(ui->quickFilterView, SIGNAL(filterClosed()), ui->commentsTreeView, SLOT(setFocus()));
 
+    connect(ui->quickFilterView, &QuickFilterView::filterTextChanged, this, [this] {
+        tree->showItemsNumber(commentsProxyModel->rowCount());
+    });
+    
     setScrollMode();
 
     ui->actionHorizontal->setChecked(true);
@@ -326,18 +325,20 @@ void CommentsWidget::resizeEvent(QResizeEvent *event)
 
 void CommentsWidget::refreshTree()
 {
-    commentsModel->beginReloadComments();
+    commentsModel->beginResetModel();
 
     comments = Core()->getAllComments("CCu");
     nestedComments.clear();
-    for (CommentDescription comment : comments) {
+    for (const CommentDescription &comment : comments) {
         QString fcnName = Core()->cmdFunctionAt(comment.offset);
         nestedComments[fcnName].append(comment);
     }
 
-    commentsModel->endReloadComments();
+    commentsModel->endResetModel();
 
     qhelpers::adjustColumns(ui->commentsTreeView, 3, 0);
+
+    tree->showItemsNumber(commentsProxyModel->rowCount());
 }
 
 void CommentsWidget::setScrollMode()

@@ -6,16 +6,19 @@
 #include <QAbstractItemModel>
 #include <QSortFilterProxyModel>
 
-#include "Cutter.h"
+#include "core/Cutter.h"
 #include "CutterDockWidget.h"
 
 class MainWindow;
 class QTreeWidgetItem;
+class SearchWidget;
 
 
 class SearchModel: public QAbstractListModel
 {
     Q_OBJECT
+
+    friend SearchWidget;
 
 private:
     QList<SearchDescription> *search;
@@ -31,9 +34,6 @@ public:
 
     QVariant data(const QModelIndex &index, int role) const;
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
-
-    void beginReloadSearch();
-    void endReloadSearch();
 };
 
 
@@ -66,7 +66,7 @@ public:
 
 private slots:
     void on_searchTreeView_doubleClicked(const QModelIndex &index);
-
+    void on_searchInCombo_currentIndexChanged(int index);
     void searchChanged();
     void refreshSearchspaces();
 

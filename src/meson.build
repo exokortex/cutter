@@ -1,30 +1,42 @@
 project('Cutter', 'cpp', default_options: 'cpp_std=c++11', meson_version: '>=0.47.0')
 
 qt5_mod = import('qt5')
-py3_exe = import('python3').find_python()
+py3_exe = import('python').find_installation('python3')
 
 qt_modules = []
 feature_define_args = []
-if get_option('enable_jupyter')
-  message('Jupyter support enabled')
-  add_project_arguments('-DCUTTER_ENABLE_JUPYTER', language: 'cpp')
-  feature_define_args += ['-DCUTTER_ENABLE_JUPYTER']
-  if get_option('enable_webengine')
-    message('QtWebEngine support enabled')
-    add_project_arguments('-DCUTTER_ENABLE_QTWEBENGINE', language: 'cpp')
-    feature_define_args += ['-DCUTTER_ENABLE_QTWEBENGINE']
-    qt_modules += 'WebEngineWidgets'
+if get_option('enable_python')
+  message('Python is enabled')
+  feature_define_args += ['-DCUTTER_ENABLE_PYTHON']
+
+  if get_option('enable_python_bindings')
+    message('Python Bindings are enabled')
+    feature_define_args += ['-DCUTTER_ENABLE_PYTHON_BINDINGS']
   endif
 endif
 
-parse_cmd = [py3_exe, '../scripts/meson_parse_qmake.py']
+add_project_arguments(feature_define_args, language: 'cpp')
+
+parse_cmd = [py3_exe, join_paths(meson.current_source_dir(), '../scripts/meson_parse_qmake.py')]
+configure_qmake_cmd = [py3_exe, join_paths(meson.current_source_dir(), '../scripts/meson_configure_qmake_in.py')]
 
 qt_modules += run_command(parse_cmd + ['QT'], check: true).stdout().split(';')
 sources = run_command(parse_cmd + ['SOURCES'], check: true).stdout().split(';')
 headers = run_command(parse_cmd + ['HEADERS'], check: true).stdout().split(';')
 ui_files = run_command(parse_cmd + ['FORMS'], check: true).stdout().split(';')
 qresources = run_command(parse_cmd + ['RESOURCES'], check: true).stdout().split(';')
-version = run_command(parse_cmd + ['VERSION'], check: true).stdout()
+version_major = run_command(parse_cmd + ['CUTTER_VERSION_MAJOR'], check: true).stdout()
+version_minor = run_command(parse_cmd + ['CUTTER_VERSION_MINOR'], check: true).stdout()
+version_patch = run_command(parse_cmd + ['CUTTER_VERSION_PATCH'], check: true).stdout()
+
+conf_json = '''{"CUTTER_VERSION_MAJOR":@0@,
+                "CUTTER_VERSION_MINOR":@1@,
+                "CUTTER_VERSION_PATCH":@2@}'''.format(
+                version_major, version_minor, version_patch)
+configure_file(input: 'CutterConfig.h.in',
+               output: 'CutterConfig.h',
+               command: configure_qmake_cmd + ['@INPUT@', '@OUTPUT0@', conf_json])
+conf_inc = include_directories('.')
 
 sp_dir = join_paths(meson.source_root(), 'subprojects')
 sp_r2_dir = join_paths(sp_dir, 'radare2')
@@ -45,11 +57,36 @@ endif
 r2 = subproject('radare2')
 libr2_dep = r2.get_variable('libr2_dep')
 
-qt5dep = dependency('qt5', modules: qt_modules)
+qt5dep = dependency('qt5', modules: qt_modules, main: true)
 
 deps = [libr2_dep, qt5dep]
-if get_option('enable_jupyter')
-  deps += [dependency('python3')]
+if get_option('enable_python')
+  py3_dep = dependency('python3')
+  deps += [py3_dep]
+  if get_option('enable_python_bindings')
+    shiboken_dep = dependency('shiboken2', method: 'pkg-config')
+    pyside_dep = dependency('pyside2', method: 'pkg-config')
+    pyside_inc_dep = declare_dependency(include_directories: include_directories(join_paths(pyside_dep.get_pkgconfig_variable('includedir'), 'QtCore'),
+                                                                                 join_paths(pyside_dep.get_pkgconfig_variable('includedir'), 'QtGui'),
+                                                                                 join_paths(pyside_dep.get_pkgconfig_variable('includedir'), 'QtWidgets')))
+    deps += [shiboken_dep, pyside_dep, pyside_inc_dep]
+    shiboken_exe = shiboken_dep.get_pkgconfig_variable('generator_location')
+    qt5core_dep = dependency('Qt5Core', method: 'pkg-config')
+    bindings_generate_inc = [meson.current_source_dir(),
+                             join_paths(meson.current_source_dir(), 'core'),
+                             join_paths(meson.current_source_dir(), 'common'),
+                             join_paths(meson.current_source_dir(), 'widgets'),
+                             join_paths(meson.current_source_dir(), 'plugins'),
+                             join_paths(meson.current_source_dir(), 'subprojects/radare2/libr/include'),
+                             join_paths(meson.current_build_dir(), 'subprojects/radare2'),
+                             qt5core_dep.get_pkgconfig_variable('includedir'),
+                             join_paths(qt5core_dep.get_pkgconfig_variable('includedir'), 'QtCore'),
+                             join_paths(qt5core_dep.get_pkgconfig_variable('includedir'), 'QtGui'),
+                             join_paths(qt5core_dep.get_pkgconfig_variable('includedir'), 'QtWidgets')]
+    message('bindings_inc: @0@'.format(bindings_generate_inc))
+    subdir('bindings')
+    sources += bindings_target
+  endif
 endif
 
 moc_files = qt5_mod.preprocess(
@@ -61,23 +98,20 @@ moc_files = qt5_mod.preprocess(
 
 cpp = meson.get_compiler('cpp')
 
-platform_inc = []
 if host_machine.system() == 'windows'
   add_project_arguments('-D_CRT_NONSTDC_NO_DEPRECATE', language: 'cpp')
   add_project_arguments('-D_CRT_SECURE_NO_WARNINGS', language: 'cpp')
-  platform_inc = include_directories('../radare2/libr/include/msvc')
-  # Workaround for https://github.com/mesonbuild/meson/issues/2327
-  qt_host_libs = run_command('qmake', '-query', 'QT_HOST_LIBS').stdout().strip()
-  add_project_link_arguments(join_paths(qt_host_libs, 'qtmain.lib'), language: 'cpp')
+  add_project_link_arguments(join_paths(py3_exe.get_variable('BINDIR'), 'libs', 'python3.lib'), language: 'cpp')
 endif
-
-add_project_arguments('-DAPP_VERSION="@0@"'.format(version), language: 'cpp')
 
 cutter_exe = executable(
   'Cutter',
   moc_files,
   gui_app: true,
   sources: sources,
-  include_directories: platform_inc,
+  include_directories: [
+    include_directories('core', 'common', 'widgets', 'plugins'),
+    conf_inc
+  ],
   dependencies: deps,
 )

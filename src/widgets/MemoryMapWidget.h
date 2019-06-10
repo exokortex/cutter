@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "Cutter.h"
+#include "core/Cutter.h"
 #include "CutterDockWidget.h"
 
 #include <QAbstractListModel>
@@ -10,10 +10,10 @@
 
 class MainWindow;
 class QTreeWidget;
+class MemoryMapWidget;
 
-namespace Ui
-{
-    class MemoryMapWidget;
+namespace Ui {
+class MemoryMapWidget;
 }
 
 
@@ -24,6 +24,8 @@ class QTreeWidgetItem;
 class MemoryMapModel: public QAbstractListModel
 {
     Q_OBJECT
+
+    friend MemoryMapWidget;
 
 private:
     QList<MemoryMapDescription> *memoryMaps;
@@ -39,9 +41,6 @@ public:
 
     QVariant data(const QModelIndex &index, int role) const;
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
-
-    void beginReloadMemoryMap();
-    void endReloadMemoryMap();
 };
 
 
@@ -81,4 +80,6 @@ private:
     QList<MemoryMapDescription> memoryMaps;
 
     void setScrollMode();
+
+    RefreshDeferrer *refreshDeferrer;
 };

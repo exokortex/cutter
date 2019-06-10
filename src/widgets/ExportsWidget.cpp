@@ -1,7 +1,10 @@
 #include "ExportsWidget.h"
 #include "ui_ExportsWidget.h"
-#include "MainWindow.h"
-#include "utils/Helpers.h"
+#include "core/MainWindow.h"
+#include "common/Helpers.h"
+#include "WidgetShortcuts.h"
+
+#include <QShortcut>
 
 ExportsModel::ExportsModel(QList<ExportDescription> *exports, QObject *parent)
     : QAbstractListModel(parent),
@@ -68,16 +71,6 @@ QVariant ExportsModel::headerData(int section, Qt::Orientation, int role) const
     }
 }
 
-void ExportsModel::beginReloadExports()
-{
-    beginResetModel();
-}
-
-void ExportsModel::endReloadExports()
-{
-    endResetModel();
-}
-
 ExportsProxyModel::ExportsProxyModel(ExportsModel *source_model, QObject *parent)
     : QSortFilterProxyModel(parent)
 {
@@ -123,14 +116,24 @@ bool ExportsProxyModel::lessThan(const QModelIndex &left, const QModelIndex &rig
 
 ExportsWidget::ExportsWidget(MainWindow *main, QAction *action) :
     CutterDockWidget(main, action),
-    ui(new Ui::ExportsWidget)
+    ui(new Ui::ExportsWidget),
+    tree(new CutterTreeWidget(this))
 {
     ui->setupUi(this);
 
+    // Add Status Bar footer
+    tree->addStatusBar(ui->verticalLayout);
+    
     exportsModel = new ExportsModel(&exports, this);
     exportsProxyModel = new ExportsProxyModel(exportsModel, this);
     ui->exportsTreeView->setModel(exportsProxyModel);
     ui->exportsTreeView->sortByColumn(ExportsModel::OffsetColumn, Qt::AscendingOrder);
+
+    QShortcut *toggle_shortcut = new QShortcut(widgetShortcuts["ExportsWidget"], main);
+    connect(toggle_shortcut, &QShortcut::activated, this, [=] (){ 
+            toggleDockWidget(true); 
+            main->updateDockActionChecked(action);
+            } );
 
     // Ctrl-F to show/hide the filter entry
     QShortcut *searchShortcut = new QShortcut(QKeySequence::Find, this);
@@ -146,6 +149,10 @@ ExportsWidget::ExportsWidget(MainWindow *main, QAction *action) :
             exportsProxyModel, SLOT(setFilterWildcard(const QString &)));
     connect(ui->quickFilterView, SIGNAL(filterClosed()), ui->exportsTreeView, SLOT(setFocus()));
 
+    connect(ui->quickFilterView, &QuickFilterView::filterTextChanged, this, [this] {
+        tree->showItemsNumber(exportsProxyModel->rowCount());
+    });
+    
     setScrollMode();
 
     connect(Core(), SIGNAL(refreshAll()), this, SLOT(refreshExports()));
@@ -155,11 +162,13 @@ ExportsWidget::~ExportsWidget() {}
 
 void ExportsWidget::refreshExports()
 {
-    exportsModel->beginReloadExports();
+    exportsModel->beginResetModel();
     exports = Core()->getAllExports();
-    exportsModel->endReloadExports();
+    exportsModel->endResetModel();
 
     qhelpers::adjustColumns(ui->exportsTreeView, 3, 0);
+
+    tree->showItemsNumber(exportsProxyModel->rowCount());
 }
 
 

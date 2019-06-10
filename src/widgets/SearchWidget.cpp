@@ -1,10 +1,33 @@
+#include "SearchWidget.h"
+#include "ui_SearchWidget.h"
+#include "core/MainWindow.h"
+#include "common/Helpers.h"
+
 #include <QDockWidget>
 #include <QTreeWidget>
 #include <QComboBox>
-#include "SearchWidget.h"
-#include "ui_SearchWidget.h"
-#include "MainWindow.h"
-#include "utils/Helpers.h"
+#include <QShortcut>
+
+namespace {
+
+static const int kMaxTooltipWidth = 500;
+static const int kMaxTooltipDisasmPreviewLines = 10;
+static const int kMaxTooltipHexdumpBytes = 64;
+
+}
+
+static const QMap<QString, QString> kSearchBoundariesValues {
+    {"io.maps", "All maps"},
+    {"io.map", "Current map"},
+    {"raw", "Raw"},
+    {"dbg.maps", "All memory maps"},
+    {"dbg.map", "Memory map"},
+    {"block", "Current block"},
+    {"bin.section", "Current mapped section"},
+    {"bin.sections", "All mapped sections"},
+    {"dbg.stack", "Stack"},
+    {"dbg.heap", "Heap"}
+   };
 
 SearchModel::SearchModel(QList<SearchDescription> *search, QObject *parent)
     : QAbstractListModel(parent),
@@ -43,6 +66,31 @@ QVariant SearchModel::data(const QModelIndex &index, int role) const
         default:
             return QVariant();
         }
+    case Qt::ToolTipRole: {
+
+        QString previewContent = QString();
+        // if result is CODE, show disassembly
+        if (!exp.code.isEmpty()) {
+            previewContent = Core()->getDisassemblyPreview(exp.offset, kMaxTooltipDisasmPreviewLines)
+                                    .join("<br>");
+        // if result is DATA or Disassembly is N/A                                    
+        } else if (!exp.data.isEmpty() || previewContent.isEmpty()) {
+            previewContent = Core()->getHexdumpPreview(exp.offset, kMaxTooltipHexdumpBytes);
+        }
+
+        const QFont &fnt = Config()->getFont();
+        QFontMetrics fm{ fnt };
+
+        QString toolTipContent = QString("<html><div style=\"font-family: %1; font-size: %2pt; white-space: nowrap;\">")
+                .arg(fnt.family())
+                .arg(qMax(6, fnt.pointSize() - 1)); // slightly decrease font size, to keep more text in the same box
+        
+        toolTipContent += tr("<div style=\"margin-bottom: 10px;\"><strong>Preview</strong>:<br>%1</div>")
+                .arg(previewContent);
+
+        toolTipContent += "</div></html>";
+        return toolTipContent;
+    }
     case SearchDescriptionRole:
         return QVariant::fromValue(exp);
     default:
@@ -69,16 +117,6 @@ QVariant SearchModel::headerData(int section, Qt::Orientation, int role) const
     default:
         return QVariant();
     }
-}
-
-void SearchModel::beginReloadSearch()
-{
-    beginResetModel();
-}
-
-void SearchModel::endReloadSearch()
-{
-    endResetModel();
 }
 
 
@@ -125,6 +163,13 @@ SearchWidget::SearchWidget(MainWindow *main, QAction *action) :
     ui(new Ui::SearchWidget)
 {
     ui->setupUi(this);
+    setStyleSheet(QString("QToolTip { max-width: %1px; opacity: 230; }").arg(kMaxTooltipWidth));
+
+    ui->searchInCombo->blockSignals(true);
+    QMap<QString, QString>::const_iterator mapIter;
+    for (mapIter = kSearchBoundariesValues.cbegin(); mapIter != kSearchBoundariesValues.cend(); ++mapIter)
+        ui->searchInCombo->addItem(mapIter.value(), mapIter.key());
+    ui->searchInCombo->blockSignals(false);
 
     search_model = new SearchModel(&search, this);
     search_proxy_model = new SearchSortFilterProxyModel(search_model, this);
@@ -146,8 +191,10 @@ SearchWidget::SearchWidget(MainWindow *main, QAction *action) :
     });
 
     connect(ui->searchspaceCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            [=](int index){ updatePlaceholderText(index);});
+    [ = ](int index) { updatePlaceholderText(index);});
 
+    QString currentSearchBoundary = Core()->getConfig("search.in");
+    ui->searchInCombo->setCurrentIndex(ui->searchInCombo->findData(currentSearchBoundary));
 }
 
 SearchWidget::~SearchWidget() {}
@@ -192,9 +239,9 @@ void SearchWidget::refreshSearch()
     QVariant searchspace_data = ui->searchspaceCombo->currentData();
     QString searchspace = searchspace_data.toString();
 
-    search_model->beginReloadSearch();
+    search_model->beginResetModel();
     search = Core()->getAllSearch(search_for, searchspace);
-    search_model->endReloadSearch();
+    search_model->endResetModel();
 
     qhelpers::adjustColumns(ui->searchTreeView, 3, 0);
 }
@@ -206,20 +253,27 @@ void SearchWidget::setScrollMode()
 
 void SearchWidget::updatePlaceholderText(int index)
 {
-    switch(index){
-        case 1: // string
-            ui->filterLineEdit->setPlaceholderText("foobar");
-            break;
-        case 2: // hex string
-            ui->filterLineEdit->setPlaceholderText("deadbeef");
-            break;
-        case 3: // ROP gadgets
-            ui->filterLineEdit->setPlaceholderText("pop,,pop");
-            break;
-        case 4: // 32bit value
-            ui->filterLineEdit->setPlaceholderText("0xdeadbeef");
-            break;
-        default:
-            ui->filterLineEdit->setPlaceholderText("jmp rax");
+    switch (index) {
+    case 1: // string
+        ui->filterLineEdit->setPlaceholderText("foobar");
+        break;
+    case 2: // hex string
+        ui->filterLineEdit->setPlaceholderText("deadbeef");
+        break;
+    case 3: // ROP gadgets
+        ui->filterLineEdit->setPlaceholderText("pop,,pop");
+        break;
+    case 4: // 32bit value
+        ui->filterLineEdit->setPlaceholderText("0xdeadbeef");
+        break;
+    default:
+        ui->filterLineEdit->setPlaceholderText("jmp rax");
     }
+}
+
+
+void SearchWidget::on_searchInCombo_currentIndexChanged(int index)
+{
+    Config()->setConfig("search.in",
+                      ui->searchInCombo->itemData(index).toString());
 }

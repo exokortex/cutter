@@ -5,11 +5,13 @@
 #include <QAbstractItemModel>
 #include <QSortFilterProxyModel>
 
-#include "Cutter.h"
+#include "core/Cutter.h"
 #include "CutterDockWidget.h"
+#include "CutterTreeWidget.h"
 
 class MainWindow;
 class QTreeWidgetItem;
+class CommentsWidget;
 
 namespace Ui {
 class CommentsWidget;
@@ -18,6 +20,8 @@ class CommentsWidget;
 class CommentsModel : public QAbstractItemModel
 {
     Q_OBJECT
+
+    friend CommentsWidget;
 
 private:
     QList<CommentDescription> *comments;
@@ -29,7 +33,8 @@ public:
     enum NestedColumn { OffsetNestedColumn = 0, CommentNestedColumn, NestedColumnCount };
     enum Role { CommentDescriptionRole = Qt::UserRole, FunctionRole };
 
-    CommentsModel(QList<CommentDescription> *comments, QMap<QString, QList<CommentDescription>> *nestedComments,
+    CommentsModel(QList<CommentDescription> *comments,
+                  QMap<QString, QList<CommentDescription>> *nestedComments,
                   QObject *parent = nullptr);
 
     QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const;
@@ -40,9 +45,6 @@ public:
 
     QVariant data(const QModelIndex &index, int role) const;
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
-
-    void beginReloadComments();
-    void endReloadComments();
 
     bool isNested() const;
     void setNested(bool nested);
@@ -87,6 +89,7 @@ private:
 
     CommentsModel *commentsModel;
     CommentsProxyModel *commentsProxyModel;
+    CutterTreeWidget *tree;
 
     QList<CommentDescription> comments;
     QMap<QString, QList<CommentDescription>> nestedComments;

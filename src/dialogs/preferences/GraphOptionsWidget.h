@@ -6,7 +6,7 @@
 #include <QPushButton>
 #include <memory>
 
-#include "Cutter.h"
+#include "core/Cutter.h"
 
 class PreferencesDialog;
 
@@ -19,7 +19,7 @@ class GraphOptionsWidget : public QDialog
     Q_OBJECT
 
 public:
-    explicit GraphOptionsWidget(PreferencesDialog *dialog, QWidget *parent = nullptr);
+    explicit GraphOptionsWidget(PreferencesDialog *dialog);
     ~GraphOptionsWidget();
 
 private:

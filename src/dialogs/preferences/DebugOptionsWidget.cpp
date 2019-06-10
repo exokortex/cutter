@@ -7,14 +7,13 @@
 #include <QFontDialog>
 #include "PreferencesDialog.h"
 
-#include "utils/Helpers.h"
-#include "utils/Configuration.h"
+#include "common/Helpers.h"
+#include "common/Configuration.h"
 
-DebugOptionsWidget::DebugOptionsWidget(PreferencesDialog *dialog, QWidget *parent)
-    : QDialog(parent),
+DebugOptionsWidget::DebugOptionsWidget(PreferencesDialog *dialog)
+    : QDialog(dialog),
       ui(new Ui::DebugOptionsWidget)
 {
-    Q_UNUSED(dialog);
     ui->setupUi(this);
 
     updateDebugPlugin();
@@ -29,7 +28,7 @@ void DebugOptionsWidget::updateDebugPlugin()
                SLOT(on_pluginComboBox_currentIndexChanged(const QString &)));
 
     QStringList plugins = Core()->getDebugPlugins();
-    for (QString str : plugins)
+    for (const QString &str : plugins)
         ui->pluginComboBox->addItem(str);
 
     QString plugin = Core()->getActiveDebugPlugin();

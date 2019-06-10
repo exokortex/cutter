@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "Cutter.h"
+#include "core/Cutter.h"
 #include "CutterDockWidget.h"
 
 #include <QAbstractListModel>
@@ -11,19 +11,20 @@
 class MainWindow;
 class QTreeWidget;
 
-namespace Ui
-{
-    class BreakpointWidget;
+namespace Ui {
+class BreakpointWidget;
 }
 
 
 class MainWindow;
 class QTreeWidgetItem;
-
+class BreakpointWidget;
 
 class BreakpointModel: public QAbstractListModel
 {
     Q_OBJECT
+
+    friend BreakpointWidget;
 
 private:
     QList<BreakpointDescription> *breakpoints;
@@ -32,16 +33,13 @@ public:
     enum Column { AddrColumn = 0, PermColumn, HwColumn, TraceColumn, EnabledColumn, ColumnCount };
     enum Role { BreakpointDescriptionRole = Qt::UserRole };
 
-    BreakpointModel(QList<BreakpointDescription> *breakpoints, QObject *parent = 0);
+    BreakpointModel(QList<BreakpointDescription> *breakpoints, QObject *parent = nullptr);
 
     int rowCount(const QModelIndex &parent = QModelIndex()) const;
     int columnCount(const QModelIndex &parent = QModelIndex()) const;
 
     QVariant data(const QModelIndex &index, int role) const;
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
-
-    void beginReloadBreakpoint();
-    void endReloadBreakpoint();
 };
 
 
@@ -86,4 +84,6 @@ private:
     QAction *actionToggleBreakpoint = nullptr;
 
     void setScrollMode();
+
+    RefreshDeferrer *refreshDeferrer;
 };

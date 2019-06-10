@@ -1,17 +1,20 @@
 #ifndef RESOURCESWIDGET_H
 #define RESOURCESWIDGET_H
 
-#include "Cutter.h"
+#include "core/Cutter.h"
 #include "CutterDockWidget.h"
+#include "CutterTreeView.h"
 
 #include <QAbstractListModel>
-#include <QTreeView>
 
 class MainWindow;
+class ResourcesWidget;
 
 class ResourcesModel : public QAbstractListModel
 {
     Q_OBJECT
+
+    friend ResourcesWidget;
 
 private:
     QList<ResourcesDescription> *resources;
@@ -26,9 +29,6 @@ public:
     QVariant data(const QModelIndex &index, int role) const override;
     QVariant headerData(int section, Qt::Orientation orientation,
                         int role = Qt::DisplayRole) const override;
-
-    void beginReload();
-    void endReload();
 };
 
 class ResourcesWidget : public CutterDockWidget
@@ -37,7 +37,7 @@ class ResourcesWidget : public CutterDockWidget
 
 private:
     ResourcesModel *model;
-    QTreeView *view;
+    CutterTreeView *view;
     QList<ResourcesDescription> resources;
 
 public:

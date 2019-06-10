@@ -1,7 +1,7 @@
 #ifndef DISASSEMBLYCONTEXTMENU_H
 #define DISASSEMBLYCONTEXTMENU_H
 
-#include "Cutter.h"
+#include "core/Cutter.h"
 #include <QMenu>
 #include <QKeySequence>
 
@@ -20,14 +20,22 @@ public slots:
     void setOffset(RVA offset);
     void setCanCopy(bool enabled);
 
+    /**
+     * @brief Sets the value of curHighlightedWord
+     * @param text The current highlighted word
+     */
+    void setCurHighlightedWord(const QString &text);
+
 private slots:
     void aboutToShowSlot();
 
+    void on_actionEditFunction_triggered();
     void on_actionEditInstruction_triggered();
     void on_actionNopInstruction_triggered();
     void on_actionJmpReverse_triggered();
-    void showReverseJmpQuery();
     void on_actionEditBytes_triggered();
+    void showReverseJmpQuery();
+    bool writeFailed();
 
     void on_actionCopy_triggered();
 
@@ -39,6 +47,7 @@ private slots:
     void on_actionAddFlag_triggered();
     void on_actionRename_triggered();
     void on_actionRenameUsedHere_triggered();
+    void on_actionSetFunctionVarTypes_triggered();
     void on_actionXRefs_triggered();
     void on_actionDisplayOptions_triggered();
 
@@ -51,24 +60,50 @@ private slots:
     void on_actionSetPC_triggered();
 
     void on_actionSetToCode_triggered();
+    void on_actionSetAsString_triggered();
     void on_actionSetToData_triggered();
     void on_actionSetToDataEx_triggered();
+
+    /**
+     * @brief Executed on selecting an offset from the structureOffsetMenu
+     * Uses the applyStructureOffset() function of CutterCore to apply the
+     * structure offset
+     * \param action The action which trigered the event
+     */
+    void on_actionStructureOffsetMenu_triggered(QAction *action);
+
+    /**
+     * @brief Executed on selecting the "Link Type to Address" option
+     * Opens the LinkTypeDialog box from where the user can link the address
+     * to a type
+     */
+    void on_actionLinkType_triggered();
 
 private:
     QKeySequence getCopySequence() const;
     QKeySequence getCommentSequence() const;
+    QKeySequence getCopyAddressSequence() const;
     QKeySequence getSetToCodeSequence() const;
+    QKeySequence getSetAsStringSequence() const;
     QKeySequence getSetToDataSequence() const;
     QKeySequence getSetToDataExSequence() const;
     QKeySequence getAddFlagSequence() const;
     QKeySequence getRenameSequence() const;
     QKeySequence getRenameUsedHereSequence() const;
+    QKeySequence getRetypeSequence() const;
     QKeySequence getXRefSequence() const;
     QKeySequence getDisplayOptionsSequence() const;
     QList<QKeySequence> getAddBPSequence() const;
 
+    /**
+     * @return the shortcut key for "Link Type to Address" option
+     */
+    QKeySequence getLinkTypeSequence() const;
+
+
     RVA offset;
     bool canCopy;
+    QString curHighlightedWord; // The current highlighted word
 
     QList<QAction *> anonymousActions;
 
@@ -85,16 +120,21 @@ private:
     QAction actionAddAnnotation;
     QAction actionAddComment;
     QAction actionAddFlag;
-    QMenu *analyzeMenu;
     QAction actionAnalyzeFunction;
+    QAction actionEditFunction;
     QAction actionRename;
     QAction actionRenameUsedHere;
+    QAction actionSetFunctionVarTypes;
     QAction actionXRefs;
     QAction actionDisplayOptions;
 
     QAction actionDeleteComment;
     QAction actionDeleteFlag;
     QAction actionDeleteFunction;
+
+    QMenu *structureOffsetMenu;
+
+    QAction actionLinkType;
 
     QMenu *setBaseMenu;
     QAction actionSetBaseBinary;
@@ -117,6 +157,7 @@ private:
     QAction actionSetPC;
 
     QAction actionSetToCode;
+    QAction actionSetAsString;
 
     QMenu *setToDataMenu;
     QAction actionSetToDataEx;
@@ -136,7 +177,6 @@ private:
     void setToData(int size, int repeat = 1);
     void setBits(int bits);
 
-    void addAnalyzeMenu();
     void addSetBaseMenu();
     void addSetBitsMenu();
     void addSetToDataMenu();

@@ -1,14 +1,14 @@
 win32 {
     DEFINES += _CRT_NONSTDC_NO_DEPRECATE
     DEFINES += _CRT_SECURE_NO_WARNINGS
-    INCLUDEPATH += "$$PWD/../radare2/libr/include/msvc"
     !contains(QT_ARCH, x86_64) {
-        LIBS += -L"$$PWD/../r2_dist_x86/lib"
-        INCLUDEPATH += "$$PWD/../r2_dist_x86/include"
+        LIBS += -L"$$PWD/../r2_dist_x86/radare2/lib"
+        R2_INCLUDEPATH += "$$PWD/../r2_dist_x86/include"
     } else {
-        LIBS += -L"$$PWD/../r2_dist_x64/lib"
-        INCLUDEPATH += "$$PWD/../r2_dist_x64/include"
+        LIBS += -L"$$PWD/../r2_dist_x64/radare2/lib"
+        R2_INCLUDEPATH += "$$PWD/../r2_dist_x64/include"
     }
+    INCLUDEPATH += $$R2_INCLUDEPATH
 
     LIBS += \
         -lr_core \
@@ -35,7 +35,7 @@ win32 {
         -lr_crypto \
         -lr_sdb
 } else {
-    macx {
+    macx|bsd {
         PREFIX=/usr/local
     } else {
         PREFIX=/usr
@@ -51,22 +51,31 @@ win32 {
                 PKG_CONFIG_PATH=$$PKG_CONFIG_PATH:$$PREFIX/lib/pkgconfig
             } else {
                 LIBS += -L$$PREFIX/lib
-                INCLUDEPATH += $$PREFIX/include/libr
+                R2_INCLUDEPATH += $$PREFIX/include/libr
                 USE_PKGCONFIG = 0
-           }
+            }
         }
         macx {
             LIBS += -L$$PREFIX/lib
-            INCLUDEPATH += $$PREFIX/include/libr
+            R2_INCLUDEPATH += $$PREFIX/include/libr
             USE_PKGCONFIG = 0
         }
+        bsd {
+            !exists($$PKG_CONFIG_PATH/r_core.pc) {
+                LIBS += -L$$PREFIX/lib
+                R2_INCLUDEPATH += $$PREFIX/include/libr
+                USE_PKGCONFIG = 0
+            }
+        }
     }
+    INCLUDEPATH += $$R2_INCLUDEPATH
 
     DEFINES += _CRT_NONSTDC_NO_DEPRECATE
     DEFINES += _CRT_SECURE_NO_WARNINGS
     equals(USE_PKGCONFIG, 1) {
         CONFIG += link_pkgconfig
         PKGCONFIG += r_core
+        R2_INCLUDEPATH = "$$system("pkg-config --variable=includedir r_core")/libr"
     } else {
         LIBS += \
         -lr_core \

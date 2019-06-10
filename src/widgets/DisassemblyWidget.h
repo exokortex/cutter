@@ -1,9 +1,11 @@
 #ifndef DISASSEMBLYWIDGET_H
 #define DISASSEMBLYWIDGET_H
 
-#include "Cutter.h"
-#include "CutterDockWidget.h"
-#include "CutterSeekableWidget.h"
+#include "core/Cutter.h"
+#include "MemoryDockWidget.h"
+#include "common/CutterSeekable.h"
+#include "common/RefreshDeferrer.h"
+
 #include <QTextEdit>
 #include <QPlainTextEdit>
 #include <QShortcut>
@@ -14,7 +16,7 @@ class DisassemblyTextEdit;
 class DisassemblyScrollArea;
 class DisassemblyContextMenu;
 
-class DisassemblyWidget : public CutterDockWidget
+class DisassemblyWidget : public MemoryDockWidget
 {
     Q_OBJECT
 public:
@@ -24,15 +26,15 @@ public:
 public slots:
     void highlightCurrentLine();
     void showDisasContextMenu(const QPoint &pt);
-    void refreshDisasm(RVA offset = RVA_INVALID);
     void fontsUpdatedSlot();
     void colorsUpdatedSlot();
     void seekPrev();
     void toggleSync();
+    void setPreviewMode(bool previewMode);
 
-private slots:
+protected slots:
     void on_seekChanged(RVA offset);
-    void raisePrioritizedMemoryWidget(CutterCore::MemoryWidgetType type);
+    void refreshDisasm(RVA offset = RVA_INVALID);
 
     void scrollInstructions(int count);
     bool updateMaxLines();
@@ -42,24 +44,30 @@ private slots:
     void zoomIn();
     void zoomOut();
 
-private:
+protected:
     DisassemblyContextMenu *mCtxMenu;
     DisassemblyScrollArea *mDisasScrollArea;
     DisassemblyTextEdit *mDisasTextEdit;
 
+private:
     RVA topOffset;
     RVA bottomOffset;
     int maxLines;
 
-    /*!
+    QString curHighlightedWord;
+
+    /**
      * offset of lines below the first line of the current seek
      */
     int cursorLineOffset;
+    int cursorCharOffset;
     bool seekFromCursor;
+
+    RefreshDeferrer *disasmRefresh;
 
     RVA readCurrentDisassemblyOffset();
     RVA readDisassemblyOffset(QTextCursor tc);
-    bool eventFilter(QObject *obj, QEvent *event);
+    bool eventFilter(QObject *obj, QEvent *event) override;
 
     QList<RVA> breakpoints;
 
@@ -71,8 +79,10 @@ private:
     void connectCursorPositionChanged(bool disconnect);
 
     void moveCursorRelative(bool up, bool page);
+    QList<QTextEdit::ExtraSelection> getSameWordsSelections();
+
     QAction syncIt;
-    CutterSeekableWidget *seekable;
+    CutterSeekable *seekable;
 };
 
 class DisassemblyScrollArea : public QAbstractScrollArea

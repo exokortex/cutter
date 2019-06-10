@@ -5,7 +5,7 @@
 #include <QStandardItem>
 #include <QTableView>
 
-#include "Cutter.h"
+#include "core/Cutter.h"
 #include "CutterDockWidget.h"
 
 class MainWindow;
@@ -31,4 +31,5 @@ private:
     std::unique_ptr<Ui::BacktraceWidget> ui;
     QStandardItemModel *modelBacktrace = new QStandardItemModel(1, 5, this);
     QTableView *viewBacktrace = new QTableView;
+    RefreshDeferrer *refreshDeferrer;
 };

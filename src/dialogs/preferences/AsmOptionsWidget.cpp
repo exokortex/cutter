@@ -6,13 +6,14 @@
 
 #include "PreferencesDialog.h"
 
-#include "utils/Helpers.h"
-#include "utils/Configuration.h"
+#include "common/Helpers.h"
+#include "common/Configuration.h"
 
-AsmOptionsWidget::AsmOptionsWidget(PreferencesDialog */*dialog*/, QWidget *parent)
-    : QDialog(parent),
+AsmOptionsWidget::AsmOptionsWidget(PreferencesDialog *dialog)
+    : QDialog(dialog),
       ui(new Ui::AsmOptionsWidget)
 {
+
     ui->setupUi(this);
 
     ui->syntaxComboBox->blockSignals(true);
@@ -33,13 +34,15 @@ void AsmOptionsWidget::updateAsmOptionsFromVars()
     qhelpers::setCheckedWithoutSignals(ui->esilCheckBox, Config()->getConfigBool("asm.esil"));
     qhelpers::setCheckedWithoutSignals(ui->pseudoCheckBox, Config()->getConfigBool("asm.pseudo"));
     qhelpers::setCheckedWithoutSignals(ui->offsetCheckBox, Config()->getConfigBool("asm.offset"));
+    qhelpers::setCheckedWithoutSignals(ui->xrefCheckBox, Config()->getConfigBool("asm.xrefs"));
+    qhelpers::setCheckedWithoutSignals(ui->indentCheckBox, Config()->getConfigBool("asm.indent"));
     qhelpers::setCheckedWithoutSignals(ui->describeCheckBox, Config()->getConfigBool("asm.describe"));
-    qhelpers::setCheckedWithoutSignals(ui->stackpointerCheckBox, Config()->getConfigBool("asm.stackptr"));
     qhelpers::setCheckedWithoutSignals(ui->slowCheckBox, Config()->getConfigBool("asm.slow"));
     qhelpers::setCheckedWithoutSignals(ui->linesCheckBox, Config()->getConfigBool("asm.lines"));
     qhelpers::setCheckedWithoutSignals(ui->fcnlinesCheckBox, Config()->getConfigBool("asm.lines.fcn"));
     qhelpers::setCheckedWithoutSignals(ui->flgoffCheckBox, Config()->getConfigBool("asm.flags.offset"));
     qhelpers::setCheckedWithoutSignals(ui->emuCheckBox, Config()->getConfigBool("asm.emu"));
+    qhelpers::setCheckedWithoutSignals(ui->emuStrCheckBox, Config()->getConfigBool("emu.str"));
     qhelpers::setCheckedWithoutSignals(ui->varsumCheckBox, Config()->getConfigBool("asm.var.summary"));
     qhelpers::setCheckedWithoutSignals(ui->sizeCheckBox, Config()->getConfigBool("asm.size"));
 
@@ -91,11 +94,12 @@ void AsmOptionsWidget::updateAsmOptionsFromVars()
     ui->asmTabsOffSpinBox->setValue(Config()->getConfigInt("asm.tabs.off"));
     ui->asmTabsOffSpinBox->blockSignals(false);
 
-    qhelpers::setCheckedWithoutSignals(ui->bblineCheckBox, Config()->getConfigBool("asm.bbline"));
+    qhelpers::setCheckedWithoutSignals(ui->bblineCheckBox, Config()->getConfigBool("asm.bb.line"));
 
-    bool varsubEnabled = Config()->getConfigBool("asm.varsub");
+    bool varsubEnabled = Config()->getConfigBool("asm.var.sub");
     qhelpers::setCheckedWithoutSignals(ui->varsubCheckBox, varsubEnabled);
-    qhelpers::setCheckedWithoutSignals(ui->varsubOnlyCheckBox, Config()->getConfigBool("asm.varsub_only"));
+    qhelpers::setCheckedWithoutSignals(ui->varsubOnlyCheckBox,
+                                       Config()->getConfigBool("asm.var.subonly"));
     ui->varsubOnlyCheckBox->setEnabled(varsubEnabled);
 }
 
@@ -132,15 +136,21 @@ void AsmOptionsWidget::on_offsetCheckBox_toggled(bool checked)
     triggerAsmOptionsChanged();
 }
 
-void AsmOptionsWidget::on_describeCheckBox_toggled(bool checked)
+void AsmOptionsWidget::on_xrefCheckBox_toggled(bool checked)
 {
-    Config()->setConfig("asm.describe", checked);
+    Config()->setConfig("asm.xrefs", checked);
     triggerAsmOptionsChanged();
 }
 
-void AsmOptionsWidget::on_stackpointerCheckBox_toggled(bool checked)
+void AsmOptionsWidget::on_indentCheckBox_toggled(bool checked)
 {
-    Config()->setConfig("asm.stackptr", checked);
+    Config()->setConfig("asm.indent", checked);
+    triggerAsmOptionsChanged();
+}
+
+void AsmOptionsWidget::on_describeCheckBox_toggled(bool checked)
+{
+    Config()->setConfig("asm.describe", checked);
     triggerAsmOptionsChanged();
 }
 
@@ -171,6 +181,12 @@ void AsmOptionsWidget::on_flgoffCheckBox_toggled(bool checked)
 void AsmOptionsWidget::on_emuCheckBox_toggled(bool checked)
 {
     Config()->setConfig("asm.emu", checked);
+    triggerAsmOptionsChanged();
+}
+
+void AsmOptionsWidget::on_emuStrCheckBox_toggled(bool checked)
+{
+    Config()->setConfig("emu.str", checked);
     triggerAsmOptionsChanged();
 }
 
@@ -230,7 +246,7 @@ void AsmOptionsWidget::on_nbytesSpinBox_valueChanged(int value)
 void AsmOptionsWidget::on_syntaxComboBox_currentIndexChanged(int index)
 {
     Config()->setConfig("asm.syntax",
-                      ui->syntaxComboBox->itemData(index).toString().toUtf8().constData());
+                        ui->syntaxComboBox->itemData(index).toString().toUtf8().constData());
     triggerAsmOptionsChanged();
 }
 
@@ -279,7 +295,7 @@ void AsmOptionsWidget::on_asmTabsOffSpinBox_valueChanged(int value)
 
 void AsmOptionsWidget::on_bblineCheckBox_toggled(bool checked)
 {
-    Config()->setConfig("asm.bbline", checked);
+    Config()->setConfig("asm.bb.line", checked);
     triggerAsmOptionsChanged();
 }
 

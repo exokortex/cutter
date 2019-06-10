@@ -1,8 +1,8 @@
 #include "BreakpointWidget.h"
 #include "ui_BreakpointWidget.h"
 #include "dialogs/BreakpointsDialog.h"
-#include "MainWindow.h"
-#include "utils/Helpers.h"
+#include "core/MainWindow.h"
+#include "common/Helpers.h"
 #include <QMenu>
 
 BreakpointModel::BreakpointModel(QList<BreakpointDescription> *breakpoints, QObject *parent)
@@ -74,16 +74,6 @@ QVariant BreakpointModel::headerData(int section, Qt::Orientation, int role) con
     }
 }
 
-void BreakpointModel::beginReloadBreakpoint()
-{
-    beginResetModel();
-}
-
-void BreakpointModel::endReloadBreakpoint()
-{
-    endResetModel();
-}
-
 BreakpointProxyModel::BreakpointProxyModel(BreakpointModel *sourceModel, QObject *parent)
     : QSortFilterProxyModel(parent)
 {
@@ -93,14 +83,17 @@ BreakpointProxyModel::BreakpointProxyModel(BreakpointModel *sourceModel, QObject
 bool BreakpointProxyModel::filterAcceptsRow(int row, const QModelIndex &parent) const
 {
     QModelIndex index = sourceModel()->index(row, 0, parent);
-    BreakpointDescription item = index.data(BreakpointModel::BreakpointDescriptionRole).value<BreakpointDescription>();
+    BreakpointDescription item = index.data(
+                                     BreakpointModel::BreakpointDescriptionRole).value<BreakpointDescription>();
     return item.permission.contains(filterRegExp());
 }
 
 bool BreakpointProxyModel::lessThan(const QModelIndex &left, const QModelIndex &right) const
 {
-    BreakpointDescription leftBreakpt = left.data(BreakpointModel::BreakpointDescriptionRole).value<BreakpointDescription>();
-    BreakpointDescription rightBreakpt = right.data(BreakpointModel::BreakpointDescriptionRole).value<BreakpointDescription>();
+    BreakpointDescription leftBreakpt = left.data(
+                                            BreakpointModel::BreakpointDescriptionRole).value<BreakpointDescription>();
+    BreakpointDescription rightBreakpt = right.data(
+                                             BreakpointModel::BreakpointDescriptionRole).value<BreakpointDescription>();
 
     switch (left.column()) {
     case BreakpointModel::AddrColumn:
@@ -129,9 +122,13 @@ BreakpointWidget::BreakpointWidget(MainWindow *main, QAction *action) :
     ui->breakpointTreeView->setModel(breakpointProxyModel);
     ui->breakpointTreeView->sortByColumn(BreakpointModel::AddrColumn, Qt::AscendingOrder);
 
+    refreshDeferrer = createRefreshDeferrer([this]() {
+        refreshBreakpoint();
+    });
+
     setScrollMode();
-    actionDelBreakpoint = new QAction(tr("Delete breakpoint"));
-    actionToggleBreakpoint = new QAction(tr("Toggle breakpoint"));
+    actionDelBreakpoint = new QAction(tr("Delete breakpoint"), this);
+    actionToggleBreakpoint = new QAction(tr("Toggle breakpoint"), this);
     connect(actionDelBreakpoint, &QAction::triggered, this, &BreakpointWidget::delBreakpoint);
     connect(actionToggleBreakpoint, &QAction::triggered, this, &BreakpointWidget::toggleBreakpoint);
     connect(Core(), &CutterCore::refreshAll, this, &BreakpointWidget::refreshBreakpoint);
@@ -142,16 +139,20 @@ BreakpointWidget::BreakpointWidget(MainWindow *main, QAction *action) :
     connect(ui->delAllBreakpoints, &QAbstractButton::clicked, Core(), &CutterCore::delAllBreakpoints);
     ui->breakpointTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->breakpointTreeView, SIGNAL(customContextMenuRequested(const QPoint &)),
-        this, SLOT(showBreakpointContextMenu(const QPoint &)));
+            this, SLOT(showBreakpointContextMenu(const QPoint &)));
 }
 
-BreakpointWidget::~BreakpointWidget() {}
+BreakpointWidget::~BreakpointWidget() = default;
 
 void BreakpointWidget::refreshBreakpoint()
 {
-    breakpointModel->beginReloadBreakpoint();
+    if (!refreshDeferrer->attemptRefresh(nullptr)) {
+        return;
+    }
+
+    breakpointModel->beginResetModel();
     breakpoints = Core()->getBreakpoints();
-    breakpointModel->endReloadBreakpoint();
+    breakpointModel->endResetModel();
 
     ui->breakpointTreeView->resizeColumnToContents(0);
     ui->breakpointTreeView->resizeColumnToContents(1);
@@ -165,7 +166,8 @@ void BreakpointWidget::setScrollMode()
 
 void BreakpointWidget::on_breakpointTreeView_doubleClicked(const QModelIndex &index)
 {
-    BreakpointDescription item = index.data(BreakpointModel::BreakpointDescriptionRole).value<BreakpointDescription>();
+    BreakpointDescription item = index.data(
+                                     BreakpointModel::BreakpointDescriptionRole).value<BreakpointDescription>();
     Core()->seek(item.addr);
 }
 
@@ -184,13 +186,13 @@ void BreakpointWidget::showBreakpointContextMenu(const QPoint &pt)
 
 void BreakpointWidget::addBreakpointDialog()
 {
-    BreakpointsDialog *dialog = new BreakpointsDialog(this);
+    BreakpointsDialog dialog(this);
 
-    if (dialog->exec()) {
-        QString bps = dialog->getBreakpoints();
+    if (dialog.exec()) {
+        QString bps = dialog.getBreakpoints();
         if (!bps.isEmpty()) {
-            QStringList bpList = bps.split(" ", QString::SkipEmptyParts);
-            for ( QString bp : bpList) {
+            QStringList bpList = bps.split(QLatin1Char(' '), QString::SkipEmptyParts);
+            for (const QString &bp : bpList) {
                 Core()->toggleBreakpoint(bp);
             }
         }
@@ -200,14 +202,14 @@ void BreakpointWidget::addBreakpointDialog()
 void BreakpointWidget::delBreakpoint()
 {
     BreakpointDescription bp = ui->breakpointTreeView->selectionModel()->currentIndex().data(
-                    BreakpointModel::BreakpointDescriptionRole).value<BreakpointDescription>();
+                                   BreakpointModel::BreakpointDescriptionRole).value<BreakpointDescription>();
     Core()->delBreakpoint(bp.addr);
 }
 
 void BreakpointWidget::toggleBreakpoint()
 {
     BreakpointDescription bp = ui->breakpointTreeView->selectionModel()->currentIndex().data(
-                    BreakpointModel::BreakpointDescriptionRole).value<BreakpointDescription>();
+                                   BreakpointModel::BreakpointDescriptionRole).value<BreakpointDescription>();
     if (bp.enabled) {
         Core()->disableBreakpoint(bp.addr);
     } else {

@@ -1,19 +1,23 @@
-
-#include "utils/AsyncTask.h"
-
+#include "common/AsyncTask.h"
 #include "InitialOptionsDialog.h"
 #include "ui_InitialOptionsDialog.h"
-#include "MainWindow.h"
+
+#include "core/MainWindow.h"
 #include "dialogs/NewFileDialog.h"
 #include "dialogs/AsyncTaskDialog.h"
-#include "utils/Helpers.h"
+#include "common/Helpers.h"
 
 #include <QSettings>
 #include <QFileInfo>
 #include <QFileDialog>
+#include <QCloseEvent>
+
+#include "core/Cutter.h"
+#include "common/AnalTask.h"
+
 
 InitialOptionsDialog::InitialOptionsDialog(MainWindow *main):
-    QDialog(0), // parent must not be main
+    QDialog(nullptr), // parent must not be main
     ui(new Ui::InitialOptionsDialog),
     main(main),
     core(Core())
@@ -24,8 +28,9 @@ InitialOptionsDialog::InitialOptionsDialog(MainWindow *main):
 
     // Fill the plugins combo
     asm_plugins = core->getAsmPluginNames();
-    for (auto plugin : asm_plugins)
+    for (const auto &plugin : asm_plugins) {
         ui->archComboBox->addItem(plugin, plugin);
+    }
     ui->archComboBox->setToolTip(core->cmd("e? asm.arch").trimmed());
 
     // cpu combo box
@@ -34,16 +39,16 @@ InitialOptionsDialog::InitialOptionsDialog(MainWindow *main):
     updateCPUComboBox();
 
     // os combo box
-    for (const auto &plugin : core->cmdList("e asm.os=?"))
+    for (const auto &plugin : core->cmdList("e asm.os=?")) {
         ui->kernelComboBox->addItem(plugin, plugin);
+    }
     ui->kernelComboBox->setToolTip(core->cmd("e? asm.os").trimmed());
 
     ui->bitsComboBox->setToolTip(core->cmd("e? asm.bits").trimmed());
 
-    ui->entry_analbb->setToolTip(core->cmd("e? anal.bb.maxsize").trimmed());
-
-    for (auto plugin : core->getRBinPluginDescriptions("bin"))
+    for (const auto &plugin : core->getRBinPluginDescriptions("bin")) {
         ui->formatComboBox->addItem(plugin.name, QVariant::fromValue(plugin));
+    }
 
     ui->hideFrame->setVisible(false);
     ui->analoptionsFrame->setVisible(false);
@@ -71,8 +76,9 @@ void InitialOptionsDialog::updateCPUComboBox()
     QString cmd = "e asm.cpu=?";
 
     QString arch = getSelectedArch();
-    if (!arch.isNull())
+    if (!arch.isNull()) {
         cmd += " @a:" + arch;
+    }
 
     ui->cpuComboBox->addItem("");
     ui->cpuComboBox->addItems(core->cmdList(cmd));
@@ -122,21 +128,22 @@ void InitialOptionsDialog::loadOptions(const InitialOptions &options)
     // TODO: all other options should also be applied to the ui
 }
 
-QString InitialOptionsDialog::getSelectedArch()
+QString InitialOptionsDialog::getSelectedArch() const
 {
     QVariant archValue = ui->archComboBox->currentData();
     return archValue.isValid() ? archValue.toString() : nullptr;
 }
 
-QString InitialOptionsDialog::getSelectedCPU()
+QString InitialOptionsDialog::getSelectedCPU() const
 {
     QString cpu = ui->cpuComboBox->currentText();
-    if (cpu.isNull() || cpu.isEmpty())
+    if (cpu.isNull() || cpu.isEmpty()) {
         return nullptr;
+    }
     return cpu;
 }
 
-int InitialOptionsDialog::getSelectedBits()
+int InitialOptionsDialog::getSelectedBits() const
 {
     QString sel_bits = ui->bitsComboBox->currentText();
     if (sel_bits != "Auto") {
@@ -146,17 +153,7 @@ int InitialOptionsDialog::getSelectedBits()
     return 0;
 }
 
-int InitialOptionsDialog::getSelectedBBSize()
-{
-    QString sel_bbsize = ui->entry_analbb->text();
-    bool ok;
-    int bbsize = sel_bbsize.toInt(&ok);
-    if (ok)
-        return bbsize;
-    return 1024;
-}
-
-InitialOptions::Endianness InitialOptionsDialog::getSelectedEndianness()
+InitialOptions::Endianness InitialOptionsDialog::getSelectedEndianness() const
 {
     switch (ui->endiannessComboBox->currentIndex()) {
     case 1:
@@ -168,16 +165,26 @@ InitialOptions::Endianness InitialOptionsDialog::getSelectedEndianness()
     }
 }
 
-QString InitialOptionsDialog::getSelectedOS()
+QString InitialOptionsDialog::getSelectedOS() const
 {
     QVariant os = ui->kernelComboBox->currentData();
     return os.isValid() ? os.toString() : nullptr;
 }
 
-QList<QString> InitialOptionsDialog::getSelectedAdvancedAnalCmds()
+QList<QString> InitialOptionsDialog::getSelectedAdvancedAnalCmds() const
 {
     QList<QString> advanced = QList<QString>();
     if (ui->analSlider->value() == 3) {
+        // Enable analysis configurations before executing analysis commands
+        if (ui->jmptbl->isChecked()) {
+            advanced << "e! anal.jmptbl";
+        }
+        if (ui->pushret->isChecked()) {
+            advanced << "e! anal.pushret";
+        }
+        if (ui->hasnext->isChecked()) {
+            advanced << "e! anal.hasnext";
+        }
         if (ui->aa_symbols->isChecked()) {
             advanced << "aa";
         }
@@ -189,6 +196,12 @@ QList<QString> InitialOptionsDialog::getSelectedAdvancedAnalCmds()
         }
         if (ui->aab_basicblocks->isChecked()) {
             advanced << "aab";
+        }
+        if (ui->aao_objc->isChecked()) {
+            advanced << "aao";
+        }
+        if (ui->avrr_vtables->isChecked()) {
+            advanced << "avrr";
         }
         if (ui->aan_rename->isChecked()) {
             advanced << "aan";
@@ -208,15 +221,6 @@ QList<QString> InitialOptionsDialog::getSelectedAdvancedAnalCmds()
         if (ui->aap_preludes->isChecked()) {
             advanced << "aap";
         }
-        if (ui->jmptbl->isChecked()) {
-            advanced << "e! anal.jmptbl";
-        }
-        if (ui->pushret->isChecked()) {
-            advanced << "e! anal.pushret";
-        }
-        if (ui->hasnext->isChecked()) {
-            advanced << "e! anal.hasnext";
-        }
     }
     return advanced;
 }
@@ -228,6 +232,9 @@ void InitialOptionsDialog::setupAndStartAnalysis(/*int level, QList<QString> adv
     InitialOptions options;
 
     options.filename = main->getFilename();
+    if (!options.filename.isEmpty()) {
+        main->setWindowTitle("Cutter – " + options.filename);
+    }
     options.shellcode = this->shellcode;
 
     // Where the bin header is located in the file (-B)
@@ -235,7 +242,8 @@ void InitialOptionsDialog::setupAndStartAnalysis(/*int level, QList<QString> adv
         options.binLoadAddr = Core()->math(ui->entry_loadOffset->text());
     }
 
-    options.mapAddr = Core()->math(ui->entry_mapOffset->text());      // Where to map the file once loaded (-m)
+    options.mapAddr = Core()->math(
+                          ui->entry_mapOffset->text());      // Where to map the file once loaded (-m)
     options.arch = getSelectedArch();
     options.cpu = getSelectedCPU();
     options.bits = getSelectedBits();
@@ -254,23 +262,24 @@ void InitialOptionsDialog::setupAndStartAnalysis(/*int level, QList<QString> adv
     if (ui->scriptCheckBox->isChecked()) {
         options.script = ui->scriptLineEdit->text();
     }
+
+
     options.endian = getSelectedEndianness();
-    options.bbsize = getSelectedBBSize();
 
     int level = ui->analSlider->value();
-    switch(level) {
-        case 1:
-            options.analCmd = { "aaa" };
-            break;
-        case 2:
-            options.analCmd = { "aaaa" };
-            break;
-        case 3:
-            options.analCmd = getSelectedAdvancedAnalCmds();
-            break;
-        default:
-            options.analCmd = {};
-            break;
+    switch (level) {
+    case 1:
+        options.analCmd = { "aaa" };
+        break;
+    case 2:
+        options.analCmd = { "aaaa" };
+        break;
+    case 3:
+        options.analCmd = getSelectedAdvancedAnalCmds();
+        break;
+    default:
+        options.analCmd = {};
+        break;
     }
 
 
@@ -382,7 +391,7 @@ void InitialOptionsDialog::on_pdbSelectButton_clicked()
         return;
     }
 
-    QString fileName = dialog.selectedFiles().first();
+    const QString &fileName = QDir::toNativeSeparators(dialog.selectedFiles().first());
 
     if (!fileName.isEmpty()) {
         ui->pdbLineEdit->setText(fileName);
@@ -405,7 +414,7 @@ void InitialOptionsDialog::on_scriptSelectButton_clicked()
         return;
     }
 
-    QString fileName = dialog.selectedFiles().first();
+    const QString &fileName = QDir::toNativeSeparators(dialog.selectedFiles().first());
 
     if (!fileName.isEmpty()) {
         ui->scriptLineEdit->setText(fileName);
@@ -416,6 +425,5 @@ void InitialOptionsDialog::on_scriptSelectButton_clicked()
 void InitialOptionsDialog::reject()
 {
     done(0);
-    NewFileDialog *n = new NewFileDialog(nullptr);
-    n->show();
+    main->displayNewFileDialog();
 }

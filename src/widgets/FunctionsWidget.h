@@ -4,14 +4,16 @@
 #include <memory>
 
 #include <QSortFilterProxyModel>
-#include <QTreeView>
 
-#include "Cutter.h"
+#include "core/Cutter.h"
 #include "CutterDockWidget.h"
+#include "CutterTreeWidget.h"
+#include "CutterTreeView.h"
 
 class MainWindow;
 class QTreeWidgetItem;
 class FunctionsTask;
+class FunctionsWidget;
 
 namespace Ui {
 class FunctionsWidget;
@@ -21,6 +23,8 @@ class FunctionsWidget;
 class FunctionModel : public QAbstractItemModel
 {
     Q_OBJECT
+
+    friend FunctionsWidget;
 
 private:
     QList<FunctionDescription> *functions;
@@ -42,8 +46,9 @@ public:
     static const int FunctionDescriptionRole = Qt::UserRole;
     static const int IsImportRole = Qt::UserRole + 1;
 
-    enum Column { NameColumn = 0, SizeColumn, ImportColumn, OffsetColumn, NargsColumn, NbbsColumn,
-                  NlocalsColumn, CcColumn, CalltypeColumn, ColumnCount };
+    enum Column { NameColumn = 0, SizeColumn, ImportColumn, OffsetColumn, NargsColumn, NlocalsColumn,
+                  NbbsColumn, CalltypeColumn, EdgesColumn, FrameColumn, ColumnCount
+                };
 
     FunctionModel(QList<FunctionDescription> *functions, QSet<RVA> *importAddresses, ut64 *mainAdress,
                   bool nested, QFont defaultFont, QFont highlightFont, QObject *parent = nullptr);
@@ -57,10 +62,7 @@ public:
     QVariant data(const QModelIndex &index, int role) const;
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
 
-    void beginReloadFunctions();
-    void endReloadFunctions();
-
-    /*!
+    /**
      * @return true if the index changed
      */
     bool updateCurrentIndex();
@@ -98,21 +100,19 @@ class FunctionsWidget : public CutterDockWidget
 public:
     explicit FunctionsWidget(MainWindow *main, QAction *action = nullptr);
     ~FunctionsWidget();
+    void changeSizePolicy(QSizePolicy::Policy hor, QSizePolicy::Policy ver);
 
 private slots:
     void onFunctionsDoubleClicked(const QModelIndex &index);
     void showFunctionsContextMenu(const QPoint &pt);
-
     void on_actionDisasAdd_comment_triggered();
     void on_actionFunctionsRename_triggered();
     void on_action_References_triggered();
     void on_actionFunctionsUndefine_triggered();
-
     void on_actionHorizontal_triggered();
     void on_actionVertical_triggered();
-
     void showTitleContextMenu(const QPoint &pt);
-
+    void setTooltipStylesheet();
     void refreshTree();
 
 protected:
@@ -120,22 +120,15 @@ protected:
 
 private:
     std::unique_ptr<Ui::FunctionsWidget> ui;
-    MainWindow      *main;
-
+    MainWindow *main;
     QSharedPointer<FunctionsTask> task;
-
     QList<FunctionDescription> functions;
     QSet<RVA> importAddresses;
     ut64 mainAdress;
-
     FunctionModel *functionModel;
     FunctionSortFilterProxyModel *functionProxyModel;
-
+    CutterTreeWidget *tree;
     void setScrollMode();
 };
-
-
-
-
 
 #endif // FUNCTIONSWIDGET_H

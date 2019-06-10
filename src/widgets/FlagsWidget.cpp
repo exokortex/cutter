@@ -1,12 +1,14 @@
-#include <QTreeWidget>
-#include <QComboBox>
-#include <QMenu>
-
 #include "FlagsWidget.h"
 #include "ui_FlagsWidget.h"
-#include "MainWindow.h"
+#include "core/MainWindow.h"
 #include "dialogs/RenameDialog.h"
-#include "utils/Helpers.h"
+#include "dialogs/XrefsDialog.h"
+#include "common/Helpers.h"
+
+#include <QComboBox>
+#include <QMenu>
+#include <QShortcut>
+#include <QTreeWidget>
 
 FlagsModel::FlagsModel(QList<FlagDescription> *flags, QObject *parent)
     : QAbstractListModel(parent),
@@ -69,16 +71,6 @@ QVariant FlagsModel::headerData(int section, Qt::Orientation, int role) const
     }
 }
 
-void FlagsModel::beginReloadFlags()
-{
-    beginResetModel();
-}
-
-void FlagsModel::endReloadFlags()
-{
-    endResetModel();
-}
-
 
 
 
@@ -124,9 +116,13 @@ bool FlagsSortFilterProxyModel::lessThan(const QModelIndex &left, const QModelIn
 FlagsWidget::FlagsWidget(MainWindow *main, QAction *action) :
     CutterDockWidget(main, action),
     ui(new Ui::FlagsWidget),
-    main(main)
+    main(main),
+    tree(new CutterTreeWidget(this))
 {
     ui->setupUi(this);
+
+    // Add Status Bar footer
+    tree->addStatusBar(ui->verticalLayout);
 
     flags_model = new FlagsModel(&flags, this);
     flags_proxy_model = new FlagsSortFilterProxyModel(flags_model, this);
@@ -135,6 +131,31 @@ FlagsWidget::FlagsWidget(MainWindow *main, QAction *action) :
     ui->flagsTreeView->setModel(flags_proxy_model);
     ui->flagsTreeView->sortByColumn(FlagsModel::OFFSET, Qt::AscendingOrder);
 
+    // Ctrl-F to move the focus to the Filter search box
+    QShortcut *searchShortcut = new QShortcut(QKeySequence::Find, this);
+    connect(searchShortcut, SIGNAL(activated()), ui->filterLineEdit, SLOT(setFocus()));
+    searchShortcut->setContext(Qt::WidgetWithChildrenShortcut);
+
+    // Esc to clear the filter entry
+    QShortcut *clearShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
+    connect(clearShortcut, &QShortcut::activated, [this] {
+        if (ui->filterLineEdit->text().isEmpty()) {
+            ui->flagsTreeView->setFocus();
+        } else {
+            ui->filterLineEdit->setText("");
+        }
+    });
+    clearShortcut->setContext(Qt::WidgetWithChildrenShortcut);
+
+    connect(ui->filterLineEdit, &QLineEdit::textChanged, this, [this] {
+        tree->showItemsNumber(flags_proxy_model->rowCount());
+    });
+
+    auto xRefShortcut = new QShortcut(QKeySequence{Qt::CTRL + Qt::Key_X}, this);
+    xRefShortcut->setContext(Qt::WidgetWithChildrenShortcut);
+    ui->actionXrefs->setShortcut(Qt::CTRL + Qt::Key_X);
+    connect(xRefShortcut, SIGNAL(activated()), this, SLOT(on_actionXrefs_triggered()));
+    
     setScrollMode();
 
     ui->flagsTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -168,10 +189,10 @@ void FlagsWidget::on_actionRename_triggered()
     FlagDescription flag = ui->flagsTreeView->selectionModel()->currentIndex().data(
                                FlagsModel::FlagDescriptionRole).value<FlagDescription>();
 
-    RenameDialog *r = new RenameDialog(this);
-    r->setName(flag.name);
-    if (r->exec()) {
-        QString new_name = r->getName();
+    RenameDialog r(this);
+    r.setName(flag.name);
+    if (r.exec()) {
+        QString new_name = r.getName();
         Core()->renameFlag(flag.name, new_name);
     }
 }
@@ -183,11 +204,23 @@ void FlagsWidget::on_actionDelete_triggered()
     Core()->delFlag(flag.name);
 }
 
+void FlagsWidget::on_actionXrefs_triggered()
+{
+    FlagDescription flag = ui->flagsTreeView->selectionModel()->currentIndex().data(
+                               FlagsModel::FlagDescriptionRole).value<FlagDescription>();
+
+    XrefsDialog xresfDialog(nullptr);
+    xresfDialog.fillRefsForAddress(flag.offset, RAddressString(flag.offset), false);
+    xresfDialog.exec();
+}
+
 void FlagsWidget::showContextMenu(const QPoint &pt)
 {
     QMenu *menu = new QMenu(ui->flagsTreeView);
     menu->addAction(ui->actionRename);
     menu->addAction(ui->actionDelete);
+    menu->addSeparator();
+    menu->addAction(ui->actionXrefs);
     menu->exec(ui->flagsTreeView->mapToGlobal(pt));
     delete menu;
 }
@@ -207,7 +240,7 @@ void FlagsWidget::refreshFlagspaces()
     ui->flagspaceCombo->clear();
     ui->flagspaceCombo->addItem(tr("(all)"));
 
-    for (auto i : Core()->getAllFlagspaces()) {
+    for (const FlagspaceDescription &i : Core()->getAllFlagspaces()) {
         ui->flagspaceCombo->addItem(i.name, QVariant::fromValue(i));
     }
 
@@ -226,16 +259,17 @@ void FlagsWidget::refreshFlags()
         flagspace = flagspace_data.value<FlagspaceDescription>().name;
 
 
-    flags_model->beginReloadFlags();
+    flags_model->beginResetModel();
     flags = Core()->getAllFlags(flagspace);
-    flags_model->endReloadFlags();
+    flags_model->endResetModel();
 
     qhelpers::adjustColumns(ui->flagsTreeView, 2, 0);
 
-
+    tree->showItemsNumber(flags_proxy_model->rowCount());
+    
     // TODO: this is not a very good place for the following:
     QStringList flagNames;
-    for (auto i : flags)
+    for (const FlagDescription &i : flags)
         flagNames.append(i.name);
     main->refreshOmniBar(flagNames);
 }

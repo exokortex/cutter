@@ -1,9 +1,11 @@
 #include "RegisterRefsWidget.h"
 #include "ui_RegisterRefsWidget.h"
-#include "MainWindow.h"
-#include "utils/Helpers.h"
+#include "core/MainWindow.h"
+#include "common/Helpers.h"
+
 #include <QMenu>
 #include <QClipboard>
+#include <QShortcut>
 
 RegisterRefModel::RegisterRefModel(QList<RegisterRefDescription> *registerRefs, QObject *parent)
     : QAbstractListModel(parent),
@@ -66,16 +68,6 @@ QVariant RegisterRefModel::headerData(int section, Qt::Orientation, int role) co
     }
 }
 
-void RegisterRefModel::beginReloadRegisterRef()
-{
-    beginResetModel();
-}
-
-void RegisterRefModel::endReloadRegisterRef()
-{
-    endResetModel();
-}
-
 RegisterRefProxyModel::RegisterRefProxyModel(RegisterRefModel *sourceModel, QObject *parent)
     : QSortFilterProxyModel(parent)
 {
@@ -113,17 +105,25 @@ bool RegisterRefProxyModel::lessThan(const QModelIndex &left, const QModelIndex 
 
 RegisterRefsWidget::RegisterRefsWidget(MainWindow *main, QAction *action) :
     CutterDockWidget(main, action),
-    ui(new Ui::RegisterRefsWidget)
+    ui(new Ui::RegisterRefsWidget),
+    tree(new CutterTreeWidget(this))
 {
     ui->setupUi(this);
+
+    // Add Status Bar footer
+    tree->addStatusBar(ui->verticalLayout);
 
     registerRefModel = new RegisterRefModel(&registerRefs, this);
     registerRefProxyModel = new RegisterRefProxyModel(registerRefModel, this);
     ui->registerRefTreeView->setModel(registerRefProxyModel);
     ui->registerRefTreeView->sortByColumn(RegisterRefModel::RegColumn, Qt::AscendingOrder);
 
-    actionCopyValue = new QAction(tr("Copy register value"));
-    actionCopyRef = new QAction(tr("Copy register reference"));
+    actionCopyValue = new QAction(tr("Copy register value"), this);
+    actionCopyRef = new QAction(tr("Copy register reference"), this);
+
+    refreshDeferrer = createRefreshDeferrer([this](){
+        refreshRegisterRef();
+    });
 
     // Ctrl-F to show/hide the filter entry
     QShortcut *search_shortcut = new QShortcut(QKeySequence::Find, this);
@@ -136,28 +136,38 @@ RegisterRefsWidget::RegisterRefsWidget(MainWindow *main, QAction *action) :
     setScrollMode();
     connect(Core(), &CutterCore::refreshAll, this, &RegisterRefsWidget::refreshRegisterRef);
     connect(Core(), &CutterCore::registersChanged, this, &RegisterRefsWidget::refreshRegisterRef);
-    connect(actionCopyValue, &QAction::triggered, [=] () {
+    connect(actionCopyValue, &QAction::triggered, [ = ] () {
         copyClip(RegisterRefModel::ValueColumn);
     });
-    connect(actionCopyRef, &QAction::triggered, [=] () {
+    connect(actionCopyRef, &QAction::triggered, [ = ] () {
         copyClip(RegisterRefModel::RefColumn);
     });
     ui->registerRefTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->registerRefTreeView, SIGNAL(customContextMenuRequested(const QPoint &)),
-        this, SLOT(showRegRefContextMenu(const QPoint &)));
+            this, SLOT(showRegRefContextMenu(const QPoint &)));
+
+    connect(ui->quickFilterView, &QuickFilterView::filterTextChanged, this, [this] {
+        tree->showItemsNumber(registerRefProxyModel->rowCount());
+    });
 }
 
-RegisterRefsWidget::~RegisterRefsWidget() {}
+RegisterRefsWidget::~RegisterRefsWidget() = default;
 
 void RegisterRefsWidget::refreshRegisterRef()
 {
-    registerRefModel->beginReloadRegisterRef();
+    if (!refreshDeferrer->attemptRefresh(nullptr)) {
+        return;
+    }
+
+    registerRefModel->beginResetModel();
     registerRefs = Core()->getRegisterRefs();
-    registerRefModel->endReloadRegisterRef();
+    registerRefModel->endResetModel();
 
     ui->registerRefTreeView->resizeColumnToContents(0);
     ui->registerRefTreeView->resizeColumnToContents(1);
     ui->registerRefTreeView->resizeColumnToContents(2);
+
+    tree->showItemsNumber(registerRefProxyModel->rowCount());
 }
 
 void RegisterRefsWidget::setScrollMode()
@@ -186,7 +196,8 @@ void RegisterRefsWidget::showRegRefContextMenu(const QPoint &pt)
 void RegisterRefsWidget::copyClip(int column)
 {
     int row = ui->registerRefTreeView->selectionModel()->currentIndex().row();
-    QString value = ui->registerRefTreeView->selectionModel()->currentIndex().sibling(row, column).data().toString();
+    QString value = ui->registerRefTreeView->selectionModel()->currentIndex().sibling(row,
+                                                                                      column).data().toString();
     QClipboard *clipboard = QApplication::clipboard();
     clipboard->setText(value);
 }

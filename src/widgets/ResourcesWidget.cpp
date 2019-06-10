@@ -1,6 +1,6 @@
-#include "utils/Helpers.h"
+#include "common/Helpers.h"
 #include "ResourcesWidget.h"
-#include "MainWindow.h"
+#include "core/MainWindow.h"
 #include <QVBoxLayout>
 
 ResourcesModel::ResourcesModel(QList<ResourcesDescription> *resources, QObject *parent)
@@ -73,16 +73,6 @@ QVariant ResourcesModel::headerData(int section, Qt::Orientation, int role) cons
     }
 }
 
-void ResourcesModel::beginReload()
-{
-    beginResetModel();
-}
-
-void ResourcesModel::endReload()
-{
-    endResetModel();
-}
-
 ResourcesWidget::ResourcesWidget(MainWindow *main, QAction *action) :
     CutterDockWidget(main, action)
 {
@@ -94,7 +84,7 @@ ResourcesWidget::ResourcesWidget(MainWindow *main, QAction *action) :
     this->setWindowTitle(tr("Resources"));
 
     // Add resources tree view
-    view = new QTreeView(this);
+    view = new CutterTreeView(this);
     view->setModel(model);
     view->show();
     this->setWidget(view);
@@ -106,9 +96,9 @@ ResourcesWidget::ResourcesWidget(MainWindow *main, QAction *action) :
 
 void ResourcesWidget::refreshResources()
 {
-    model->beginReload();
+    model->beginResetModel();
     resources = Core()->getAllResources();
-    model->endReload();
+    model->endResetModel();
 }
 
 void ResourcesWidget::onDoubleClicked(const QModelIndex &index)

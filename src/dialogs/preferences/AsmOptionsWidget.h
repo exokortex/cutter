@@ -6,7 +6,7 @@
 #include <QPushButton>
 #include <memory>
 
-#include "Cutter.h"
+#include "core/Cutter.h"
 
 class PreferencesDialog;
 
@@ -19,7 +19,7 @@ class AsmOptionsWidget : public QDialog
     Q_OBJECT
 
 public:
-    explicit AsmOptionsWidget(PreferencesDialog *dialog, QWidget *parent = nullptr);
+    explicit AsmOptionsWidget(PreferencesDialog *dialog);
     ~AsmOptionsWidget();
 
 private:
@@ -35,13 +35,15 @@ private slots:
     void on_esilCheckBox_toggled(bool checked);
     void on_pseudoCheckBox_toggled(bool checked);
     void on_offsetCheckBox_toggled(bool checked);
+    void on_xrefCheckBox_toggled(bool checked);
+    void on_indentCheckBox_toggled(bool checked);
     void on_describeCheckBox_toggled(bool checked);
-    void on_stackpointerCheckBox_toggled(bool checked);
     void on_slowCheckBox_toggled(bool checked);
     void on_linesCheckBox_toggled(bool checked);
     void on_fcnlinesCheckBox_toggled(bool checked);
     void on_flgoffCheckBox_toggled(bool checked);
     void on_emuCheckBox_toggled(bool checked);
+    void on_emuStrCheckBox_toggled(bool checked);
     void on_cmtrightCheckBox_toggled(bool checked);
     void on_cmtcolSpinBox_valueChanged(int value);
     void on_varsumCheckBox_toggled(bool checked);
