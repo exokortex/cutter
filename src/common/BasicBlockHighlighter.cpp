@@ -16,7 +16,7 @@ BasicBlockHighlighter::~BasicBlockHighlighter()
  */
 void BasicBlockHighlighter::highlight(RVA address, const QColor &color)
 {
-    BasicBlock *block = new BasicBlock;
+    CuBasicBlock *block = new CuBasicBlock;
     block->address = address;
     block->color = color;
     bbMap[address] = block;
@@ -35,7 +35,7 @@ void BasicBlockHighlighter::clear(RVA address)
  *
  * If there is nothing to highlight at specified address, returns nullptr
  */
-BasicBlock *BasicBlockHighlighter::getBasicBlock(RVA address)
+CuBasicBlock *BasicBlockHighlighter::getBasicBlock(RVA address)
 {
     BasicBlockIt it;
 

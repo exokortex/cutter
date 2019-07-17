@@ -6,12 +6,12 @@ class BasicBlockHighlighter;
 #include "Cutter.h"
 #include <map>
 
-struct BasicBlock {
+struct CuBasicBlock {
     RVA address;
     QColor color;
 };
 
-typedef std::map<RVA, BasicBlock*>::iterator BasicBlockIt;
+typedef std::map<RVA, CuBasicBlock*>::iterator BasicBlockIt;
 
 class BasicBlockHighlighter
 {
@@ -21,10 +21,10 @@ public:
 
     void highlight(RVA address, const QColor &color);
     void clear(RVA address);
-    BasicBlock *getBasicBlock(RVA address);
+    CuBasicBlock *getBasicBlock(RVA address);
 
 private:
-    std::map<RVA, BasicBlock*> bbMap;
+    std::map<RVA, CuBasicBlock*> bbMap;
 };
 
 #endif   // BASICBLOCKHIGHLIGHTER_H

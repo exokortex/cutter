@@ -5,13 +5,13 @@
 
 AnnotationsEditorDockWidget::AnnotationsEditorDockWidget(MainWindow *main, QAction *action) :
     CutterDockWidget(main, action),
-    seekable(new CutterSeekableWidget(this))
+    seekable(new CutterSeekable(this))
 {
     this->setObjectName("annotationEditor");
     this->setAllowedAreas(Qt::AllDockWidgetAreas);
     this->widget = new AnnotationsEditorWidget(this);
     this->setWidget(widget);
-    connect(seekable, &CutterSeekableWidget::seekChanged, this, &AnnotationsEditorDockWidget::onSeekChanged);
+    connect(seekable, &CutterSeekable::seekableSeekChanged, this, &AnnotationsEditorDockWidget::onSeekChanged);
     onSeekChanged(0);
 }
 

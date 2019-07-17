@@ -1,10 +1,11 @@
 #include <QMenu>
 #include <QResizeEvent>
+#include <QShortcut>
 
 #include "AnnotationsWidget.h"
 #include "ui_AnnotationsWidget.h"
 #include "MainWindow.h"
-#include "utils/Helpers.h"
+#include "common/Helpers.h"
 #include "plugins/ppCutter/core/PPCutterCore.h"
 
 AnnotationsModel::AnnotationsModel(QList<std::shared_ptr<Annotation>> *Annotations,

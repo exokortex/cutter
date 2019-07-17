@@ -184,7 +184,7 @@
    </widget>
    <widget class="QMenu" name="menuPP">
     <property name="title">
-     <string>PP</string>
+     <string>Post Processing</string>
     </property>
     <addaction name="actionPPProjectLoad"/>
     <addaction name="actionPPProjectSave"/>

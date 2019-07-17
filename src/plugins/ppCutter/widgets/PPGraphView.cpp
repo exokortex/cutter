@@ -1,5 +1,14 @@
 #include "PPGraphView.h"
-#include "widgets/CutterSeekableWidget.h"
+#include "common/CutterSeekable.h"
+#include "core/Cutter.h"
+#include "common/Colors.h"
+#include "common/Configuration.h"
+#include "common/CachedFontMetrics.h"
+#include "common/TempConfig.h"
+#include "common/SyntaxHighlighter.h"
+#include "common/BasicBlockHighlighter.h"
+
+#include <QColorDialog>
 #include <QPainter>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -8,15 +17,22 @@
 #include <QShortcut>
 #include <QToolTip>
 #include <QTextDocument>
+#include <QTextEdit>
 #include <QFileDialog>
 #include <QFile>
 #include <QVBoxLayout>
+#include <QRegularExpression>
+#include <QStandardPaths>
+#include <QClipboard>
+#include <QApplication>
+
+#include <cmath>
 
 #include "Cutter.h"
-#include "utils/Colors.h"
-#include "utils/Configuration.h"
-#include "utils/CachedFontMetrics.h"
-#include "utils/TempConfig.h"
+#include "common/Colors.h"
+#include "common/Configuration.h"
+#include "common/CachedFontMetrics.h"
+#include "common/TempConfig.h"
 
 #include <llvm-c/Target.h>
 #include <llvm/ADT/STLExtras.h>
@@ -57,10 +73,12 @@ std::vector<QString> PPGraphView::instructionColors = {
 PPGraphView::PPGraphView(QWidget *parent)
     : GraphView(parent),
       mFontMetrics(nullptr),
-      mMenu(new DisassemblyContextMenu(this)),
-      seekable(new CutterSeekableWidget(this))
+      blockMenu(new DisassemblyContextMenu(this)),
+      contextMenu(new QMenu(this)),
+      seekable(new CutterSeekable(this))
 {
     highlight_token = nullptr;
+    auto *layout = new QVBoxLayout(this);
     // Signals that require a refresh all
     connect(Core(), SIGNAL(refreshAll()), this, SLOT(refreshView()));
     connect(Core(), SIGNAL(commentsChanged()), this, SLOT(refreshView()));
@@ -72,6 +90,7 @@ PPGraphView::PPGraphView(QWidget *parent)
     connect(Core(), SIGNAL(functionsChanged()), this, SLOT(refreshView()));
     connect(Core(), SIGNAL(graphOptionsChanged()), this, SLOT(refreshView()));
     connect(Core(), SIGNAL(asmOptionsChanged()), this, SLOT(refreshView()));
+    connect(Core(), SIGNAL(refreshCodeViews()), this, SLOT(refreshView()));
 
     connect(Config(), SIGNAL(colorsUpdated()), this, SLOT(colorsUpdatedSlot()));
     connect(Config(), SIGNAL(fontsUpdated()), this, SLOT(fontsUpdatedSlot()));
@@ -87,15 +106,17 @@ PPGraphView::PPGraphView(QWidget *parent)
     // ESC for previous
     QShortcut *shortcut_escape = new QShortcut(QKeySequence(Qt::Key_Escape), this);
     shortcut_escape->setContext(Qt::WidgetShortcut);
-    connect(shortcut_escape, SIGNAL(activated()), this, SLOT(seekPrev()));
+    connect(shortcut_escape, SIGNAL(activated()), seekable, SLOT(seekPrev()));
 
     // Zoom shortcuts
     QShortcut *shortcut_zoom_in = new QShortcut(QKeySequence(Qt::Key_Plus), this);
     shortcut_zoom_in->setContext(Qt::WidgetShortcut);
-    connect(shortcut_zoom_in, SIGNAL(activated()), this, SLOT(zoomIn()));
+    connect(shortcut_zoom_in, &QShortcut::activated, this, std::bind(&PPGraphView::zoom, this,
+                                                                     QPointF(0.5, 0.5), 1));
     QShortcut *shortcut_zoom_out = new QShortcut(QKeySequence(Qt::Key_Minus), this);
     shortcut_zoom_out->setContext(Qt::WidgetShortcut);
-    connect(shortcut_zoom_out, SIGNAL(activated()), this, SLOT(zoomOut()));
+    connect(shortcut_zoom_out, &QShortcut::activated, this, std::bind(&PPGraphView::zoom,
+                                                                      this, QPointF(0.5, 0.5), -1));
     QShortcut *shortcut_zoom_reset = new QShortcut(QKeySequence(Qt::Key_Equal), this);
     shortcut_zoom_reset->setContext(Qt::WidgetShortcut);
     connect(shortcut_zoom_reset, SIGNAL(activated()), this, SLOT(zoomReset()));
@@ -131,20 +152,73 @@ PPGraphView::PPGraphView(QWidget *parent)
     shortcuts.append(shortcut_next_instr_arrow);
     shortcuts.append(shortcut_prev_instr_arrow);
 
-    //Export Graph menu
-    mMenu->addSeparator();
+    // Export Graph menu
     actionExportGraph.setText(tr("Export Graph"));
-    mMenu->addAction(&actionExportGraph);
     connect(&actionExportGraph, SIGNAL(triggered(bool)), this, SLOT(on_actionExportGraph_triggered()));
-
-    mMenu->addSeparator();
     actionSyncOffset.setText(tr("Sync/unsync offset"));
-    mMenu->addAction(&actionSyncOffset);
-
     connect(&actionSyncOffset, SIGNAL(triggered(bool)), this, SLOT(toggleSync()));
+
+    // Context menu that applies to everything
+    contextMenu->addAction(&actionExportGraph);
+    contextMenu->addSeparator();
+    contextMenu->addAction(&actionSyncOffset);
+
+
+    QAction *highlightBB = new QAction(this);
+    actionUnhighlight.setVisible(false);
+
+    highlightBB->setText(tr("Highlight block"));
+    connect(highlightBB, &QAction::triggered, this, [this]() {
+        auto bbh = Core()->getBBHighlighter();
+        RVA currBlockEntry = blockForAddress(this->seekable->getOffset())->entry;
+
+        QColor background = disassemblyBackgroundColor;
+        if (auto block = bbh->getBasicBlock(currBlockEntry)) {
+            background = block->color;
+        }
+
+        QColor c = QColorDialog::getColor(background, this, QString(),
+                                          QColorDialog::DontUseNativeDialog);
+        if (c.isValid()) {
+            bbh->highlight(currBlockEntry, c);
+        }
+        Config()->colorsUpdated();
+    });
+
+    actionUnhighlight.setText(tr("Unhighlight block"));
+    connect(&actionUnhighlight, &QAction::triggered, this, [this]() {
+        auto bbh = Core()->getBBHighlighter();
+        bbh->clear(blockForAddress(this->seekable->getOffset())->entry);
+        Config()->colorsUpdated();
+    });
+
+    blockMenu->addAction(highlightBB);
+    blockMenu->addAction(&actionUnhighlight);
+
+
+    // Include all actions from generic context menu in block specific menu
+    blockMenu->addSeparator();
+    blockMenu->addActions(contextMenu->actions());
+
+
     initFont();
     colorsUpdatedSlot();
 
+    connect(blockMenu, &DisassemblyContextMenu::copy, this, &PPGraphView::copySelection);
+
+    header = new QTextEdit();
+    header->setFixedHeight(30);
+    header->setReadOnly(true);
+    header->setLineWrapMode(QTextEdit::NoWrap);
+
+    // Add header as widget to layout so it stretches to the layout width
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setAlignment(Qt::AlignTop);
+    layout->addWidget(header);
+
+    prepareHeader();
+
+    highlighter = new SyntaxHighlighter(header->document());
     connect(PPCore(), SIGNAL(annotationsChanged()), this, SLOT(refreshSeek()));
     connect(PPCore(), SIGNAL(stateChanged()), this, SLOT(refreshView()));
 }
@@ -152,9 +226,9 @@ PPGraphView::PPGraphView(QWidget *parent)
 void PPGraphView::connectSeekChanged(bool disconn)
 {
     if (disconn) {
-        disconnect(seekable, &CutterSeekableWidget::seekChanged, this, &PPGraphView::onSeekChanged);
+        disconnect(seekable, &CutterSeekable::seekableSeekChanged, this, &PPGraphView::onSeekChanged);
     } else {
-        connect(seekable, &CutterSeekableWidget::seekChanged, this, &PPGraphView::onSeekChanged);
+        connect(seekable, &CutterSeekable::seekableSeekChanged, this, &PPGraphView::onSeekChanged);
     }
 }
 
@@ -167,12 +241,11 @@ PPGraphView::~PPGraphView()
 
 void PPGraphView::toggleSync()
 {
-    seekable->toggleSyncWithCore();
-    if (seekable->getSyncWithCore()) {
+    seekable->toggleSynchronization();
+    if (seekable->isSynchronized()) {
         parentWidget()->setWindowTitle(windowTitle);
     } else {
-        parentWidget()->setWindowTitle(windowTitle + " (not synced)");
-        seekable->setIndependentOffset(Core()->getOffset());
+        parentWidget()->setWindowTitle(windowTitle + CutterSeekable::tr(" (unsynced)"));
     }
 }
 
@@ -181,6 +254,7 @@ void PPGraphView::refreshView()
     initFont();
     loadCurrentGraph();
     viewport()->update();
+    emit viewRefreshed();
 }
 
 void PPGraphView::loadCurrentGraph()
@@ -270,7 +344,7 @@ void PPGraphView::loadCurrentGraph()
             const BasicBlock *succ = *sit;
             // get address of first instruction (= address of block)
             RVA addr = (succ->inst_begin())->address;
-            gb.exits.push_back(addr);
+            gb.edges.emplace_back(addr);
         }
 
         // mark block if it is the entry of the function
@@ -389,14 +463,29 @@ void PPGraphView::loadCurrentGraph()
         db.false_path = RVA_INVALID;
         if (block_fail) {
             db.false_path = block_fail;
-            gb.exits.push_back(block_fail);
+            gb.edges.emplace_back(block_fail);
         }
         if (block_jump) {
             if (block_fail) {
                 db.true_path = block_jump;
             }
-            gb.exits.push_back(block_jump);
+            gb.edges.emplace_back(block_jump);
         }
+
+        QJsonObject switchOp = block["switchop"].toObject();
+        if (!switchOp.isEmpty()) {
+            QJsonArray caseArray = switchOp["cases"].toArray();
+            for (QJsonValue caseOpValue : caseArray) {
+                QJsonObject caseOp = caseOpValue.toObject();
+                bool ok;
+                RVA caseJump = caseOp["jump"].toVariant().toULongLong(&ok);
+                if (!ok) {
+                    continue;
+                }
+                gb.edges.emplace_back(caseJump);
+            }
+        }
+
         QJsonArray opArray = block["ops"].toArray();
         for (int opIndex = 0; opIndex < opArray.size(); opIndex++) {
             QJsonObject op = opArray[opIndex].toObject();
@@ -412,14 +501,9 @@ void PPGraphView::loadCurrentGraph()
                 i.size = (block_entry + block_size) - i.addr;
             }
 
-            // Skip last byte, otherwise it will overlap with next instruction
-            i.size -= 1;
-
-            QString disas;
-            disas = op["text"].toString();
-
             QTextDocument textDoc;
-            textDoc.setHtml(disas);
+            textDoc.setHtml(CutterCore::ansiEscapeToHtml(op["text"].toString()));
+
             i.plainText = textDoc.toPlainText();
 
             RichTextPainter::List richText = RichTextPainter::fromTextDocument(textDoc);
@@ -437,24 +521,25 @@ void PPGraphView::loadCurrentGraph()
         }
         disassembly_blocks[db.entry] = db;
         prepareGraphNode(gb);
-        f.blocks.push_back(db);
 
         addBlock(gb);
     }*/
+    cleanupEdges();
 
-    anal.functions[f.entry] = f;
-    anal.status = "Ready.";
-    anal.entry = f.entry;
-
-    if (true) { // func["blocks"].toArray().size() > 0) {
+    if (!disassembly_blocks.empty()) {
         computeGraph(f.entry);
-        viewport()->update();
+    }
+}
 
-        if (first_draw) {
-            showBlock(blocks[f.entry]);
-            first_draw = false;
+PPGraphView::EdgeConfigurationMapping PPGraphView::getEdgeConfigurations()
+{
+    EdgeConfigurationMapping result;
+    for (auto &block : blocks) {
+        for (const auto &edge : block.second.edges) {
+            result[ {block.first, edge.target}] = edgeConfiguration(block.second, &blocks[edge.target]);
         }
     }
+    return result;
 }
 
 void PPGraphView::prepareGraphNode(GraphBlock &block)
@@ -480,9 +565,39 @@ void PPGraphView::prepareGraphNode(GraphBlock &block)
             height += 1;
         }
     }
-    int extra = 4 * charWidth + 4;
-    block.width = width + extra + charWidth;
+    int extra = static_cast<int>(4 * charWidth + 4);
+    block.width = static_cast<int>(width + extra + charWidth);
     block.height = (height * charHeight) + extra;
+}
+
+void PPGraphView::cleanupEdges()
+{
+    for (auto &blockIt : blocks) {
+        auto &block = blockIt.second;
+        auto outIt = block.edges.begin();
+        std::unordered_set<ut64> seenEdges;
+        for (auto it = block.edges.begin(), end = block.edges.end(); it != end; ++it) {
+            // remove edges going  to different functions
+            // and remove duplicate edges, common in switch statements
+            if (blocks.find(it->target) != blocks.end() &&
+                    seenEdges.find(it->target) == seenEdges.end()) {
+                *outIt++ = *it;
+                seenEdges.insert(it->target);
+            }
+        }
+        block.edges.erase(outIt, block.edges.end());
+    }
+}
+
+void PPGraphView::prepareHeader()
+{
+    QString afcf = Core()->cmd("afcf").trimmed();
+    if (afcf.isEmpty()) {
+        header->hide();
+        return;
+    }
+    header->show();
+    header->setPlainText(afcf);
 }
 
 void PPGraphView::initFont()
@@ -491,32 +606,43 @@ void PPGraphView::initFont()
     QFontMetricsF metrics(font());
     baseline = int(metrics.ascent());
     charWidth = metrics.width('X');
-    charHeight = metrics.height();
+    charHeight = static_cast<int>(metrics.height());
     charOffset = 0;
-    if (mFontMetrics)
-        delete mFontMetrics;
-    mFontMetrics = new CachedFontMetrics(this, font());
+    mFontMetrics.reset(new CachedFontMetrics<qreal>(font()));
 }
 
-void PPGraphView::drawBlock(QPainter & p, GraphView::GraphBlock &block)
+void PPGraphView::drawBlock(QPainter &p, GraphView::GraphBlock &block)
 {
+    int blockX = block.x - getViewOffset().x();
+    int blockY = block.y - getViewOffset().y();
+
+    const qreal padding = 2 * charWidth;
+
     p.setPen(Qt::black);
     p.setBrush(Qt::gray);
-    p.drawRect(block.x, block.y, block.width, block.height);
+    p.setFont(Config()->getFont());
+    p.drawRect(blockX, blockY, block.width, block.height);
 
+    breakpoints = Core()->getBreakpointsAddresses();
 
     // Render node
     DisassemblyBlock &db = disassembly_blocks[block.entry];
     bool block_selected = false;
+    bool PCInBlock = false;
     RVA selected_instruction = RVA_INVALID;
 
     // Figure out if the current block is selected
+    RVA addr = seekable->getOffset();
+    RVA PCAddr = Core()->getProgramCounterValue();
     for (const Instr &instr : db.instrs) {
-        RVA addr = seekable->getOffset();
-        if ((instr.addr <= addr) && (addr <= instr.addr + instr.size)) {
+        if (instr.contains(addr)) {
             block_selected = true;
             selected_instruction = instr.addr;
         }
+        if (instr.contains(PCAddr)) {
+            PCInBlock = true;
+        }
+
         // TODO: L219
     }
 
@@ -529,9 +655,6 @@ void PPGraphView::drawBlock(QPainter & p, GraphView::GraphBlock &block)
         p.setBrush(QColor(0, 0, 0, 100));
     }
 
-    // Node's shadow effect
-    p.drawRect(block.x + 2, block.y + 2,
-               block.width, block.height);
     p.setPen(QPen(graphNodeColor, 1));
 
     if (block_selected) {
@@ -540,69 +663,151 @@ void PPGraphView::drawBlock(QPainter & p, GraphView::GraphBlock &block)
         p.setBrush(disassemblyBackgroundColor);
     }
 
-    p.drawRect(block.x, block.y,
+    // Draw basic block background
+    p.drawRect(blockX, blockY,
                block.width, block.height);
+    auto bb = Core()->getBBHighlighter()->getBasicBlock(block.entry);
+    if (bb) {
+        QColor color(bb->color);
+        p.setBrush(color);
+        p.drawRect(blockX, blockY,
+                   block.width, block.height);
+    }
+
+    const int firstInstructionY = blockY + getInstructionOffset(db, 0).y();
 
     // Draw different background for selected instruction
-    /*if (selected_instruction != RVA_INVALID)*/ {
-        int y = block.y + (2 * charWidth) + (db.header_text.lines.size() * charHeight);
-        for (Instr &instr : db.instrs) {
-            if (instr.addr > selected_instruction) {
-                break;
-            }
+    if (selected_instruction != RVA_INVALID) {
+        int y = firstInstructionY;
+        for (const Instr &instr : db.instrs) {
+            //if (instr.addr > selected_instruction) {
+            //    break;
+            //}
             auto selected = instr.addr == selected_instruction;
-            //auto traceCount = dbgfunctions->GetTraceRecordHitCount(instr.addr);
-            auto traceCount = 0;
-            if (selected && traceCount) {
-                p.fillRect(QRect(block.x + charWidth, y, block.width - (10 + 2 * charWidth),
-                                 int(instr.text.lines.size()) * charHeight), disassemblyTracedSelectionColor);
-            } else if (selected) {
-                p.fillRect(QRect(block.x + charWidth, y, block.width - (10 + 2 * charWidth),
+            if (selected) {
+                p.fillRect(QRect(static_cast<int>(blockX + charWidth), y,
+                                 static_cast<int>(block.width - (10 + padding)),
                                  int(instr.text.lines.size()) * charHeight), disassemblySelectionColor);
-            } else if (traceCount) {
-                // Color depending on how often a sequence of code is executed
-                int exponent = 1;
-                while (traceCount >>= 1) //log2(traceCount)
-                    exponent++;
-                int colorDiff = (exponent * exponent) / 2;
-
-                // If the user has a light trace background color, substract
-                if (disassemblyTracedColor.blue() > 160)
-                    colorDiff *= -1;
-
-                p.fillRect(QRect(block.x + charWidth, y, block.width - (10 + 2 * charWidth),
-                                 int(instr.text.lines.size()) * charHeight),
-                           QColor(disassemblyTracedColor.red(),
-                                  disassemblyTracedColor.green(),
-                                  std::max(0, std::min(256, disassemblyTracedColor.blue() + colorDiff))));
             } else if (associatedAddresses.count(instr.addr)) {
-                p.fillRect(QRect(block.x + charWidth, y, block.width - (10 + 2 * charWidth),
+                p.fillRect(QRect(static_cast<int>(blockX + charWidth), y,
+                                 static_cast<int>(block.width - (10 + padding)),
                                  int(instr.text.lines.size()) * charHeight), QColor(0x8f, 0xf0, 0x82));
             }
             y += int(instr.text.lines.size()) * charHeight;
         }
     }
 
+    // Highlight selected tokens
+    if (highlight_token != nullptr) {
+        int y = firstInstructionY;
+        qreal tokenWidth = mFontMetrics->width(highlight_token->content);
+
+        for (const Instr &instr : db.instrs) {
+            int pos = -1;
+
+            while ((pos = instr.plainText.indexOf(highlight_token->content, pos + 1)) != -1) {
+                int tokenEnd = pos + highlight_token->content.length();
+
+                if ((pos > 0 && instr.plainText[pos - 1].isLetterOrNumber())
+                        || (tokenEnd < instr.plainText.length() && instr.plainText[tokenEnd].isLetterOrNumber())) {
+                    continue;
+                }
+
+                qreal widthBefore = mFontMetrics->width(instr.plainText.left(pos));
+                if (charWidth * 3 + widthBefore > block.width - (10 + padding)) {
+                    continue;
+                }
+
+                qreal highlightWidth = tokenWidth;
+                if (charWidth * 3 + widthBefore + tokenWidth >= block.width - (10 + padding)) {
+                    highlightWidth = block.width - widthBefore - (10 +  2 * padding);
+                }
+
+                QColor selectionColor = ConfigColor("wordHighlight");
+
+                p.fillRect(QRectF(blockX + charWidth * 3 + widthBefore, y, highlightWidth,
+                                 charHeight), selectionColor);
+            }
+
+            y += int(instr.text.lines.size()) * charHeight;
+        }
+    }
+
+    // Highlight program counter
+    if (PCInBlock) {
+        int y = firstInstructionY;
+        for (const Instr &instr : db.instrs) {
+            if (instr.addr > PCAddr) {
+                break;
+            }
+            auto PC = instr.addr == PCAddr;
+            if (PC) {
+                p.fillRect(QRect(static_cast<int>(blockX + charWidth), y,
+                                 static_cast<int>(block.width - (10 + padding)),
+                                 int(instr.text.lines.size()) * charHeight), PCSelectionColor);
+            }
+            y += int(instr.text.lines.size()) * charHeight;
+        }
+    }
+
+    qreal render_height = viewport()->size().height();
+
+    // Stop rendering text when it's too small
+    if (charHeight * getViewScale() * p.device()->devicePixelRatioF() < 4) {
+        return;
+    }
+
     // Render node text
-    auto x = block.x + (2 * charWidth);
-    int y = block.y + (2 * charWidth);
+    auto x = blockX + padding;
+    int y = blockY + getTextOffset(0).y();
+    qreal lineHeightRender = charHeight;
     for (auto &line : db.header_text.lines) {
-        RichTextPainter::paintRichText(&p, x, y, block.width, charHeight, 0, line, mFontMetrics);
+        qreal lineYRender = y;
+        lineYRender *= getViewScale();
+        // Check if line does NOT intersects with view area
+        if (0 > lineYRender + lineHeightRender
+                || render_height < lineYRender) {
+            y += charHeight;
+            continue;
+        }
+
+        RichTextPainter::paintRichText<qreal>(&p, x, y, block.width, charHeight, 0, line,
+                                       mFontMetrics.get());
         y += charHeight;
     }
-    for (Instr &instr : db.instrs) {
+
+    for (const Instr &instr : db.instrs) {
+        if (Core()->isBreakpoint(breakpoints, instr.addr)) {
+            p.fillRect(QRect(static_cast<int>(blockX + charWidth), y,
+                             static_cast<int>(block.width - (10 + padding)),
+                             int(instr.text.lines.size()) * charHeight), ConfigColor("gui.breakpoint_background"));
+            if (instr.addr == selected_instruction) {
+                p.fillRect(QRect(static_cast<int>(blockX + charWidth), y,
+                                 static_cast<int>(block.width - (10 + padding)),
+                                 int(instr.text.lines.size()) * charHeight), disassemblySelectionColor);
+            }
+        }
         for (auto &line : instr.text.lines) {
+            qreal lineYRender = y;
+            lineYRender *= getViewScale();
+            if (0 > lineYRender + lineHeightRender
+                    || render_height < lineYRender) {
+                y += charHeight;
+                continue;
+            }
+
             int rectSize = qRound(charWidth);
             if (rectSize % 2) {
                 rectSize++;
             }
             // Assume charWidth <= charHeight
-            QRectF bpRect(x - rectSize / 3.0, y + (charHeight - rectSize) / 2.0, rectSize, rectSize);
-
             // TODO: Breakpoint/Cip stuff
+            QRectF bpRect(x - rectSize / 3.0, y + (charHeight - rectSize) / 2.0, rectSize, rectSize);
+            Q_UNUSED(bpRect);
 
-            RichTextPainter::paintRichText(&p, x + charWidth, y, block.width - charWidth, charHeight, 0, line,
-                                           mFontMetrics);
+            RichTextPainter::paintRichText<qreal>(&p, x + charWidth, y,
+                                           block.width - charWidth, charHeight, 0, line,
+                                           mFontMetrics.get());
             y += charHeight;
 
         }
@@ -631,12 +836,13 @@ RVA PPGraphView::getAddrForMouseEvent(GraphBlock &block, QPoint *point)
     DisassemblyBlock &db = disassembly_blocks[block.entry];
 
     // Remove header and margin
-    int off_y = (2 * charWidth) + (db.header_text.lines.size() * charHeight);
+    int off_y = getInstructionOffset(db, 0).y();
+
     // Get mouse coordinate over the actual text
     int text_point_y = point->y() - off_y;
     int mouse_row = text_point_y / charHeight;
 
-    int cur_row = db.header_text.lines.size();
+    int cur_row = static_cast<int>(db.header_text.lines.size());
     if (mouse_row < cur_row) {
         return db.entry;
     }
@@ -654,12 +860,13 @@ PPGraphView::Instr *PPGraphView::getInstrForMouseEvent(GraphView::GraphBlock &bl
     DisassemblyBlock &db = disassembly_blocks[block.entry];
 
     // Remove header and margin
-    int off_y = (2 * charWidth) + (db.header_text.lines.size() * charHeight);
+    int off_y = getInstructionOffset(db, 0).y();
+
     // Get mouse coordinate over the actual text
     int text_point_y = point->y() - off_y;
     int mouse_row = text_point_y / charHeight;
 
-    int cur_row = db.header_text.lines.size();
+    int cur_row = static_cast<int>(db.header_text.lines.size());
 
     for (Instr &instr : db.instrs) {
         if (mouse_row < cur_row + (int)instr.text.lines.size()) {
@@ -671,6 +878,47 @@ PPGraphView::Instr *PPGraphView::getInstrForMouseEvent(GraphView::GraphBlock &bl
     return nullptr;
 }
 
+QRectF PPGraphView::getInstrRect(GraphView::GraphBlock &block, RVA addr) const
+{
+    auto blockIt = disassembly_blocks.find(block.entry);
+    if (blockIt == disassembly_blocks.end()) {
+        return QRectF();
+    }
+    auto &db = blockIt->second;
+    if (db.instrs.empty()) {
+        return QRectF();
+    }
+
+    size_t sequenceAddr = db.instrs[0].addr;
+    size_t firstLineWithAddr = 0;
+    size_t currentLine = 0;
+    for (size_t i = 0; i < db.instrs.size(); i++) {
+        auto &instr = db.instrs[i];
+        if (instr.addr != sequenceAddr) {
+            sequenceAddr = instr.addr;
+            firstLineWithAddr = currentLine;
+        }
+        if (instr.contains(addr)) {
+            while (i < db.instrs.size() && db.instrs[i + 1].addr == sequenceAddr) {
+                currentLine += db.instrs[i].text.lines.size();
+                i++;
+            }
+            QPointF topLeft = getInstructionOffset(db, static_cast<int>(firstLineWithAddr));
+            return QRectF(topLeft, QSizeF(block.width - 4 * charWidth,
+                                          charHeight * int(currentLine - firstLineWithAddr + db.instrs[i].text.lines.size())));
+        }
+        currentLine += instr.text.lines.size();
+    }
+    return QRectF();
+}
+
+void PPGraphView::showInstruction(GraphView::GraphBlock &block, RVA addr)
+{
+    QRectF rect = getInstrRect(block, addr);
+    rect.translate(block.x, block.y);
+    showRectangle(QRect(rect.x(), rect.y(), rect.width(), rect.height()), true);
+}
+
 // Public Slots
 
 void PPGraphView::colorsUpdatedSlot()
@@ -680,7 +928,8 @@ void PPGraphView::colorsUpdatedSlot()
     mDisabledBreakpointColor = disassemblyBackgroundColor;
     graphNodeColor = ConfigColor("gui.border");
     backgroundColor = ConfigColor("gui.background");
-    disassemblySelectionColor = ConfigColor("highlight");
+    disassemblySelectionColor = ConfigColor("lineHighlight");
+    PCSelectionColor = ConfigColor("highlightPC");
 
     jmpColor = ConfigColor("graph.trufae");
     brtrueColor = ConfigColor("graph.true");
@@ -701,12 +950,12 @@ PPGraphView::DisassemblyBlock *PPGraphView::blockForAddress(RVA addr)
 {
     for (auto &blockIt : disassembly_blocks) {
         DisassemblyBlock &db = blockIt.second;
-        for (Instr i : db.instrs) {
+        for (const Instr &i : db.instrs) {
             if (i.addr == RVA_INVALID || i.size == RVA_INVALID) {
                 continue;
             }
 
-            if ((i.addr <= addr) && (addr <= i.addr + i.size)) {
+            if (i.contains(addr)) {
                 return &db;
             }
         }
@@ -716,68 +965,78 @@ PPGraphView::DisassemblyBlock *PPGraphView::blockForAddress(RVA addr)
 
 void PPGraphView::onSeekChanged(RVA addr)
 {
-    mMenu->setOffset(addr);
-    associatedAddresses = PPCore()->getFile().getAssociatedAddresses(addr);
+    blockMenu->setOffset(addr);
     DisassemblyBlock *db = blockForAddress(addr);
+    bool switchFunction = false;
+    if (!db) {
+        // not in this function, try refreshing
+        refreshView();
+        db = blockForAddress(addr);
+        switchFunction = true;
+    }
     if (db) {
         // This is a local address! We animated to it.
         transition_dont_seek = true;
-        showBlock(&blocks[db->entry], true);
-        return;
+        showBlock(&blocks[db->entry], !switchFunction);
+        showInstruction(blocks[db->entry], addr);
+        prepareHeader();
     } else {
-        refreshView();
-        DisassemblyBlock *db = blockForAddress(addr);
-        if (db) {
-            // This is a local address! We animated to it.
-            transition_dont_seek = true;
-            showBlock(&blocks[db->entry], false);
-            return;
-        }
+        header->hide();
     }
 }
 
-void PPGraphView::zoomIn(QPoint mouse)
+void PPGraphView::zoom(QPointF mouseRelativePos, double velocity)
 {
-    current_scale += 0.1;
-    auto areaSize = viewport()->size();
-    adjustSize(areaSize.width(), areaSize.height(), mouse);
-    viewport()->update();
-}
+    mouseRelativePos.rx() *= size().width();
+    mouseRelativePos.ry() *= size().height();
+    mouseRelativePos /= getViewScale();
 
-void PPGraphView::zoomOut(QPoint mouse)
-{
-    current_scale -= 0.1;
-    current_scale = std::max(current_scale, 0.3);
-    auto areaSize = viewport()->size();
-    adjustSize(areaSize.width(), areaSize.height(), mouse);
+    auto globalMouse = mouseRelativePos + getViewOffset();
+    mouseRelativePos *= getViewScale();
+    qreal newScale = getViewScale() * std::pow(1.25, velocity);
+    newScale = std::max(newScale, 0.05);
+    mouseRelativePos /= newScale;
+    setViewScale(newScale);
+
+    // Adjusting offset, so that zooming will be approaching to the cursor.
+    setViewOffset(globalMouse.toPoint() - mouseRelativePos.toPoint());
+
     viewport()->update();
+    emit viewZoomed();
 }
 
 void PPGraphView::zoomReset()
 {
-    current_scale = 1.0;
-    auto areaSize = viewport()->size();
-    adjustSize(areaSize.width(), areaSize.height());
+    setViewScale(1.0);
     viewport()->update();
+    emit viewZoomed();
 }
 
 void PPGraphView::takeTrue()
 {
     DisassemblyBlock *db = blockForAddress(seekable->getOffset());
+    if (!db) {
+        return;
+    }
+
     if (db->true_path != RVA_INVALID) {
         seekable->seek(db->true_path);
-    } else if (blocks[db->entry].exits.size()) {
-        seekable->seek(blocks[db->entry].exits[0]);
+    } else if (!blocks[db->entry].edges.empty()) {
+        seekable->seek(blocks[db->entry].edges[0].target);
     }
 }
 
 void PPGraphView::takeFalse()
 {
     DisassemblyBlock *db = blockForAddress(seekable->getOffset());
+    if (!db) {
+        return;
+    }
+
     if (db->false_path != RVA_INVALID) {
         seekable->seek(db->false_path);
-    } else if (blocks[db->entry].exits.size()) {
-        seekable->seek(blocks[db->entry].exits[0]);
+    } else if (!blocks[db->entry].edges.empty()) {
+        seekable->seek(blocks[db->entry].edges[0].target);
     }
 }
 
@@ -791,15 +1050,19 @@ void PPGraphView::seekInstruction(bool previous_instr)
 
     for (size_t i = 0; i < db->instrs.size(); i++) {
         Instr &instr = db->instrs[i];
-        if (!((instr.addr <= addr) && (addr <= instr.addr + instr.size))) {
+        if (!instr.contains(addr)) {
             continue;
         }
 
-        // Found the instructon. Check if a next one exists
+        // Found the instruction. Check if a next one exists
         if (!previous_instr && (i < db->instrs.size() - 1)) {
             seekable->seek(db->instrs[i + 1].addr);
         } else if (previous_instr && (i > 0)) {
-            seekable->seek(db->instrs[i - 1].addr);
+            while (i > 0 && db->instrs[i].addr == addr) { // jump over 0 size instructions
+                i--;
+            }
+            seekable->seek(db->instrs[i].addr);
+            break;
         }
     }
 }
@@ -814,13 +1077,12 @@ void PPGraphView::prevInstr()
     seekInstruction(true);
 }
 
-void PPGraphView::refreshSeek()
-{
-    seekLocal(seekable->getOffset());
-}
-
 void PPGraphView::seekLocal(RVA addr, bool update_viewport)
 {
+    RVA curAddr = seekable->getOffset();
+    if (addr == curAddr) {
+        return;
+    }
     connectSeekChanged(true);
     seekable->seek(addr);
     associatedAddresses = PPCore()->getFile().getAssociatedAddresses(addr);
@@ -830,28 +1092,81 @@ void PPGraphView::seekLocal(RVA addr, bool update_viewport)
     }
 }
 
-void PPGraphView::seekPrev()
+void PPGraphView::copySelection()
 {
-    if (seekable->getSyncWithCore()) {
-        Core()->seekPrev();
-    } else {
-        seekable->seek(seekable->getPrevIndependentOffset());
-    }
+    if (!highlight_token) return;
+
+    QClipboard *clipboard = QApplication::clipboard();
+    clipboard->setText(highlight_token->content);
 }
 
-void PPGraphView::blockClicked(GraphView::GraphBlock &block, QMouseEvent *event, QPoint pos)
+PPGraphView::Token *PPGraphView::getToken(Instr *instr, int x)
 {
-    RVA instr = getAddrForMouseEvent(block, &pos);
-    if (instr == RVA_INVALID) {
+    x -= (int) (3 * charWidth); // Ignore left margin
+    if (x < 0) {
+        return nullptr;
+    }
+
+    int clickedCharPos = mFontMetrics->position(instr->plainText, x);
+    if (clickedCharPos > instr->plainText.length()) {
+        return nullptr;
+    }
+
+    static const QRegularExpression tokenRegExp(R"(\b(?<!\.)([^\s]+)\b(?!\.))");
+    QRegularExpressionMatchIterator i = tokenRegExp.globalMatch(instr->plainText);
+
+    while (i.hasNext()) {
+        QRegularExpressionMatch match = i.next();
+
+        if (match.capturedStart() <= clickedCharPos && match.capturedEnd() > clickedCharPos) {
+            auto t = new Token;
+            t->start = match.capturedStart();
+            t->length = match.capturedLength();
+            t->content = match.captured();
+            t->instr = instr;
+
+            return t;
+        }
+    }
+
+    return nullptr;
+}
+
+QPoint PPGraphView::getTextOffset(int line) const
+{
+    int padding = static_cast<int>(2 * charWidth);
+    return QPoint(padding, padding + line * charHeight);
+}
+
+QPoint PPGraphView::getInstructionOffset(const DisassemblyBlock &block, int line) const
+{
+    return getTextOffset(line + static_cast<int>(block.header_text.lines.size()));
+}
+
+void PPGraphView::blockClicked(GraphView::GraphBlock &block, QMouseEvent *event,
+                                         QPoint pos)
+{
+    Instr *instr = getInstrForMouseEvent(block, &pos);
+    if (!instr) {
         return;
     }
 
-    seekLocal(instr);
+    highlight_token = getToken(instr, pos.x());
 
-    if (event->button() == Qt::RightButton) {
-        mMenu->setOffset(instr);
-        mMenu->exec(event->globalPos());
+    RVA addr = instr->addr;
+    seekLocal(addr);
+
+    blockMenu->setOffset(addr);
+    blockMenu->setCanCopy(highlight_token);
+    if (highlight_token) {
+        blockMenu->setCurHighlightedWord(highlight_token->content);
     }
+    if (event->button() == Qt::RightButton) {
+        actionUnhighlight.setVisible(Core()->getBBHighlighter()->getBasicBlock(block.entry));
+        event->accept();
+        blockMenu->exec(event->globalPos());
+    }
+    viewport()->update();
 }
 
 void PPGraphView::blockDoubleClicked(GraphView::GraphBlock &block, QMouseEvent *event, QPoint pos)
@@ -904,8 +1219,36 @@ void PPGraphView::blockTransitionedTo(GraphView::GraphBlock *to)
 
 void PPGraphView::on_actionExportGraph_triggered()
 {
-    QString fileName = QFileDialog::getSaveFileName(this,
-                                                    tr("Export Graph"), "", tr("Dot file (*.dot)"));
+    QStringList filters;
+    filters.append(tr("Graphiz dot (*.dot)"));
+    if (!QStandardPaths::findExecutable("dot").isEmpty()
+            || !QStandardPaths::findExecutable("xdot").isEmpty()) {
+        filters.append(tr("GIF (*.gif)"));
+        filters.append(tr("PNG (*.png)"));
+        filters.append(tr("JPEG (*.jpg)"));
+        filters.append(tr("PostScript (*.ps)"));
+        filters.append(tr("SVG (*.svg)"));
+        filters.append(tr("JSON (*.json)"));
+    }
+
+    QFileDialog dialog(this, tr("Export Graph"));
+    dialog.setAcceptMode(QFileDialog::AcceptSave);
+    dialog.setFileMode(QFileDialog::AnyFile);
+    dialog.setNameFilters(filters);
+    dialog.selectFile("graph");
+    dialog.setDefaultSuffix("dot");
+    if (!dialog.exec())
+        return;
+    int startIdx = dialog.selectedNameFilter().lastIndexOf("*.") + 2;
+    int count = dialog.selectedNameFilter().length() - startIdx - 1;
+    QString format = dialog.selectedNameFilter().mid(startIdx, count);
+    QString fileName = dialog.selectedFiles()[0];
+    if (format != "dot") {
+        TempConfig tempConfig;
+        tempConfig.set("graph.gv.format", format);
+        qWarning() << Core()->cmd(QString("agfw \"%1\" @ $FB").arg(fileName));
+        return;
+    }
     QFile file(fileName);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         qWarning() << "Can't open file";
@@ -915,23 +1258,58 @@ void PPGraphView::on_actionExportGraph_triggered()
     fileOut << Core()->cmd("agfd $FB");
 }
 
+void PPGraphView::mousePressEvent(QMouseEvent *event)
+{
+    GraphView::mousePressEvent(event);
+    if (!event->isAccepted() && event->button() == Qt::RightButton) {
+        contextMenu->exec(event->globalPos());
+        event->accept();
+    }
+    emit graphMoved();
+}
+
+void PPGraphView::mouseMoveEvent(QMouseEvent *event)
+{
+    GraphView::mouseMoveEvent(event);
+    emit graphMoved();
+}
+
 void PPGraphView::wheelEvent(QWheelEvent *event)
 {
     // when CTRL is pressed, we zoom in/out with mouse wheel
     if (Qt::ControlModifier == event->modifiers()) {
         const QPoint numDegrees = event->angleDelta() / 8;
         if (!numDegrees.isNull()) {
-            const QPoint numSteps = numDegrees / 15;
-            QPoint mouse = event->globalPos();
-            if (numSteps.y() > 0) {
-                zoomIn(mouse);
-            } else if (numSteps.y() < 0) {
-                zoomOut(mouse);
-            }
+            int numSteps = numDegrees.y() / 15;
+
+            QPointF relativeMousePos = event->pos();
+            relativeMousePos.rx() /= size().width();
+            relativeMousePos.ry() /= size().height();
+
+            zoom(relativeMousePos, numSteps);
         }
         event->accept();
     } else {
         // use mouse wheel for scrolling when CTRL is not pressed
         GraphView::wheelEvent(event);
     }
+    emit graphMoved();
+}
+
+void PPGraphView::resizeEvent(QResizeEvent *event)
+{
+    GraphView::resizeEvent(event);
+    emit resized();
+}
+
+void PPGraphView::paintEvent(QPaintEvent *event)
+{
+    // PPGraphView is always dirty
+    setCacheDirty();
+    GraphView::paintEvent(event);
+}
+
+bool PPGraphView::Instr::contains(ut64 addr) const
+{
+    return this->addr <= addr && (addr - this->addr) < size;
 }

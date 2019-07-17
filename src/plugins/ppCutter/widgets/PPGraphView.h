@@ -10,8 +10,8 @@
 
 #include "widgets/GraphView.h"
 #include "menus/DisassemblyContextMenu.h"
-#include "utils/RichTextPainter.h"
-#include "widgets/CutterSeekableWidget.h"
+#include "common/RichTextPainter.h"
+#include "common/CutterSeekable.h"
 
 #include <vector>
 #include <set>
@@ -19,41 +19,12 @@
 #include <pp/objectdisassembler.h>
 #include "MainWindow.h"
 
+class QTextEdit;
+class SyntaxHighlighter;
+
 class PPGraphView : public GraphView
 {
     Q_OBJECT
-
-
-    struct Token {
-        int start; //token[0]
-        int length; //token[1]
-        QString type; //token[2]
-        ut64 addr; //token[3]
-        QString name; //token[4]
-    };
-
-    struct HighlightToken {
-        QString type; //highlight_token[0]
-        ut64 addr; //highlight_token[1]
-        QString name; //highlight_token[2]
-
-        bool equalsToken(const Token &token)
-        {
-            return this->type == token.type &&
-                   this->addr == token.addr &&
-                   this->name == token.name;
-        }
-
-        static HighlightToken *fromToken(const Token &token)
-        {
-            //TODO: memory leaks
-            auto result = new HighlightToken();
-            result->type = token.type;
-            result->addr = token.addr;
-            result->name = token.name;
-            return result;
-        }
-    };
 
     struct Text {
         std::vector<RichTextPainter::List> lines;
@@ -81,8 +52,8 @@ class PPGraphView : public GraphView
         QString ToQString() const
         {
             QString result;
-            for (auto &line : lines) {
-                for (auto &t : line) {
+            for (const auto &line : lines) {
+                for (const auto &t : line) {
                     result += t.text;
                 }
             }
@@ -95,10 +66,44 @@ class PPGraphView : public GraphView
         ut64 size = 0;
         Text text;
         Text fullText;
+        QString plainText;
         std::vector<unsigned char> opcode; //instruction bytes
-        std::vector<AddressType> associatedInstructions;
+
+        bool empty() const { return size == 0; }
+        bool contains(ut64 addr) const;
     };
 
+    struct Token {
+        int start;
+        int length;
+        QString type;
+        Instr *instr;
+        QString name;
+        QString content;
+    };
+
+    //struct HighlightToken {
+    //    QString type; //highlight_token[0]
+    //    ut64 start; //highlight_token[1]
+    //    QString name; //highlight_token[2]
+//
+    //    bool equalsToken(const Token &token)
+    //    {
+    //        return this->type == token.type &&
+    //               this->start == token.start &&
+    //               this->name == token.name;
+    //    }
+//
+    //    static HighlightToken *fromToken(const Token &token)
+    //    {
+    //        //TODO: memory leaks
+    //        auto result = new HighlightToken();
+    //        result->type = token.type;
+    //        result->start = token.start;
+    //        result->name = token.name;
+    //        return result;
+    //    }
+    //};
 
     struct DisassemblyBlock {
         Text header_text;
@@ -138,7 +143,7 @@ class PPGraphView : public GraphView
 
 public:
     PPGraphView(QWidget *parent);
-    ~PPGraphView();
+    ~PPGraphView() override;
     std::unordered_map<ut64, DisassemblyBlock> disassembly_blocks;
     virtual void drawBlock(QPainter &p, GraphView::GraphBlock &block) override;
     virtual void blockClicked(GraphView::GraphBlock &block, QMouseEvent *event, QPoint pos) override;
@@ -152,7 +157,13 @@ public:
 
     void loadCurrentGraph();
     QString windowTitle;
-//    bool navigate(ut64 addr);
+    QTextEdit *header = nullptr;
+
+    int getWidth() { return width; }
+    int getHeight() { return height; }
+    std::unordered_map<ut64, GraphBlock> getBlocks() { return blocks; }
+    using EdgeConfigurationMapping = std::map<std::pair<ut64, ut64>, EdgeConfiguration>;
+    EdgeConfigurationMapping getEdgeConfigurations();
 
 public slots:
     void refreshView();
@@ -161,8 +172,7 @@ public slots:
     void onSeekChanged(RVA addr);
     void toggleSync();
 
-    void zoomIn(QPoint mouse = QPoint(0, 0));
-    void zoomOut(QPoint mouse = QPoint(0, 0));
+    void zoom(QPointF mouseRelativePos, double velocity);
     void zoomReset();
 
     void takeTrue();
@@ -171,51 +181,69 @@ public slots:
     void nextInstr();
     void prevInstr();
 
-    void refreshSeek();
+    void copySelection();
 
 protected:
-    virtual void wheelEvent(QWheelEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void wheelEvent(QWheelEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
+
+    void paintEvent(QPaintEvent *event) override;
 
 private slots:
-    void seekPrev();
-
     void on_actionExportGraph_triggered();
 
 private:
-    bool first_draw = true;
     bool transition_dont_seek = false;
 
-    HighlightToken *highlight_token;
+    Token *highlight_token;
     // Font data
-    CachedFontMetrics *mFontMetrics;
+    std::unique_ptr<CachedFontMetrics<qreal>> mFontMetrics;
     qreal charWidth;
     int charHeight;
     int charOffset;
     int baseline;
+    bool emptyGraph;
+
+    DisassemblyContextMenu *blockMenu;
+    QMenu *contextMenu;
 
     MainWindow *main;
     static std::vector<QString> instructionColors;
     std::set<AddressType> associatedAddresses;
 
-    DisassemblyContextMenu *mMenu;
-
     void connectSeekChanged(bool disconnect);
 
     void initFont();
     void prepareGraphNode(GraphBlock &block);
+    void cleanupEdges();
+    void prepareHeader();
+    Token *getToken(Instr *instr, int x);
+    QPoint getTextOffset(int line) const;
+    QPoint getInstructionOffset(const DisassemblyBlock &block, int line) const;
     RVA getAddrForMouseEvent(GraphBlock &block, QPoint *point);
     Instr *getInstrForMouseEvent(GraphBlock &block, QPoint *point);
+    /**
+     * @brief Get instructions placement and size relative to block.
+     * Inefficient don't use this function when iterating over all instructions.
+     * @param block
+     * @param addr
+     * @return
+     */
+    QRectF getInstrRect(GraphView::GraphBlock &block, RVA addr) const;
+    void showInstruction(GraphView::GraphBlock &block, RVA addr);
     DisassemblyBlock *blockForAddress(RVA addr);
     void seekLocal(RVA addr, bool update_viewport = true);
     void seekInstruction(bool previous_instr);
-    CutterSeekableWidget *seekable = nullptr;
+    CutterSeekable *seekable = nullptr;
     QList<QShortcut *> shortcuts;
+    QList<RVA> breakpoints;
 
     QColor disassemblyBackgroundColor;
     QColor disassemblySelectedBackgroundColor;
     QColor disassemblySelectionColor;
-    QColor disassemblyTracedColor;
-    QColor disassemblyTracedSelectionColor;
+    QColor PCSelectionColor;
     QColor jmpColor;
     QColor brtrueColor;
     QColor brfalseColor;
@@ -235,9 +263,20 @@ private:
     QColor mDisabledBreakpointColor;
 
     QAction actionExportGraph;
+    QAction actionUnhighlight;
     QAction actionSyncOffset;
 
     QLabel *emptyText = nullptr;
+    SyntaxHighlighter *highlighter = nullptr;
+
+signals:
+    void viewRefreshed();
+    void viewZoomed();
+    void graphMoved();
+    void resized();
+
+public:
+    bool isGraphEmpty()     { return emptyGraph; }
 };
 
 #endif // PPGRAPHVIEW_H

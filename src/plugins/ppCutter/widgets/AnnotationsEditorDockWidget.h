@@ -3,7 +3,7 @@
 
 #include "widgets/CutterDockWidget.h"
 #include "Cutter.h"
-#include "widgets/CutterSeekableWidget.h"
+#include "common/CutterSeekable.h"
 
 class MainWindow;
 class AnnotationsEditorWidget;
@@ -21,7 +21,7 @@ class AnnotationsEditorDockWidget : public CutterDockWidget
 
   private:
     AnnotationsEditorWidget *widget;
-    CutterSeekableWidget *seekable;
+    CutterSeekable *seekable;
 
 };
 
