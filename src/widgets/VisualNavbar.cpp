@@ -42,11 +42,11 @@ VisualNavbar::VisualNavbar(MainWindow *main, QWidget *parent) :
     addWidget(this->graphicsView);
     //addWidget(addsCombo);
 
-    connect(Core(), SIGNAL(seekChanged(RVA)), this, SLOT(on_seekChanged(RVA)));
-    connect(Core(), SIGNAL(registersChanged()), this, SLOT(drawPCCursor()));
-    connect(Core(), SIGNAL(refreshAll()), this, SLOT(fetchAndPaintData()));
-    connect(Core(), SIGNAL(functionsChanged()), this, SLOT(fetchAndPaintData()));
-    connect(Core(), SIGNAL(flagsChanged()), this, SLOT(fetchAndPaintData()));
+    connect(Core(), &CutterCore::seekChanged, this, &VisualNavbar::on_seekChanged);
+    connect(Core(), &CutterCore::registersChanged, this, &VisualNavbar::drawPCCursor);
+    connect(Core(), &CutterCore::refreshAll, this, &VisualNavbar::fetchAndPaintData);
+    connect(Core(), &CutterCore::functionsChanged, this, &VisualNavbar::fetchAndPaintData);
+    connect(Core(), &CutterCore::flagsChanged, this, &VisualNavbar::fetchAndPaintData);
 
     graphicsScene = new QGraphicsScene(this);
 
@@ -58,7 +58,7 @@ VisualNavbar::VisualNavbar(MainWindow *main, QWidget *parent) :
     this->graphicsView->setMinimumHeight(15);
     this->graphicsView->setMaximumHeight(15);
     this->graphicsView->setFrameShape(QFrame::NoFrame);
-    this->graphicsView->setRenderHints(0);
+    this->graphicsView->setRenderHints({});
     this->graphicsView->setScene(graphicsScene);
     this->graphicsView->setRenderHints(QPainter::Antialiasing);
     this->graphicsView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -291,6 +291,12 @@ QList<QString> VisualNavbar::sectionsForAddress(RVA address)
 QString VisualNavbar::toolTipForAddress(RVA address)
 {
     QString ret = "Address: " + RAddressString(address);
+
+    // Don't append sections when a debug task is in progress to avoid freezing the interface
+    if (Core()->isDebugTaskInProgress()) {
+        return ret;
+    }
+
     auto sections = sectionsForAddress(address);
     if (sections.count()) {
         ret += "\nSections: \n";

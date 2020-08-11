@@ -16,6 +16,7 @@ if get_option('enable_python')
 endif
 
 add_project_arguments(feature_define_args, language: 'cpp')
+add_project_arguments('-DCUTTER_SOURCE_BUILD', language: 'cpp')
 
 parse_cmd = [py3_exe, join_paths(meson.current_source_dir(), '../scripts/meson_parse_qmake.py')]
 configure_qmake_cmd = [py3_exe, join_paths(meson.current_source_dir(), '../scripts/meson_configure_qmake_in.py')]
@@ -54,8 +55,9 @@ if run_command(py3_exe, '-c', exists_cmd).returncode() == 0
   run_command(link_cmd, check: true)
 endif
 
-r2 = subproject('radare2')
-libr2_dep = r2.get_variable('libr2_dep')
+libr2_dep = dependency('libr2',
+    fallback : ['radare2', 'libr2_dep'],
+    default_options : ['enable_tests=false'])
 
 qt5dep = dependency('qt5', modules: qt_modules, main: true)
 
@@ -77,6 +79,7 @@ if get_option('enable_python')
                              join_paths(meson.current_source_dir(), 'common'),
                              join_paths(meson.current_source_dir(), 'widgets'),
                              join_paths(meson.current_source_dir(), 'plugins'),
+                             join_paths(meson.current_source_dir(), 'menus'),
                              join_paths(meson.current_source_dir(), 'subprojects/radare2/libr/include'),
                              join_paths(meson.current_build_dir(), 'subprojects/radare2'),
                              qt5core_dep.get_pkgconfig_variable('includedir'),

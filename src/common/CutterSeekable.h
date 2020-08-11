@@ -4,7 +4,7 @@
 
 class MainWindow;
 
-class CutterSeekable : public QObject
+class CUTTER_EXPORT  CutterSeekable : public QObject
 {
     Q_OBJECT
 
@@ -23,10 +23,10 @@ public:
     void seek(RVA addr) { updateSeek(addr, false); }
 
     /**
-     * @brief toggleSyncWithCore toggles
+     * @brief setSynchronization sets
      * Core seek synchronization.
      */
-    void toggleSynchronization();
+    void setSynchronization(bool sync);
 
     /**
      * @brief getOffset returns the seekable offset.
@@ -44,11 +44,23 @@ public:
      */
     bool isSynchronized();
 
+    /**
+     * @brief seekToReference will seek to the function or the object which is referenced in a given offset
+     * @param offset - an address that contains a reference to jump to
+     */
+    void seekToReference(RVA offset);
+
 public slots:
     /**
      * @brief seekPrev seeks to last location.
      */
     void seekPrev();
+
+    /**
+     * @brief toggleSyncWithCore toggles
+     * Core seek synchronization.
+     */
+    void toggleSynchronization();
 
 private slots:
     /**
@@ -82,5 +94,5 @@ private:
 
 signals:
     void seekableSeekChanged(RVA addr);
-
+    void syncChanged();
 };

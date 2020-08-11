@@ -11,17 +11,14 @@
 
 #include "CutterDockWidget.h"
 #include "core/Cutter.h"
-#include "CutterTreeWidget.h"
+#include "widgets/ListDockWidget.h"
+#include "common/AddressableItemModel.h"
 
 class MainWindow;
 class QTreeWidget;
 class ImportsWidget;
 
-namespace Ui {
-class ImportsWidget;
-}
-
-class ImportsModel : public QAbstractTableModel
+class ImportsModel : public AddressableItemModel<QAbstractTableModel>
 {
     Q_OBJECT
 
@@ -46,19 +43,24 @@ private:
     QList<ImportDescription> *imports;
 
 public:
-    enum Column { AddressColumn = 0, TypeColumn, SafetyColumn, NameColumn, ColumnCount };
+    enum Column { AddressColumn = 0, TypeColumn, LibraryColumn, NameColumn, SafetyColumn, ColumnCount };
     enum Role { ImportDescriptionRole = Qt::UserRole, AddressRole };
 
     ImportsModel(QList<ImportDescription> *imports, QObject *parent = nullptr);
 
-    int rowCount(const QModelIndex &parent) const;
-    int columnCount(const QModelIndex &parent) const;
+    int rowCount(const QModelIndex &parent) const override;
+    int columnCount(const QModelIndex &parent) const override;
 
-    QVariant data(const QModelIndex &index, int role) const;
-    QVariant headerData(int section, Qt::Orientation orientation, int role) const;
+    QVariant data(const QModelIndex &index, int role) const override;
+    QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
+
+    RVA address(const QModelIndex &index) const override;
+    QString name(const QModelIndex &index) const override;
+    QString libname(const QModelIndex &index) const;
+
 };
 
-class ImportsProxyModel : public QSortFilterProxyModel
+class ImportsProxyModel : public AddressableFilterProxyModel
 {
     Q_OBJECT
 
@@ -70,29 +72,22 @@ protected:
     bool lessThan(const QModelIndex &left, const QModelIndex &right) const override;
 };
 
-class ImportsWidget : public CutterDockWidget
+class ImportsWidget : public ListDockWidget
 {
     Q_OBJECT
 
 public:
-    explicit ImportsWidget(MainWindow *main, QAction *action);
+    explicit ImportsWidget(MainWindow *main);
     ~ImportsWidget();
 
 private slots:
-    void on_importsTreeView_doubleClicked(const QModelIndex &index);
-
     void refreshImports();
-
 private:
-    std::unique_ptr<Ui::ImportsWidget> ui;
-
     ImportsModel *importsModel;
     ImportsProxyModel *importsProxyModel;
     QList<ImportDescription> imports;
-    CutterTreeWidget *tree;
 
     void highlightUnsafe();
-    void setScrollMode();
 };
 
 #endif // IMPORTSWIDGET_H

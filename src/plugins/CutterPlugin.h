@@ -7,7 +7,7 @@ class MainWindow;
 #include "core/Cutter.h"
 #include "widgets/CutterDockWidget.h"
 
-class CutterPlugin 
+class CUTTER_EXPORT CutterPlugin
 {
 public:
     virtual ~CutterPlugin() = default;
@@ -26,6 +26,13 @@ public:
      * called after Cutter's core UI has been initialized
      */
     virtual void setupInterface(MainWindow *main) = 0;
+
+    /**
+     * @brief Register any decompiler implemented by the Plugin
+     *
+     * called during initialization of Cutter, after setupPlugin()
+     */
+    virtual void registerDecompilers() {}
 
     /**
      * @brief Shutdown the Plugin

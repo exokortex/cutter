@@ -17,6 +17,9 @@ DebugOptionsWidget::DebugOptionsWidget(PreferencesDialog *dialog)
     ui->setupUi(this);
 
     updateDebugPlugin();
+
+    connect(ui->pluginComboBox, &QComboBox::currentTextChanged,
+            this, &DebugOptionsWidget::onDebugPluginChanged);
 }
 
 DebugOptionsWidget::~DebugOptionsWidget() {}
@@ -24,8 +27,8 @@ DebugOptionsWidget::~DebugOptionsWidget() {}
 void DebugOptionsWidget::updateDebugPlugin()
 {
     ui->esilBreakOnInvalid->setChecked(Config()->getConfigBool("esil.breakoninvalid"));
-    disconnect(ui->pluginComboBox, SIGNAL(currentIndexChanged(const QString &)), this,
-               SLOT(on_pluginComboBox_currentIndexChanged(const QString &)));
+    disconnect(ui->pluginComboBox, &QComboBox::currentTextChanged,
+            this, &DebugOptionsWidget::onDebugPluginChanged);
 
     QStringList plugins = Core()->getDebugPlugins();
     for (const QString &str : plugins)
@@ -34,13 +37,8 @@ void DebugOptionsWidget::updateDebugPlugin()
     QString plugin = Core()->getActiveDebugPlugin();
     ui->pluginComboBox->setCurrentText(plugin);
 
-    connect(ui->pluginComboBox, SIGNAL(currentIndexChanged(const QString &)), this,
-            SLOT(on_pluginComboBox_currentIndexChanged(const QString &)));
-
-    QString debugArgs = Core()->getConfig("dbg.args");
-    ui->debugArgs->setText(debugArgs);
-    ui->debugArgs->setPlaceholderText(debugArgs);
-    connect(ui->debugArgs, &QLineEdit::editingFinished, this, &DebugOptionsWidget::updateDebugArgs);
+    connect(ui->pluginComboBox, &QComboBox::currentTextChanged,
+            this, &DebugOptionsWidget::onDebugPluginChanged);
 
     QString stackSize = Core()->getConfig("esil.stack.size");
     ui->stackSize->setText(stackSize);
@@ -52,14 +50,7 @@ void DebugOptionsWidget::updateDebugPlugin()
     connect(ui->stackSize, &QLineEdit::editingFinished, this, &DebugOptionsWidget::updateStackSize);
 }
 
-void DebugOptionsWidget::updateDebugArgs()
-{
-    QString newArgs = ui->debugArgs->text();
-    Core()->setConfig("dbg.args", newArgs);
-    ui->debugArgs->setPlaceholderText(newArgs);
-}
-
-void DebugOptionsWidget::on_pluginComboBox_currentIndexChanged(const QString &plugin)
+void DebugOptionsWidget::onDebugPluginChanged(const QString &plugin)
 {
     Core()->setDebugPlugin(plugin);
 }

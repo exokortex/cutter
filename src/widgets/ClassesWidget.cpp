@@ -4,11 +4,11 @@
 #include "common/Helpers.h"
 #include "common/SvgIconEngine.h"
 #include "dialogs/EditMethodDialog.h"
-#include "dialogs/RenameDialog.h"
 
 #include <QList>
 #include <QMenu>
 #include <QMouseEvent>
+#include <QInputDialog>
 
 QVariant ClassesModel::headerData(int section, Qt::Orientation, int role) const
 {
@@ -219,6 +219,7 @@ AnalClassesModel::AnalClassesModel(CutterDockWidget *parent)
     });
 
     connect(Core(), &CutterCore::refreshAll, this, &AnalClassesModel::refreshAll);
+    connect(Core(), &CutterCore::codeRebased, this, &AnalClassesModel::refreshAll);
     connect(Core(), &CutterCore::classNew, this, &AnalClassesModel::classNew);
     connect(Core(), &CutterCore::classDeleted, this, &AnalClassesModel::classDeleted);
     connect(Core(), &CutterCore::classRenamed, this, &AnalClassesModel::classRenamed);
@@ -440,6 +441,8 @@ QVariant AnalClassesModel::data(const QModelIndex &index, int role) const
                     return QIcon(new SvgIconEngine(QString(":/img/icons/home.svg"), QPalette::WindowText));
                 }
                 return QVariant();
+            case VTableRole:
+                return -1;
             case NameRole:
                 return base.className;
             case TypeRole:
@@ -470,6 +473,8 @@ QVariant AnalClassesModel::data(const QModelIndex &index, int role) const
                     return QIcon(new SvgIconEngine(QString(":/img/icons/fork.svg"), QPalette::WindowText));
                 }
                 return QVariant();
+            case VTableRole:
+                return QVariant::fromValue(meth.vtableOffset);
             case OffsetRole:
                 return QVariant::fromValue(meth.addr);
             case NameRole:
@@ -547,6 +552,14 @@ bool ClassesSortFilterProxyModel::lessThan(const QModelIndex &left, const QModel
         }
     }
     // fallthrough
+    case ClassesModel::VTABLE: {
+        auto left_vtable = left.data(ClassesModel::VTableRole).toLongLong();
+        auto right_vtable = right.data(ClassesModel::VTableRole).toLongLong();
+        if (left_vtable != right_vtable) {
+            return left_vtable < right_vtable;
+        }
+    }
+    // fallthrough
     case ClassesModel::NAME:
     default:
         QString left_name = left.data(ClassesModel::NameRole).toString();
@@ -562,8 +575,8 @@ bool ClassesSortFilterProxyModel::hasChildren(const QModelIndex &parent) const
 
 
 
-ClassesWidget::ClassesWidget(MainWindow *main, QAction *action) :
-    CutterDockWidget(main, action),
+ClassesWidget::ClassesWidget(MainWindow *main) :
+    CutterDockWidget(main),
     ui(new Ui::ClassesWidget)
 {
     ui->setupUi(this);
@@ -577,7 +590,8 @@ ClassesWidget::ClassesWidget(MainWindow *main, QAction *action) :
 
     ui->classSourceCombo->setCurrentIndex(1);
 
-    connect(ui->classSourceCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(refreshClasses()));
+    connect<void(QComboBox::*)(int)>(ui->classSourceCombo, &QComboBox::currentIndexChanged,
+                                     this, &ClassesWidget::refreshClasses);
     connect(ui->classesTreeView, &QTreeView::customContextMenuRequested, this, &ClassesWidget::showContextMenu);
 
     refreshClasses();
@@ -634,7 +648,7 @@ void ClassesWidget::on_classesTreeView_doubleClicked(const QModelIndex &index)
         return;
     }
     RVA offset = offsetData.value<RVA>();
-    Core()->seek(offset);
+    Core()->seekAndShow(offset);
 }
 
 void ClassesWidget::showContextMenu(const QPoint &pt)
@@ -696,7 +710,7 @@ void ClassesWidget::on_seekToVTableAction_triggered()
         return;
     }
 
-    Core()->seek(vtables[0].addr + desc.vtableOffset);
+    Core()->seekAndShow(vtables[0].addr + desc.vtableOffset);
 }
 
 void ClassesWidget::on_addMethodAction_triggered()
@@ -727,14 +741,14 @@ void ClassesWidget::on_editMethodAction_triggered()
     EditMethodDialog::editMethod(className, methName, this);
 }
 
-
 void ClassesWidget::on_newClassAction_triggered()
 {
-    QString name;
-    if (!RenameDialog::showDialog(tr("Create new Class"), &name, tr("Class Name"), this) || name.isEmpty()) {
-        return;
+    bool ok;
+    QString name = QInputDialog::getText(this, tr("Create new Class"),
+                            tr("Class Name:"), QLineEdit::Normal, QString(), &ok);
+    if (ok && !name.isEmpty()) {
+        Core()->createNewClass(name);
     }
-    Core()->createNewClass(name);
 }
 
 void ClassesWidget::on_deleteClassAction_triggered()
@@ -757,9 +771,10 @@ void ClassesWidget::on_renameClassAction_triggered()
         return;
     }
     QString oldName = index.data(ClassesModel::NameRole).toString();
-    QString newName = oldName;
-    if (!RenameDialog::showDialog(tr("Rename Class %1").arg(oldName), &newName, tr("Class Name"), this) || newName.isEmpty()) {
-        return;
+    bool ok;
+    QString newName = QInputDialog::getText(this, tr("Rename Class %1").arg(oldName),
+                                         tr("Class name:"), QLineEdit::Normal, oldName, &ok);
+    if (ok && !newName.isEmpty()) {
+            Core()->renameClass(oldName, newName);
     }
-    Core()->renameClass(oldName, newName);
 }

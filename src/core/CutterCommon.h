@@ -9,10 +9,10 @@
 #include <QString>
 
 // Workaround for compile errors on Windows
-#ifdef _WIN32
+#ifdef Q_OS_WIN
 #undef min
 #undef max
-#endif //_WIN32
+#endif // Q_OS_WIN
 
 // radare2 list iteration macros
 #define CutterRListForeach(list, it, type, x) \
@@ -54,6 +54,19 @@ inline QString RHexString(RVA size)
 {
     return QString::asprintf("%#llx", size);
 }
+
+#ifdef CUTTER_SOURCE_BUILD
+#define CUTTER_EXPORT Q_DECL_EXPORT
+#else
+#define CUTTER_EXPORT Q_DECL_IMPORT
+#endif
+
+
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(deprecated)
+#define CUTTER_DEPRECATED(msg) [[deprecated(msg)]]
+#else
+#define CUTTER_DEPRECATED(msg)
+#endif
 
 #endif // CUTTERCORE_H
 

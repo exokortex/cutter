@@ -13,6 +13,13 @@ CutterSeekable::CutterSeekable(QObject *parent)
 
 CutterSeekable::~CutterSeekable() {}
 
+void CutterSeekable::setSynchronization(bool sync)
+{
+    synchronized = sync;
+    onCoreSeekChanged(Core()->getOffset());
+    emit syncChanged();
+}
+
 void CutterSeekable::onCoreSeekChanged(RVA addr)
 {
     if (synchronized && widgetOffset != addr) {
@@ -48,11 +55,33 @@ RVA CutterSeekable::getOffset()
 
 void CutterSeekable::toggleSynchronization()
 {
-    synchronized = !synchronized;
-    onCoreSeekChanged(Core()->getOffset());
+    setSynchronization(!synchronized);
 }
 
 bool CutterSeekable::isSynchronized()
 {
     return synchronized;
+}
+
+void CutterSeekable::seekToReference(RVA offset)
+{
+    if (offset == RVA_INVALID)
+    {
+        return;
+    }
+    
+    RVA target;
+    QList<XrefDescription> refs = Core()->getXRefs(offset, false, false);
+    
+    if (refs.length()) {
+        if (refs.length() > 1) {
+            qWarning() << tr("More than one (%1) references here. Weird behaviour expected.")
+                            .arg(refs.length());
+        }
+        
+        target = refs.at(0).to;
+        if (target != RVA_INVALID) {
+            seek(target);
+        }
+    }
 }

@@ -3,19 +3,25 @@ TEMPLATE = app
 TARGET = Cutter
 
 CUTTER_VERSION_MAJOR = 1
-CUTTER_VERSION_MINOR = 8
-CUTTER_VERSION_PATCH = 2
+CUTTER_VERSION_MINOR = 11
+CUTTER_VERSION_PATCH = 0
 
 VERSION = $${CUTTER_VERSION_MAJOR}.$${CUTTER_VERSION_MINOR}.$${CUTTER_VERSION_PATCH}
 
 # Required QT version
 lessThan(QT_MAJOR_VERSION, 5): error("requires Qt 5")
 
-TRANSLATIONS += translations/cutter_ca.ts \
+TRANSLATIONS += translations/cutter_ar.ts \
+                translations/cutter_ca.ts \
+                translations/cutter_cn.ts \
                 translations/cutter_de.ts \
                 translations/cutter_es.ts \
+                translations/cutter_fa.ts \
                 translations/cutter_fr.ts \
+                translations/cutter_he.ts \
+                translations/cutter_hi.ts \
                 translations/cutter_it.ts \
+                translations/cutter_ja.ts \
                 translations/cutter_nl.ts \
                 translations/cutter_pt.ts \
                 translations/cutter_ro.ts \
@@ -32,8 +38,9 @@ QT += core gui widgets svg network
 QT_CONFIG -= no-pkg-config
 CONFIG += c++11
 
-!defined(CUTTER_ENABLE_CRASH_REPORTS, var)        CUTTER_ENABLE_CRASH_REPORTS=false
-equals(CUTTER_ENABLE_CRASH_REPORTS, true)         CONFIG += CUTTER_ENABLE_CRASH_REPORTS
+!defined(CUTTER_ENABLE_CRASH_REPORTS, var)      CUTTER_ENABLE_CRASH_REPORTS=false
+equals(CUTTER_ENABLE_CRASH_REPORTS, true)       CONFIG += CUTTER_ENABLE_CRASH_REPORTS
+
 !defined(CUTTER_ENABLE_PYTHON, var)             CUTTER_ENABLE_PYTHON=false
 equals(CUTTER_ENABLE_PYTHON, true)              CONFIG += CUTTER_ENABLE_PYTHON
 
@@ -41,7 +48,6 @@ equals(CUTTER_ENABLE_PYTHON, true)              CONFIG += CUTTER_ENABLE_PYTHON
 equals(CUTTER_ENABLE_PYTHON, true) {
     equals(CUTTER_ENABLE_PYTHON_BINDINGS, true) {
         CONFIG += CUTTER_ENABLE_PYTHON_BINDINGS
-        !defined(SHIBOKEN_EXECUTABLE, var) SHIBOKEN_EXECUTABLE=shiboken2
     }
 }
 
@@ -50,6 +56,11 @@ equals(CUTTER_BUNDLE_R2_APPBUNDLE, true)        CONFIG += CUTTER_BUNDLE_R2_APPBU
 
 !defined(CUTTER_APPVEYOR_R2DEC, var)            CUTTER_APPVEYOR_R2DEC=false
 equals(CUTTER_APPVEYOR_R2DEC, true)             CONFIG += CUTTER_APPVEYOR_R2DEC
+
+!defined(CUTTER_R2GHIDRA_STATIC, var)           CUTTER_R2GHIDRA_STATIC=false
+equals(CUTTER_R2GHIDRA_STATIC, true)            CONFIG += CUTTER_R2GHIDRA_STATIC
+
+DEFINES += CUTTER_SOURCE_BUILD
 
 CUTTER_ENABLE_CRASH_REPORTS {
     message("Crash report support enabled.")
@@ -72,7 +83,16 @@ CUTTER_ENABLE_PYTHON_BINDINGS {
     message("Python Bindings disabled. (requires CUTTER_ENABLE_PYTHON=true)")
 }
 
-INCLUDEPATH *= . core widgets dialogs common plugins
+win32:defined(CUTTER_DEPS_DIR, var) {
+    !defined(SHIBOKEN_EXECUTABLE, var)          SHIBOKEN_EXECUTABLE="$${CUTTER_DEPS_DIR}/pyside/bin/shiboken2.exe"
+    !defined(SHIBOKEN_INCLUDEDIR, var)          SHIBOKEN_INCLUDEDIR="$${CUTTER_DEPS_DIR}/pyside/include/shiboken2"
+    !defined(SHIBOKEN_LIBRARY, var)             SHIBOKEN_LIBRARY="$${CUTTER_DEPS_DIR}/pyside/lib/shiboken2.abi3.lib"
+    !defined(PYSIDE_INCLUDEDIR, var)            PYSIDE_INCLUDEDIR="$${CUTTER_DEPS_DIR}/pyside/include/PySide2"
+    !defined(PYSIDE_LIBRARY, var)               PYSIDE_LIBRARY="$${CUTTER_DEPS_DIR}/pyside/lib/pyside2.abi3.lib"
+    !defined(PYSIDE_TYPESYSTEMS, var)           PYSIDE_TYPESYSTEMS="$${CUTTER_DEPS_DIR}/pyside/share/PySide2/typesystems"
+}
+
+INCLUDEPATH *= . core widgets dialogs common plugins menus
 
 win32 {
     # Generate debug symbols in release mode
@@ -141,6 +161,7 @@ CUTTER_ENABLE_PYTHON {
         }
         BINDINGS_SRC_DIR = "$${PWD}/bindings"
         BINDINGS_BUILD_DIR = "$${OUT_PWD}/bindings"
+        BINDINGS_SOURCE_DIR = "$${BINDINGS_BUILD_DIR}/CutterBindings"
         BINDINGS_SOURCE = $$system("$${BINDINGS_SRC_LIST_CMD} qmake \"$${BINDINGS_BUILD_DIR}\"")
         BINDINGS_INCLUDE_DIRS = "$$[QT_INSTALL_HEADERS]" \
                                 "$$[QT_INSTALL_HEADERS]/QtCore" \
@@ -172,14 +193,16 @@ CUTTER_ENABLE_PYTHON {
         QMAKE_SUBSTITUTES += bindings/bindings.txt.in
 
         SHIBOKEN_OPTIONS = --project-file="$${BINDINGS_BUILD_DIR}/bindings.txt"
+        defined(SHIBOKEN_EXTRA_OPTIONS, var) SHIBOKEN_OPTIONS += $${SHIBOKEN_EXTRA_OPTIONS}
+
         win32:SHIBOKEN_OPTIONS += --avoid-protected-hack
         bindings.target = bindings_target
-        bindings.commands = "$${SHIBOKEN_EXECUTABLE}" $${SHIBOKEN_OPTIONS}
+        bindings.commands = $$quote($$system_path($${SHIBOKEN_EXECUTABLE})) $${SHIBOKEN_OPTIONS}
         QMAKE_EXTRA_TARGETS += bindings
         PRE_TARGETDEPS += bindings_target
-        GENERATED_SOURCES += $${BINDINGS_SOURCE}
+        # GENERATED_SOURCES += $${BINDINGS_SOURCE} done by dummy targets bellow
 
-        INCLUDEPATH += "$${BINDINGS_BUILD_DIR}/CutterBindings"
+        INCLUDEPATH += "$${BINDINGS_SOURCE_DIR}"
 
         win32:DEFINES += WIN32_LEAN_AND_MEAN
 
@@ -194,6 +217,34 @@ CUTTER_ENABLE_PYTHON {
             PKGCONFIG += shiboken2 pyside2
         }
         INCLUDEPATH += "$$PYSIDE_INCLUDEDIR" "$$PYSIDE_INCLUDEDIR/QtCore" "$$PYSIDE_INCLUDEDIR/QtWidgets" "$$PYSIDE_INCLUDEDIR/QtGui"
+
+
+        BINDINGS_DUMMY_INPUT_LIST = bindings/src_list.py
+
+        # dummy rules to specify dependency between generated binding files and bindings_target
+        bindings_h.input = BINDINGS_DUMMY_INPUT_LIST
+        bindings_h.depends = bindings_target
+        bindings_h.output = cutterbindings_python.h
+        bindings_h.commands = "echo placeholder command ${QMAKE_FILE_OUT}"
+        bindings_h.variable_out = HEADERS
+        QMAKE_EXTRA_COMPILERS += bindings_h
+
+        for(path, BINDINGS_SOURCE) {
+            dummy_input = $$replace(path, .cpp, .txt)
+            BINDINGS_DUMMY_INPUTS += $$dummy_input
+            win32 {
+                _ = $$system("mkdir \"$$dirname(dummy_input)\"; echo a >\"$$dummy_input\"")
+            } else {
+                _ = $$system("mkdir -p \"$$dirname(dummy_input)\"; echo a >\"$$dummy_input\"")
+            }
+        }
+
+        bindings_cpp.input = BINDINGS_DUMMY_INPUTS
+        bindings_cpp.depends = bindings_target
+        bindings_cpp.output = "$${BINDINGS_SOURCE_DIR}/${QMAKE_FILE_IN_BASE}.cpp"
+        bindings_cpp.commands = "echo placeholder command ${QMAKE_FILE_OUT}"
+        bindings_cpp.variable_out = GENERATED_SOURCES
+        QMAKE_EXTRA_COMPILERS += bindings_cpp
     }
 }
 
@@ -231,6 +282,16 @@ CUTTER_APPVEYOR_R2DEC {
     DEFINES += CUTTER_APPVEYOR_R2DEC
 }
 
+CUTTER_R2GHIDRA_STATIC {
+    message("Building with static r2ghidra support")
+    DEFINES += CUTTER_R2GHIDRA_STATIC
+    SOURCES += $$R2GHIDRA_SOURCE/cutter-plugin/R2GhidraDecompiler.cpp
+    HEADERS += $$R2GHIDRA_SOURCE/cutter-plugin/R2GhidraDecompiler.h
+    INCLUDEPATH += $$R2GHIDRA_SOURCE/cutter-plugin
+    LIBS += -L$$R2GHIDRA_INSTALL_PATH -lcore_ghidra -ldelayimp
+    QMAKE_LFLAGS += /delayload:core_ghidra.dll
+}
+
 QMAKE_SUBSTITUTES += CutterConfig.h.in
 
 SOURCES += \
@@ -247,6 +308,8 @@ SOURCES += \
     plugins/ppCutter/widgets/PPGraphWidget.cpp \
     Main.cpp \
     core/Cutter.cpp \
+    dialogs/EditStringDialog.cpp \
+    dialogs/WriteCommandsDialogs.cpp \
     widgets/DisassemblerGraphView.cpp \
     widgets/OverviewView.cpp \
     common/RichTextPainter.cpp \
@@ -255,14 +318,14 @@ SOURCES += \
     dialogs/CommentsDialog.cpp \
     dialogs/EditInstructionDialog.cpp \
     dialogs/FlagDialog.cpp \
-    dialogs/RenameDialog.cpp \
+    dialogs/RemoteDebugDialog.cpp \
+    dialogs/NativeDebugDialog.cpp \
     dialogs/XrefsDialog.cpp \
     core/MainWindow.cpp \
     common/Helpers.cpp \
-    common/HexAsciiHighlighter.cpp \
-    common/HexHighlighter.cpp \
     common/Highlighter.cpp \
     common/MdHighlighter.cpp \
+    common/DirectionalComboBox.cpp \
     dialogs/preferences/AsmOptionsWidget.cpp \
     dialogs/NewFileDialog.cpp \
     common/AnalTask.cpp \
@@ -289,13 +352,14 @@ SOURCES += \
     common/TempConfig.cpp \
     common/SvgIconEngine.cpp \
     common/SyntaxHighlighter.cpp \
-    widgets/PseudocodeWidget.cpp \
+    widgets/DecompilerWidget.cpp \
     widgets/VisualNavbar.cpp \
     widgets/GraphView.cpp \
     dialogs/preferences/PreferencesDialog.cpp \
     dialogs/preferences/AppearanceOptionsWidget.cpp \
     dialogs/preferences/GraphOptionsWidget.cpp \
     dialogs/preferences/PreferenceCategory.cpp \
+    dialogs/preferences/InitializationFileEditor.cpp \
     widgets/QuickFilterView.cpp \
     widgets/ClassesWidget.cpp \
     widgets/ResourcesWidget.cpp \
@@ -318,11 +382,14 @@ SOURCES += \
     dialogs/AsyncTaskDialog.cpp \
     widgets/StackWidget.cpp \
     widgets/RegistersWidget.cpp \
+    widgets/ThreadsWidget.cpp \
+    widgets/ProcessesWidget.cpp \
     widgets/BacktraceWidget.cpp \
-    dialogs/OpenFileDialog.cpp \
+    dialogs/MapFileDialog.cpp \
     common/CommandTask.cpp \
     common/ProgressIndicator.cpp \
     common/R2Task.cpp \
+    dialogs/R2TaskDialog.cpp \
     widgets/DebugActions.cpp \
     widgets/MemoryMapWidget.cpp \
     dialogs/preferences/DebugOptionsWidget.cpp \
@@ -343,11 +410,12 @@ SOURCES += \
     dialogs/WelcomeDialog.cpp \
     common/RunScriptTask.cpp \
     dialogs/EditMethodDialog.cpp \
-    dialogs/LoadNewTypesDialog.cpp \
+    dialogs/TypesInteractionDialog.cpp \
     widgets/SdbWidget.cpp \
     common/PythonManager.cpp \
     plugins/PluginManager.cpp \
     common/BasicBlockHighlighter.cpp \
+    common/BasicInstructionHighlighter.cpp \
     dialogs/LinkTypeDialog.cpp \
     widgets/ColorPicker.cpp \
     common/ColorThemeWorker.cpp \
@@ -360,7 +428,29 @@ SOURCES += \
     common/BugReporting.cpp \
     common/HighDpiPixmap.cpp \
     widgets/GraphGridLayout.cpp \
-    widgets/HexWidget.cpp
+    widgets/HexWidget.cpp \
+    common/SelectionHighlight.cpp \
+    common/Decompiler.cpp \
+    menus/AddressableItemContextMenu.cpp \
+    common/AddressableItemModel.cpp \
+    widgets/ListDockWidget.cpp \
+    dialogs/MultitypeFileSaveDialog.cpp \
+    widgets/BoolToggleDelegate.cpp \
+    common/IOModesController.cpp \
+    common/SettingsUpgrade.cpp \
+    dialogs/LayoutManager.cpp \
+    common/CutterLayout.cpp \
+    widgets/GraphHorizontalAdapter.cpp \
+    common/ResourcePaths.cpp \
+    widgets/CutterGraphView.cpp \
+    widgets/SimpleTextGraphView.cpp \
+    widgets/R2GraphWidget.cpp \
+    widgets/CallGraph.cpp \
+    widgets/AddressableDockWidget.cpp \
+    dialogs/preferences/AnalOptionsWidget.cpp
+
+GRAPHVIZ_SOURCES = \
+    widgets/GraphvizLayout.cpp
 
 HEADERS  += \
     plugins/ppCutter/core/PPCutterCore.h \
@@ -377,6 +467,8 @@ HEADERS  += \
     core/Cutter.h \
     core/CutterCommon.h \
     core/CutterDescriptions.h \
+    dialogs/EditStringDialog.h \
+    dialogs/WriteCommandsDialogs.h \
     widgets/DisassemblerGraphView.h \
     widgets/OverviewView.h \
     common/RichTextPainter.h \
@@ -386,14 +478,14 @@ HEADERS  += \
     dialogs/CommentsDialog.h \
     dialogs/EditInstructionDialog.h \
     dialogs/FlagDialog.h \
-    dialogs/RenameDialog.h \
+    dialogs/RemoteDebugDialog.h \
+    dialogs/NativeDebugDialog.h \
     dialogs/XrefsDialog.h \
     common/Helpers.h \
-    common/HexAsciiHighlighter.h \
-    common/HexHighlighter.h \
     core/MainWindow.h \
     common/Highlighter.h \
     common/MdHighlighter.h \
+    common/DirectionalComboBox.h \
     dialogs/InitialOptionsDialog.h \
     dialogs/NewFileDialog.h \
     common/AnalTask.h \
@@ -420,13 +512,14 @@ HEADERS  += \
     common/TempConfig.h \
     common/SvgIconEngine.h \
     common/SyntaxHighlighter.h \
-    widgets/PseudocodeWidget.h \
+    widgets/DecompilerWidget.h \
     widgets/VisualNavbar.h \
     widgets/GraphView.h \
     dialogs/preferences/PreferencesDialog.h \
     dialogs/preferences/AppearanceOptionsWidget.h \
     dialogs/preferences/PreferenceCategory.h \
     dialogs/preferences/GraphOptionsWidget.h \
+    dialogs/preferences/InitializationFileEditor.h \
     widgets/QuickFilterView.h \
     widgets/ClassesWidget.h \
     widgets/ResourcesWidget.h \
@@ -449,14 +542,17 @@ HEADERS  += \
     dialogs/AsyncTaskDialog.h \
     widgets/StackWidget.h \
     widgets/RegistersWidget.h \
+    widgets/ThreadsWidget.h \
+    widgets/ProcessesWidget.h \
     widgets/BacktraceWidget.h \
-    dialogs/OpenFileDialog.h \
+    dialogs/MapFileDialog.h \
     common/StringsTask.h \
     common/FunctionsTask.h \
     common/CommandTask.h \
     common/ProgressIndicator.h \
     plugins/CutterPlugin.h \
     common/R2Task.h \
+    dialogs/R2TaskDialog.h \
     widgets/DebugActions.h \
     widgets/MemoryMapWidget.h \
     dialogs/preferences/DebugOptionsWidget.h \
@@ -480,11 +576,12 @@ HEADERS  += \
     common/Json.h \
     dialogs/EditMethodDialog.h \
     common/CrashHandler.h \
-    dialogs/LoadNewTypesDialog.h \
+    dialogs/TypesInteractionDialog.h \
     widgets/SdbWidget.h \
     common/PythonManager.h \
     plugins/PluginManager.h \
     common/BasicBlockHighlighter.h \
+    common/BasicInstructionHighlighter.h \
     common/UpdateWorker.h \
     widgets/ColorPicker.h \
     common/ColorThemeWorker.h \
@@ -497,55 +594,80 @@ HEADERS  += \
     common/HighDpiPixmap.h \
     widgets/GraphLayout.h \
     widgets/GraphGridLayout.h \
-    widgets/HexWidget.h
+    widgets/HexWidget.h \
+    common/SelectionHighlight.h \
+    common/Decompiler.h \
+    menus/AddressableItemContextMenu.h \
+    common/AddressableItemModel.h \
+    widgets/ListDockWidget.h \
+    widgets/AddressableItemList.h \
+    dialogs/MultitypeFileSaveDialog.h \
+    widgets/BoolToggleDelegate.h \
+    common/IOModesController.h \
+    common/SettingsUpgrade.h \
+    dialogs/LayoutManager.h \
+    common/CutterLayout.h \
+    common/BinaryTrees.h \
+    common/LinkedListPool.h \
+    widgets/GraphHorizontalAdapter.h \
+    common/ResourcePaths.h \
+    widgets/CutterGraphView.h \
+    widgets/SimpleTextGraphView.h \
+    widgets/R2GraphWidget.h \
+    widgets/CallGraph.h \
+    widgets/AddressableDockWidget.h \
+    dialogs/preferences/AnalOptionsWidget.h
+
+GRAPHVIZ_HEADERS = widgets/GraphvizLayout.h
 
 FORMS    += \
     plugins/ppCutter/dialogs/PPAnnotationsDialog.ui \
     plugins/ppCutter/widgets/AnnotationsWidget.ui \
     plugins/ppCutter/widgets/AnnotationsEditorWidget.ui \
     dialogs/AboutDialog.ui \
+    dialogs/EditStringDialog.ui \
+    dialogs/Base64EnDecodedWriteDialog.ui \
+    dialogs/DuplicateFromOffsetDialog.ui \
+    dialogs/IncrementDecrementDialog.ui \
     dialogs/preferences/AsmOptionsWidget.ui \
     dialogs/CommentsDialog.ui \
     dialogs/EditInstructionDialog.ui \
     dialogs/FlagDialog.ui \
-    dialogs/RenameDialog.ui \
+    dialogs/RemoteDebugDialog.ui \
+    dialogs/NativeDebugDialog.ui \
     dialogs/XrefsDialog.ui \
     dialogs/NewfileDialog.ui \
     dialogs/InitialOptionsDialog.ui \
     dialogs/EditFunctionDialog.ui \
     core/MainWindow.ui \
-    widgets/CommentsWidget.ui \
     widgets/ConsoleWidget.ui \
     widgets/Dashboard.ui \
     widgets/EntrypointWidget.ui \
     widgets/FlagsWidget.ui \
-    widgets/ExportsWidget.ui \
-    widgets/FunctionsWidget.ui \
-    widgets/ImportsWidget.ui \
-    widgets/RelocsWidget.ui \
     widgets/StringsWidget.ui \
-    widgets/SymbolsWidget.ui \
     widgets/HexdumpWidget.ui \
     dialogs/SaveProjectDialog.ui \
     dialogs/preferences/PreferencesDialog.ui \
     dialogs/preferences/AppearanceOptionsWidget.ui \
     dialogs/preferences/GraphOptionsWidget.ui \
+    dialogs/preferences/InitializationFileEditor.ui \
     widgets/QuickFilterView.ui \
-    widgets/PseudocodeWidget.ui \
+    widgets/DecompilerWidget.ui \
     widgets/ClassesWidget.ui \
     widgets/VTablesWidget.ui \
     widgets/TypesWidget.ui \
-    widgets/HeadersWidget.ui \
     widgets/SearchWidget.ui \
     dialogs/R2PluginsDialog.ui \
     dialogs/VersionInfoDialog.ui \
     widgets/ZignaturesWidget.ui \
     dialogs/AsyncTaskDialog.ui \
+    dialogs/R2TaskDialog.ui \
     widgets/StackWidget.ui \
     widgets/RegistersWidget.ui \
+    widgets/ThreadsWidget.ui \
+    widgets/ProcessesWidget.ui \
     widgets/BacktraceWidget.ui \
-    dialogs/OpenFileDialog.ui \
-    widgets/MemoryMapWidget.ui \
+    dialogs/MapFileDialog.ui \
     dialogs/preferences/DebugOptionsWidget.ui \
     widgets/BreakpointWidget.ui \
     dialogs/BreakpointsDialog.ui \
@@ -558,16 +680,21 @@ FORMS    += \
     dialogs/HexdumpRangeDialog.ui \
     dialogs/WelcomeDialog.ui \
     dialogs/EditMethodDialog.ui \
-    dialogs/LoadNewTypesDialog.ui \
+    dialogs/TypesInteractionDialog.ui \
     widgets/SdbWidget.ui \
     dialogs/LinkTypeDialog.ui \
     widgets/ColorPicker.ui \
-    dialogs/preferences/ColorThemeEditDialog.ui
+    dialogs/preferences/ColorThemeEditDialog.ui \
+    widgets/ListDockWidget.ui \
+    dialogs/LayoutManager.ui \
+    widgets/R2GraphWidget.ui \
+    dialogs/preferences/AnalOptionsWidget.ui
 
 RESOURCES += \
     resources.qrc \
     themes/native/native.qrc \
-    themes/qdarkstyle/style.qrc \
+    themes/qdarkstyle/dark.qrc \
+    themes/midnight/midnight.qrc \
     themes/lightstyle/light.qrc
 
 

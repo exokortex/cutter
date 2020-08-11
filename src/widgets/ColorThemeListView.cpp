@@ -3,6 +3,7 @@
 #include <QJsonArray>
 #include <QMap>
 #include <QPainter>
+#include <QPainterPath>
 #include <QFontMetrics>
 #include <QScreen>
 #include <QJsonArray>
@@ -10,12 +11,15 @@
 #include <QApplication>
 #include <QSvgRenderer>
 #include <QMouseEvent>
+#include <QSortFilterProxyModel>
 
 #include "common/Configuration.h"
 #include "common/ColorThemeWorker.h"
+#include "common/Helpers.h"
 
 #include "widgets/ColorThemeListView.h"
 
+constexpr int allFieldsRole = Qt::UserRole + 2;
 
 struct OptionInfo {
     QString info;
@@ -37,7 +41,7 @@ void ColorOptionDelegate::paint(QPainter *painter,
                                 const QStyleOptionViewItem &option,
                                 const QModelIndex &index) const
 {
-    int margin = this->margin * painter->device()->devicePixelRatioF();
+    int margin = this->margin * qhelpers::devicePixelRatio(painter->device());
     painter->save();
     painter->setFont(option.font);
     painter->setRenderHint(QPainter::Antialiasing);
@@ -133,7 +137,21 @@ void ColorOptionDelegate::paint(QPainter *painter,
 
     QPainterPath roundedColorRect;
     roundedColorRect.addRoundedRect(colorRect, fontHeight / 4, fontHeight / 4);
-    painter->setPen(Qt::NoPen);
+    // Create chess-like pattern of black and white squares
+    // and fill background of roundedColorRect with it
+    if (currCO.color.alpha() < 255) {
+        const int c1 = static_cast<int>(8 * qhelpers::devicePixelRatio(painter->device()));
+        const int c2 = c1 / 2;
+        QPixmap p(c1, c1);
+        QPainter paint(&p);
+        paint.fillRect(0, 0, c1, c1, Qt::white);
+        paint.fillRect(0, 0, c2, c2, Qt::black);
+        paint.fillRect(c2, c2, c2, c2, Qt::black);
+        QBrush b;
+        b.setTexture(p);
+        painter->fillPath(roundedColorRect, b);
+    }
+    painter->setPen(currCO.color);
     painter->fillPath(roundedColorRect, currCO.color);
 
     QString desc = painter->fontMetrics().elidedText(
@@ -149,7 +167,7 @@ void ColorOptionDelegate::paint(QPainter *painter,
 
 QSize ColorOptionDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
-    qreal margin = this->margin * option.widget->devicePixelRatioF();
+    qreal margin = this->margin * qhelpers::devicePixelRatio(option.widget);
     qreal fontHeight = option.fontMetrics.height();
     qreal h = QPen().width();
     h += fontHeight; // option name
@@ -175,7 +193,7 @@ QPixmap ColorOptionDelegate::getPixmapFromSvg(const QString& fileName, const QCo
         return QPixmap();
     }
     QString data = file.readAll();
-    data.replace(QRegExp("#[0-9a-fA-F]{6}"), QString("%1").arg(after.name()));
+    data.replace(QRegularExpression("#[0-9a-fA-F]{6}"), QString("%1").arg(after.name()));
 
     QSvgRenderer svgRenderer(data.toUtf8());
     QPixmap pix(QSize(qApp->fontMetrics().height(), qApp->fontMetrics().height()));
@@ -190,12 +208,19 @@ QPixmap ColorOptionDelegate::getPixmapFromSvg(const QString& fileName, const QCo
 ColorThemeListView::ColorThemeListView(QWidget *parent) :
     QListView (parent)
 {
-    setModel(new ColorSettingsModel(static_cast<QObject *>(this)));
-    static_cast<ColorSettingsModel *>(this->model())->updateTheme();
+    QSortFilterProxyModel* proxy = new QSortFilterProxyModel(this);
+    ColorSettingsModel* model = new ColorSettingsModel(this);
+    proxy->setSourceModel(model);
+    model->updateTheme();
+    setModel(proxy);
+    proxy->setFilterRole(allFieldsRole);
+    proxy->setFilterCaseSensitivity(Qt::CaseSensitivity::CaseInsensitive);
+    proxy->setSortRole(Qt::DisplayRole);
+    proxy->setSortCaseSensitivity(Qt::CaseSensitivity::CaseInsensitive);
     setItemDelegate(new ColorOptionDelegate(this));
     setResizeMode(ResizeMode::Adjust);
 
-    QJsonArray rgb = qobject_cast<ColorSettingsModel*>(model())->getTheme()
+    QJsonArray rgb = colorSettingsModel()->getTheme()
                      .object().find("gui.background").value().toArray();
     if (rgb.size() == 3) {
         backgroundColor = QColor(rgb[0].toInt(), rgb[1].toInt(), rgb[2].toInt());
@@ -217,7 +242,7 @@ void ColorThemeListView::currentChanged(const QModelIndex &current,
     ColorOption prev = previous.data(Qt::UserRole).value<ColorOption>();
     Config()->setColor(prev.optionName, prev.color);
     if (ThemeWorker().radare2SpecificOptions.contains(prev.optionName)) {
-        Core()->cmd(QString("ec %1 %2").arg(prev.optionName).arg(prev.color.name()));
+        Core()->cmdRaw(QString("ec %1 %2").arg(prev.optionName).arg(prev.color.name()));
     }
 
     QListView::currentChanged(current, previous);
@@ -239,13 +264,12 @@ void ColorThemeListView::dataChanged(const QModelIndex& topLeft, const QModelInd
 void ColorThemeListView::mouseReleaseEvent(QMouseEvent* e)
 {
     if (qobject_cast<ColorOptionDelegate*>(itemDelegate())->getResetButtonRect().contains(e->pos())) {
-        auto model = qobject_cast<ColorSettingsModel*>(this->model());
         ColorOption co = currentIndex().data(Qt::UserRole).value<ColorOption>();
         co.changed = false;
         QJsonArray rgb = ThemeWorker().getTheme(
                              Config()->getColorTheme()).object()[co.optionName].toArray();
         co.color = QColor(rgb[0].toInt(), rgb[1].toInt(), rgb[2].toInt());
-        model->setData(currentIndex(), QVariant::fromValue(co));
+        model()->setData(currentIndex(), QVariant::fromValue(co));
         QCursor c;
         c.setShape(Qt::CursorShape::ArrowCursor);
         setCursor(c);
@@ -265,6 +289,11 @@ void ColorThemeListView::mouseMoveEvent(QMouseEvent* e)
     }
 }
 
+ColorSettingsModel* ColorThemeListView::colorSettingsModel() const
+{
+    return static_cast<ColorSettingsModel *>(static_cast<QSortFilterProxyModel *>(model())->sourceModel());
+}
+
 void ColorThemeListView::blinkTimeout()
 {
     static enum { Normal, Invisible } state = Normal;
@@ -274,7 +303,7 @@ void ColorThemeListView::blinkTimeout()
     auto updateColor = [](const QString &name, const QColor &color) {
         Config()->setColor(name, color);
         if (ThemeWorker().radare2SpecificOptions.contains(name)) {
-            Core()->cmd(QString("ec %1 %2").arg(name).arg(color.name()));
+            Core()->cmdRaw(QString("ec %1 %2").arg(name).arg(color.name()));
         }
     };
 
@@ -314,6 +343,14 @@ QVariant ColorSettingsModel::data(const QModelIndex &index, int role) const
         return QVariant::fromValue(optionInfoMap__[theme.at(index.row()).optionName].info);
     }
 
+    if (role == allFieldsRole) {
+        const QString name = theme.at(index.row()).optionName;
+        return QVariant::fromValue(optionInfoMap__[name].displayingtext + " " +
+                optionInfoMap__[theme.at(index.row()).optionName].info + " " +
+                name);
+    }
+
+
     return QVariant();
 }
 
@@ -342,6 +379,12 @@ void ColorSettingsModel::updateTheme()
         theme.push_back({it.key(), QColor(rgb[0].toInt(), rgb[1].toInt(), rgb[2].toInt(), rgb[3].toInt()), false});
     }
 
+    std::sort(theme.begin(), theme.end(), [](const ColorOption& f, const ColorOption& s) {
+        QString s1 = optionInfoMap__[f.optionName].displayingtext;
+        QString s2 = optionInfoMap__[s.optionName].displayingtext;
+        int r = s1.compare(s2, Qt::CaseSensitivity::CaseInsensitive);
+        return r < 0;
+    });
     if (!theme.isEmpty()) {
         dataChanged(index(0), index(theme.size() - 1));
     }

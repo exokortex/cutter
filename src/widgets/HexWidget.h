@@ -3,6 +3,8 @@
 
 #include "Cutter.h"
 #include "dialogs/HexdumpRangeDialog.h"
+#include "common/IOModesController.h"
+
 #include <QScrollArea>
 #include <QTimer>
 #include <QMenu>
@@ -57,7 +59,7 @@ struct HexCursor
     bool isVisible;
     bool onAsciiArea;
     QTimer blinkTimer;
-    QRect screenPos;
+    QRectF screenPos;
     uint64_t address;
     QString cachedChar;
     QColor cachedColor;
@@ -73,8 +75,9 @@ class AbstractData
 public:
     virtual ~AbstractData() {}
     virtual void fetch(uint64_t addr, int len) = 0;
-    virtual const void *dataPtr(uint64_t addr) = 0;
+    virtual bool copy(void *out, uint64_t adr, size_t len) = 0;
     virtual uint64_t maxIndex() = 0;
+    virtual uint64_t minIndex() = 0;
 };
 
 class BufferData : public AbstractData
@@ -98,9 +101,12 @@ public:
 
     void fetch(uint64_t, int) override { }
 
-    const void *dataPtr(uint64_t addr) override
-    {
-        return m_buffer.constData() + addr;
+    bool copy(void *out, uint64_t addr, size_t len) override {
+        if (addr < static_cast<uint64_t>(m_buffer.size()) && (static_cast<uint64_t>(m_buffer.size()) - addr) < len) {
+            memcpy(out, m_buffer.constData() + addr, len);
+            return true;
+        }
+        return false;
     }
 
     uint64_t maxIndex() override
@@ -117,37 +123,61 @@ class MemoryData : public AbstractData
 public:
     MemoryData() {}
     ~MemoryData() override {}
+    static constexpr size_t BLOCK_SIZE = 4096;
 
     void fetch(uint64_t address, int length) override
     {
         // FIXME: reuse data if possible
-        uint64_t alignedAddr = address & ~(4096ULL - 1);
+        const uint64_t blockSize = 0x1000ULL;
+        uint64_t alignedAddr = address & ~(blockSize - 1);
         int offset = address - alignedAddr;
-        int len = (offset + length + (4096 - 1)) & ~(4096 - 1);
+        int len = (offset + length + (blockSize - 1)) & ~(blockSize - 1);
         m_firstBlockAddr = alignedAddr;
+        m_lastValidAddr = length ? alignedAddr + len - 1 : 0;
+        if (m_lastValidAddr < m_firstBlockAddr) {
+            m_lastValidAddr = -1;
+            len = m_lastValidAddr - m_firstBlockAddr + 1;
+        }
         m_blocks.clear();
         uint64_t addr = alignedAddr;
-        for (int i = 0; i < len / 4096; ++i, addr += 4096) {
-            m_blocks.append(Core()->ioRead(addr, 4096));
+        for (ut64 i = 0; i < len / blockSize; ++i, addr += blockSize) {
+            m_blocks.append(Core()->ioRead(addr, blockSize));
         }
     }
 
-    const void *dataPtr(uint64_t addr) override
-    {
+    bool copy(void *out, uint64_t addr, size_t len) override {
+        if (addr < m_firstBlockAddr || addr > m_lastValidAddr ||
+                (m_lastValidAddr - addr + 1) < len /* do not merge with last check to handle overflows */ || m_blocks.isEmpty()) {
+            return false;
+        }
+
         int totalOffset = addr - m_firstBlockAddr;
-        int blockId = totalOffset / 4096;
-        int blockOffset = totalOffset % 4096;
-        return static_cast<const void *>(m_blocks.at(blockId).constData() + blockOffset);
+        int blockId = totalOffset / BLOCK_SIZE;
+        int blockOffset = totalOffset % BLOCK_SIZE;
+        size_t first_part = BLOCK_SIZE - blockOffset;
+        if (first_part >= len) {
+            memcpy(out, m_blocks.at(blockId).constData() + blockOffset, len);
+        } else {
+            memcpy(out, m_blocks.at(blockId).constData() + blockOffset, first_part);
+            memcpy(static_cast<char*>(out) + first_part, m_blocks.at(blockId + 1).constData(), len - first_part);
+        }
+        return true;
     }
 
     virtual uint64_t maxIndex() override
     {
-        return UINT64_MAX;
+        return m_lastValidAddr;
+    }
+
+    virtual uint64_t minIndex() override
+    {
+        return m_firstBlockAddr;
     }
 
 private:
     QVector<QByteArray> m_blocks;
-    uint64_t m_firstBlockAddr;
+    uint64_t m_firstBlockAddr = 0;
+    uint64_t m_lastValidAddr = 0;
 };
 
 class HexSelection
@@ -282,6 +312,17 @@ private slots:
     void copyAddress();
     void onRangeDialogAccepted();
 
+    // Write command slots
+    void w_writeString();
+    void w_increaseDecrease();
+    void w_writeZeros();
+    void w_write64();
+    void w_writeRandom();
+    void w_duplFromOffset();
+    void w_writePascalString();
+    void w_writeWideString();
+    void w_writeCString();
+
 private:
     void updateItemLength();
     void updateCounts();
@@ -298,10 +339,18 @@ private:
     void setCursorAddr(BasicCursor addr, bool select = false);
     void updateCursorMeta();
     void setCursorOnAscii(bool ascii);
+    bool isItemDifferentAt(uint64_t address);
     const QColor itemColor(uint8_t byte);
     QVariant readItem(int offset, QColor *color = nullptr);
     QString renderItem(int offset, QColor *color = nullptr);
     QChar renderAscii(int offset, QColor *color = nullptr);
+    QString getFlagsAndComment(uint64_t address);
+    /**
+     * @brief Get the location on which operations such as Writing should apply.
+     * @return Start of selection if multiple bytes are selected. Otherwise, the curren seek of the widget.
+     */
+    RVA getLocationAddress();
+
     void fetchData();
     /**
      * @brief Convert mouse position to address.
@@ -314,11 +363,22 @@ private:
     BasicCursor asciiPosToAddr(const QPoint &point, bool middle = false) const;
     BasicCursor currentAreaPosToAddr(const QPoint &point, bool middle = false) const;
     BasicCursor mousePosToAddr(const QPoint &point, bool middle = false) const;
-    QRect itemRectangle(uint offset);
-    QRect asciiRectangle(uint offset);
+    /**
+     * @brief Rectangle for single item in data area.
+     * @param offset relative to first byte on screen
+     * @return
+     */
+    QRectF itemRectangle(int offset);
+    /**
+     * @brief Rectangle for single item in ascii area.
+     * @param offset relative to first byte on screen
+     * @return
+     */
+    QRectF asciiRectangle(int offset);
+    QVector<QPolygonF> rangePolygons(RVA start, RVA last, bool ascii);
     void updateWidth();
 
-    inline int itemWidth() const
+    inline qreal itemWidth() const
     {
         return itemCharLen * charWidth;
     }
@@ -338,17 +398,17 @@ private:
         return itemByteLen * itemGroupSize;
     }
 
-    inline int columnWidth() const
+    inline qreal columnWidth() const
     {
         return itemGroupCharLen() * charWidth;
     }
 
-    inline int columnExWidth() const
+    inline qreal columnExWidth() const
     {
         return columnExCharLen() * charWidth;
     }
 
-    inline int columnSpacingWidth() const
+    inline qreal columnSpacingWidth() const
     {
         return columnSpacing * charWidth;
     }
@@ -368,17 +428,17 @@ private:
         return itemRowByteLen() * visibleLines;
     }
 
-    inline int itemRowWidth() const
+    inline qreal itemRowWidth() const
     {
         return itemRowCharLen() * charWidth;
     }
 
-    inline int asciiRowWidth() const
+    inline qreal asciiRowWidth() const
     {
         return itemRowByteLen() * charWidth;
     }
 
-    inline int areaSpacingWidth() const
+    inline qreal areaSpacingWidth() const
     {
         return areaSpacing * charWidth;
     }
@@ -388,7 +448,7 @@ private:
         return (startAddress - 1) + bytesPerScreen();
     }
 
-    const QRect &currentArea() const
+    const QRectF &currentArea() const
     {
         return cursorOnAscii ? asciiArea : itemArea;
     }
@@ -401,16 +461,16 @@ private:
     HexSelection selection;
     bool updatingSelection;
 
-    QRect addrArea;
-    QRect itemArea;
-    QRect asciiArea;
+    QRectF addrArea;
+    QRectF itemArea;
+    QRectF asciiArea;
 
-    int itemByteLen;
-    int itemGroupSize; ///< Items per group (default: 1), 2 in case of hexpair mode
-    int rowSizeBytes; ///< Line size in bytes
-    int itemColumns; ///< Number of columns, single column consists of itemGroupSize items
-    int itemCharLen;
-    int itemPrefixLen;
+    int itemByteLen = 1;
+    int itemGroupSize = 1; ///< Items per group (default: 1), 2 in case of hexpair mode
+    int rowSizeBytes = 16; ///< Line size in bytes
+    int itemColumns = 16; ///< Number of columns, single column consists of itemGroupSize items
+    int itemCharLen = 2;
+    int itemPrefixLen = 0;
     ColumnMode columnMode;
 
     ItemFormat itemFormat;
@@ -419,9 +479,9 @@ private:
 
     int visibleLines;
     uint64_t startAddress;
-    int charWidth;
+    qreal charWidth;
     int byteWidth;
-    int lineHeight;
+    qreal lineHeight;
     int addrCharLen;
     int addrAreaWidth;
     QFont monospaceFont;
@@ -435,6 +495,7 @@ private:
     QColor backgroundColor;
     QColor defColor;
     QColor addrColor;
+    QColor diffColor;
     QColor b0x00Color;
     QColor b0x7fColor;
     QColor b0xffColor;
@@ -457,8 +518,13 @@ private:
     QAction *actionCopy;
     QAction *actionCopyAddress;
     QAction *actionSelectRange;
+    QList<QAction *> actionsWriteString;
+    QList<QAction *> actionsWriteOther;
 
+    std::unique_ptr<AbstractData> oldData;
     std::unique_ptr<AbstractData> data;
+    IOModesController ioModesController;
+
 };
 
 #endif // HEXWIDGET_H

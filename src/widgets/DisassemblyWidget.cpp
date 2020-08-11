@@ -3,13 +3,19 @@
 #include "common/Configuration.h"
 #include "common/Helpers.h"
 #include "common/TempConfig.h"
+#include "common/SelectionHighlight.h"
+#include "core/MainWindow.h"
 
+#include <QApplication>
 #include <QScrollBar>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QVBoxLayout>
 #include <QRegularExpression>
 #include <QTextBlockUserData>
+#include <QPainter>
+#include <QPainterPath>
+#include <QSplitter>
 
 
 class DisassemblyTextBlockUserData: public QTextBlockUserData
@@ -33,39 +39,69 @@ static DisassemblyTextBlockUserData *getUserData(const QTextBlock &block)
     return static_cast<DisassemblyTextBlockUserData *>(userData);
 }
 
-DisassemblyWidget::DisassemblyWidget(MainWindow *main, QAction *action)
-    :   MemoryDockWidget(CutterCore::MemoryWidgetType::Disassembly, main, action)
-    ,   mCtxMenu(new DisassemblyContextMenu(this))
+DisassemblyWidget::DisassemblyWidget(MainWindow *main)
+    :   MemoryDockWidget(MemoryWidgetType::Disassembly, main)
+    ,   mCtxMenu(new DisassemblyContextMenu(this, main))
     ,   mDisasScrollArea(new DisassemblyScrollArea(this))
     ,   mDisasTextEdit(new DisassemblyTextEdit(this))
-    ,   seekable(new CutterSeekable(this))
 {
-    /*
-     * Ugly hack just for the layout issue
-     * QSettings saves the state with the object names
-     * By doing this hack,
-     * you can at least avoid some mess by dismissing all the Extra Widgets
-     */
-    QString name = "Disassembly";
-    if (!action) {
-        name = "Extra Disassembly";
-    }
-    setObjectName(name);
+    setObjectName(main
+                  ? main->getUniqueObjectName(getWidgetType())
+                  : getWidgetType());
 
     topOffset = bottomOffset = RVA_INVALID;
     cursorLineOffset = 0;
     cursorCharOffset = 0;
     seekFromCursor = false;
 
-    setWindowTitle(tr("Disassembly"));
+    setWindowTitle(getWindowTitle());
 
-    QVBoxLayout *layout = new QVBoxLayout();
+    // Instantiate the window layout
+    auto *splitter = new QSplitter;
+
+    // Setup the left frame that contains breakpoints and jumps
+    leftPanel = new DisassemblyLeftPanel(this);
+    splitter->addWidget(leftPanel);
+
+    // Setup the disassembly content
+    auto *layout = new QHBoxLayout;
     layout->addWidget(mDisasTextEdit);
     layout->setMargin(0);
     mDisasScrollArea->viewport()->setLayout(layout);
-    mDisasScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    splitter->addWidget(mDisasScrollArea);
+    mDisasScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarPolicy::ScrollBarAlwaysOff);
+    // Use stylesheet instead of QWidget::setFrameShape(QFrame::NoShape) to avoid
+    // issues with dark and light interface themes
+    mDisasScrollArea->setStyleSheet("QAbstractScrollArea { border: 0px transparent black; }");
+    mDisasTextEdit->setStyleSheet("QPlainTextEdit { border: 0px transparent black; }");
+    mDisasTextEdit->setFocusProxy(this);
+    mDisasTextEdit->setFocusPolicy(Qt::ClickFocus);
+    mDisasScrollArea->setFocusProxy(this);
+    mDisasScrollArea->setFocusPolicy(Qt::ClickFocus);
 
-    setWidget(mDisasScrollArea);
+    setFocusPolicy(Qt::ClickFocus);
+
+    // Behave like all widgets: highlight on focus and hover
+    connect(qApp, &QApplication::focusChanged, this, [this](QWidget* , QWidget* now) {
+        QColor borderColor = this == now
+                             ? palette().color(QPalette::Highlight)
+                             : palette().color(QPalette::WindowText).darker();
+        widget()->setStyleSheet(QString("QSplitter { border: %1px solid %2 } \n"
+                                        "QSplitter:hover { border: %1px solid %3 } \n")
+                                .arg(devicePixelRatio())
+                                .arg(borderColor.name())
+                                .arg(palette().color(QPalette::Highlight).name()));
+    });
+
+    splitter->setFrameShape(QFrame::Box);
+    // Set current widget to the splitted layout we just created
+    setWidget(splitter);
+
+    // Resize properly
+    QList<int> sizes;
+    sizes.append(3);
+    sizes.append(1);
+    splitter->setSizes(sizes);
 
     setAllowedAreas(Qt::AllDockWidgetAreas);
 
@@ -95,12 +131,12 @@ DisassemblyWidget::DisassemblyWidget(MainWindow *main, QAction *action)
 
     // Set Disas context menu
     mDisasTextEdit->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(mDisasTextEdit, SIGNAL(customContextMenuRequested(const QPoint &)),
-            this, SLOT(showDisasContextMenu(const QPoint &)));
+    connect(mDisasTextEdit, &QWidget::customContextMenuRequested,
+            this, &DisassemblyWidget::showDisasContextMenu);
 
 
-    connect(mDisasScrollArea, SIGNAL(scrollLines(int)), this, SLOT(scrollInstructions(int)));
-    connect(mDisasScrollArea, SIGNAL(disassemblyResized()), this, SLOT(updateMaxLines()));
+    connect(mDisasScrollArea, &DisassemblyScrollArea::scrollLines, this, &DisassemblyWidget::scrollInstructions);
+    connect(mDisasScrollArea, &DisassemblyScrollArea::disassemblyResized, this, &DisassemblyWidget::updateMaxLines);
 
     connectCursorPositionChanged(false);
     connect(mDisasTextEdit->verticalScrollBar(), &QScrollBar::valueChanged, this, [ = ](int value) {
@@ -123,28 +159,18 @@ DisassemblyWidget::DisassemblyWidget(MainWindow *main, QAction *action)
     });
     connect(Core(), SIGNAL(refreshCodeViews()), this, SLOT(refreshDisasm()));
 
-    connect(Config(), SIGNAL(fontsUpdated()), this, SLOT(fontsUpdatedSlot()));
-    connect(Config(), SIGNAL(colorsUpdated()), this, SLOT(colorsUpdatedSlot()));
-
-    connect(this, &QDockWidget::visibilityChanged, this, [](bool visibility) {
-        bool emptyGraph = (Core()->getMemoryWidgetPriority() == CutterCore::MemoryWidgetType::Graph
-                           && Core()->isGraphEmpty());
-        if (visibility && !emptyGraph) {
-            Core()->setMemoryWidgetPriority(CutterCore::MemoryWidgetType::Disassembly);
-        }
-    });
+    connect(Config(), &Configuration::fontsUpdated, this, &DisassemblyWidget::fontsUpdatedSlot);
+    connect(Config(), &Configuration::colorsUpdated, this, &DisassemblyWidget::colorsUpdatedSlot);
 
     connect(Core(), &CutterCore::refreshAll, this, [this]() {
         refreshDisasm(seekable->getOffset());
     });
     refreshDisasm(seekable->getOffset());
 
-    connect(mCtxMenu, SIGNAL(copy()), mDisasTextEdit, SLOT(copy()));
+    connect(mCtxMenu, &DisassemblyContextMenu::copy, mDisasTextEdit, &QPlainTextEdit::copy);
 
     mCtxMenu->addSeparator();
-    syncIt.setText(tr("Sync/unsync offset"));
-    mCtxMenu->addAction(&syncIt);
-    connect(&syncIt, SIGNAL(triggered(bool)), this, SLOT(toggleSync()));
+    mCtxMenu->addAction(&syncAction);
     connect(seekable, &CutterSeekable::seekableSeekChanged, this, &DisassemblyWidget::on_seekChanged);
 
     addActions(mCtxMenu->actions());
@@ -157,9 +183,8 @@ DisassemblyWidget::DisassemblyWidget(MainWindow *main, QAction *action)
     connect(a, &QAction::triggered, this, (slot)); }
 
     // Space to switch to graph
-    ADD_ACTION(Qt::Key_Space, Qt::WidgetWithChildrenShortcut, [] {
-        Core()->setMemoryWidgetPriority(CutterCore::MemoryWidgetType::Graph);
-        Core()->triggerRaisePrioritizedMemoryWidget();
+    ADD_ACTION(Qt::Key_Space, Qt::WidgetWithChildrenShortcut, [this] {
+        mainWindow->showMemoryWidget(MemoryWidgetType::Graph);
     })
 
     ADD_ACTION(Qt::Key_Escape, Qt::WidgetWithChildrenShortcut, &DisassemblyWidget::seekPrev)
@@ -182,24 +207,7 @@ DisassemblyWidget::DisassemblyWidget(MainWindow *main, QAction *action)
     ADD_ACTION(QKeySequence::MoveToPreviousPage, Qt::WidgetWithChildrenShortcut, [this]() {
         moveCursorRelative(true, true);
     })
-    
-    // Plus sign in num-bar considered "Qt::Key_Equal"
-    ADD_ACTION(QKeySequence(Qt::CTRL + Qt::Key_Equal), Qt::WidgetWithChildrenShortcut, &DisassemblyWidget::zoomIn)
-    // Plus sign in numpad
-    ADD_ACTION(QKeySequence(Qt::CTRL + Qt::Key_Plus), Qt::WidgetWithChildrenShortcut, &DisassemblyWidget::zoomIn)
-    ADD_ACTION(QKeySequence(Qt::CTRL + Qt::Key_Minus), Qt::WidgetWithChildrenShortcut, &DisassemblyWidget::zoomOut)
 #undef ADD_ACTION
-}
-
-void DisassemblyWidget::toggleSync()
-{
-    QString windowTitle = tr("Disassembly");
-    seekable->toggleSynchronization();
-    if (seekable->isSynchronized()) {
-        setWindowTitle(windowTitle);
-    } else {
-        setWindowTitle(windowTitle + CutterSeekable::tr(" (unsynced)"));
-    }
 }
 
 void DisassemblyWidget::setPreviewMode(bool previewMode)
@@ -217,14 +225,29 @@ void DisassemblyWidget::setPreviewMode(bool previewMode)
             action->setEnabled(!previewMode);
         }
     }
-    if (seekable->isSynchronized() && previewMode) {
-        toggleSync();
+    if (previewMode) {
+        seekable->setSynchronization(false);
     }
 }
 
 QWidget *DisassemblyWidget::getTextWidget()
 {
     return mDisasTextEdit;
+}
+
+QString DisassemblyWidget::getWidgetType()
+{
+    return "Disassembly";
+}
+
+QFontMetrics DisassemblyWidget::getFontMetrics()
+{
+    return mDisasTextEdit->fontMetrics();
+}
+
+QList<DisassemblyLine> DisassemblyWidget::getLines()
+{
+    return lines;
 }
 
 void DisassemblyWidget::refreshDisasm(RVA offset)
@@ -252,11 +275,12 @@ void DisassemblyWidget::refreshDisasm(RVA offset)
     int horizontalScrollValue = mDisasTextEdit->horizontalScrollBar()->value();
     mDisasTextEdit->setLockScroll(true); // avoid flicker
 
-    QList<DisassemblyLine> disassemblyLines;
+    // Retrieve disassembly lines
     {
         TempConfig tempConfig;
-        tempConfig.set("scr.color", COLOR_MODE_16M);
-        disassemblyLines = Core()->disassembleLines(topOffset, maxLines);
+        tempConfig.set("scr.color", COLOR_MODE_16M)
+		.set("asm.lines", false);
+        lines = Core()->disassembleLines(topOffset, maxLines);
     }
 
     connectCursorPositionChanged(true);
@@ -264,7 +288,7 @@ void DisassemblyWidget::refreshDisasm(RVA offset)
     mDisasTextEdit->document()->clear();
     QTextCursor cursor(mDisasTextEdit->document());
     QTextBlockFormat regular = cursor.blockFormat();
-    for (const DisassemblyLine &line : disassemblyLines) {
+    for (const DisassemblyLine &line : lines) {
         if (line.offset < topOffset) { // overflow
             break;
         }
@@ -280,8 +304,8 @@ void DisassemblyWidget::refreshDisasm(RVA offset)
         cursor.setBlockFormat(regular);
     }
 
-    if (!disassemblyLines.isEmpty()) {
-        bottomOffset = disassemblyLines[qMin(disassemblyLines.size(), maxLines) - 1].offset;
+    if (!lines.isEmpty()) {
+        bottomOffset = lines[qMin(lines.size(), maxLines) - 1].offset;
         if (bottomOffset < topOffset) {
             bottomOffset = RVA_MAX;
         }
@@ -303,6 +327,9 @@ void DisassemblyWidget::refreshDisasm(RVA offset)
 
     mDisasTextEdit->setLockScroll(false);
     mDisasTextEdit->horizontalScrollBar()->setValue(horizontalScrollValue);
+
+    // Refresh the left panel (trigger paintEvent)
+    leftPanel->update();
 }
 
 
@@ -342,18 +369,6 @@ bool DisassemblyWidget::updateMaxLines()
     return false;
 }
 
-void DisassemblyWidget::zoomIn()
-{
-    mDisasTextEdit->zoomIn();
-    updateMaxLines();
-}
-
-void DisassemblyWidget::zoomOut()
-{
-    mDisasTextEdit->zoomOut();
-    updateMaxLines();
-}
-
 void DisassemblyWidget::highlightCurrentLine()
 {
     QList<QTextEdit::ExtraSelection> extraSelections;
@@ -390,7 +405,7 @@ void DisassemblyWidget::highlightCurrentLine()
     }
 
     // Highlight all the words in the document same as the current one
-    extraSelections.append(getSameWordsSelections());
+    extraSelections.append(createSameWordsSelections(mDisasTextEdit, curHighlightedWord));
 
     // highlight PC line
     RVA PCAddr = Core()->getProgramCounterValue();
@@ -454,7 +469,7 @@ void DisassemblyWidget::updateCursorPosition()
 
     if (offset < topOffset || (offset > bottomOffset && bottomOffset != RVA_INVALID)) {
         mDisasTextEdit->moveCursor(QTextCursor::Start);
-        mDisasTextEdit->setExtraSelections(getSameWordsSelections());
+        mDisasTextEdit->setExtraSelections(createSameWordsSelections(mDisasTextEdit, curHighlightedWord));
     } else {
         RVA currentCursorOffset = readCurrentDisassemblyOffset();
         QTextCursor originalCursor = mDisasTextEdit->textCursor();
@@ -502,10 +517,10 @@ void DisassemblyWidget::updateCursorPosition()
 void DisassemblyWidget::connectCursorPositionChanged(bool disconnect)
 {
     if (disconnect) {
-        QObject::disconnect(mDisasTextEdit, SIGNAL(cursorPositionChanged()), this,
-                            SLOT(cursorPositionChanged()));
+        QObject::disconnect(mDisasTextEdit, &QPlainTextEdit::cursorPositionChanged,
+                            this, &DisassemblyWidget::cursorPositionChanged);
     } else {
-        connect(mDisasTextEdit, SIGNAL(cursorPositionChanged()), this, SLOT(cursorPositionChanged()));
+        connect(mDisasTextEdit, &QPlainTextEdit::cursorPositionChanged, this, &DisassemblyWidget::cursorPositionChanged);
     }
 }
 
@@ -536,6 +551,7 @@ void DisassemblyWidget::cursorPositionChanged()
         // No word is selected so use the word under the cursor
         mCtxMenu->setCurHighlightedWord(curHighlightedWord);
     }
+    leftPanel->update();
 }
 
 void DisassemblyWidget::moveCursorRelative(bool up, bool page)
@@ -599,31 +615,10 @@ void DisassemblyWidget::moveCursorRelative(bool up, bool page)
     }
 }
 
-QList<QTextEdit::ExtraSelection> DisassemblyWidget::getSameWordsSelections()
+void DisassemblyWidget::jumpToOffsetUnderCursor(const QTextCursor &cursor)
 {
-    QList<QTextEdit::ExtraSelection> selections;
-    QTextEdit::ExtraSelection highlightSelection;
-    QTextDocument *document = mDisasTextEdit->document();
-    QColor highlightWordColor = ConfigColor("wordHighlight");
-
-    if (curHighlightedWord.isNull()) {
-        return QList<QTextEdit::ExtraSelection>();
-    }
-
-    highlightSelection.cursor = mDisasTextEdit->textCursor();
-    highlightSelection.cursor.movePosition(QTextCursor::Start, QTextCursor::MoveAnchor);
-
-    while (!highlightSelection.cursor.isNull() && !highlightSelection.cursor.atEnd()) {
-        highlightSelection.cursor = document->find(curHighlightedWord, highlightSelection.cursor,
-                                                   QTextDocument::FindWholeWords);
-
-        if (!highlightSelection.cursor.isNull()) {
-            highlightSelection.format.setBackground(highlightWordColor);
-
-            selections.append(highlightSelection);
-        }
-    }
-    return selections;
+    RVA offset = readDisassemblyOffset(cursor);
+    seekable->seekToReference(offset);
 }
 
 bool DisassemblyWidget::eventFilter(QObject *obj, QEvent *event)
@@ -632,27 +627,28 @@ bool DisassemblyWidget::eventFilter(QObject *obj, QEvent *event)
         && (obj == mDisasTextEdit || obj == mDisasTextEdit->viewport())) {
         QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
 
-        QTextCursor cursor = mDisasTextEdit->cursorForPosition(QPoint(mouseEvent->x(), mouseEvent->y()));
-        RVA offset = readDisassemblyOffset(cursor);
-
-        RVA jump = Core()->getOffsetJump(offset);
-
-        if (jump == RVA_INVALID) {
-            bool ok;
-            RVA xref = Core()->cmdj("axfj@" + QString::number(
-                offset)).array().first().toObject().value("to").toVariant().toULongLong(&ok);
-            if (ok) {
-                jump = xref;
-            }
-        }
-
-        if (jump != RVA_INVALID) {
-            seekable->seek(jump);
-        }
+        const QTextCursor& cursor = mDisasTextEdit->cursorForPosition(QPoint(mouseEvent->x(), mouseEvent->y()));
+        jumpToOffsetUnderCursor(cursor);
 
         return true;
     }
-    return CutterDockWidget::eventFilter(obj, event);
+
+    return MemoryDockWidget::eventFilter(obj, event);
+}
+
+void DisassemblyWidget::keyPressEvent(QKeyEvent *event)
+{
+    if(event->key() == Qt::Key_Return) {
+        const QTextCursor cursor = mDisasTextEdit->textCursor();
+        jumpToOffsetUnderCursor(cursor);
+    }
+
+    MemoryDockWidget::keyPressEvent(event);
+}
+
+QString DisassemblyWidget::getWindowTitle() const
+{
+    return tr("Disassembly");
 }
 
 void DisassemblyWidget::on_seekChanged(RVA offset)
@@ -728,6 +724,12 @@ void DisassemblyScrollArea::resetScrollBars()
     verticalScrollBar()->blockSignals(false);
 }
 
+qreal DisassemblyTextEdit::textOffset() const
+{
+    return (blockBoundingGeometry(document()->begin()).topLeft() +
+            contentOffset()).y();
+}
+
 bool DisassemblyTextEdit::viewportEvent(QEvent *event)
 {
     switch (event->type()) {
@@ -763,4 +765,164 @@ void DisassemblyTextEdit::mousePressEvent(QMouseEvent *event)
 void DisassemblyWidget::seekPrev()
 {
     Core()->seekPrev();
+}
+
+/*********************
+ * Left panel
+ *********************/
+
+struct Range {
+    Range(RVA v1, RVA v2)
+        : from(v1), to(v2) { if (from > to) std::swap(from, to); }
+    RVA from;
+    RVA to;
+
+    inline bool contains(const Range& other) const
+    {
+        return from <= other.from && to >= other.to;
+    }
+
+    inline bool contains(RVA point) const
+    {
+        return from <= point && to >= point;
+    }
+};
+
+DisassemblyLeftPanel::DisassemblyLeftPanel(DisassemblyWidget *disas)
+{
+    this->disas = disas;
+}
+
+void DisassemblyLeftPanel::wheelEvent(QWheelEvent *event) {
+    int count = -(event->angleDelta() / 15).y();
+    count -= (count > 0 ? 5 : -5);
+
+    this->disas->scrollInstructions(count);
+}
+
+void DisassemblyLeftPanel::paintEvent(QPaintEvent *event)
+{
+    Q_UNUSED(event)
+
+    using namespace std;
+    constexpr int penSizePix = 1;
+    constexpr int distanceBetweenLines = 10;
+    constexpr int arrowWidth = 5;
+    int rightOffset = size().rwidth();
+    auto tEdit = qobject_cast<DisassemblyTextEdit*>(disas->getTextWidget());
+    int topOffset = int(tEdit->contentsMargins().top() + tEdit->textOffset());
+    int lineHeight = disas->getFontMetrics().height();
+    QColor arrowColorDown = ConfigColor("flow");
+    QColor arrowColorUp = ConfigColor("cflow");
+    QPainter p(this);
+    QPen penDown(arrowColorDown, penSizePix, Qt::SolidLine, Qt::FlatCap, Qt::RoundJoin);
+    QPen penUp(arrowColorUp, penSizePix, Qt::SolidLine, Qt::FlatCap, Qt::RoundJoin);
+    // Fill background
+    p.fillRect(event->rect(), Config()->getColor("gui.background").darker(115));
+
+    QList<DisassemblyLine> lines = disas->getLines();
+
+    QMap<RVA, int> linesPixPosition;
+    QMap<RVA, pair<RVA, int>> arrowInfo; /* offset -> (arrow, layer of arrow) */
+    int nLines = 0;
+    for (const auto& line : lines) {
+        linesPixPosition[line.offset] = nLines * lineHeight + lineHeight / 2 + topOffset;
+        nLines++;
+        if (line.arrow != RVA_INVALID) {
+            arrowInfo.insert(line.offset, { line.arrow, -1 });
+        }
+    }
+
+    for (auto it = arrowInfo.begin(); it != arrowInfo.end(); it++) {
+        Range currRange = { it.key(), it.value().first };
+        it.value().second = it.value().second == -1
+                            ? 1
+                            : it.value().second;
+        for (auto innerIt = arrowInfo.begin(); innerIt != arrowInfo.end(); innerIt++) {
+            if (innerIt == it) {
+                continue;
+            }
+            Range innerRange = { innerIt.key(), innerIt.value().first };
+            if (currRange.contains(innerRange) || currRange.contains(innerRange.from)) {
+                it.value().second++;
+            }
+        }
+    }
+
+    // I'm sorry this loop below, but it is only way I see how to implement the feature
+    while (true) {
+        bool correction = false;
+        bool correction2 = false;
+        for (auto it = arrowInfo.begin(); it != arrowInfo.end(); it++) {
+            int minDistance = INT32_MAX;
+            Range currRange = { it.key(), it.value().first };
+            for (auto innerIt = arrowInfo.begin(); innerIt != arrowInfo.end(); innerIt++) {
+                if (innerIt == it) {
+                    continue;
+                }
+                Range innerRange = { innerIt.key(), innerIt.value().first };
+                if (it.value().second == innerIt.value().second &&
+                    (currRange.contains(innerRange) || currRange.contains(innerRange.from))) {
+                    it.value().second++;
+                    correction = true;
+                }
+                int distance = it.value().second - innerIt.value().second;
+                if (distance > 0 && distance < minDistance) {
+                    minDistance = distance;
+                }
+            }
+            if (minDistance > 1 && minDistance != INT32_MAX) {
+                correction2 = true;
+                it.value().second -= minDistance - 1;
+            }
+        }
+        if (!correction && !correction2) {
+            break;
+        }
+    }
+
+    const RVA currOffset = disas->getSeekable()->getOffset();
+    qreal pixelRatio = qhelpers::devicePixelRatio(p.device());
+    // Draw the lines
+    for (const auto& l : lines) {
+        int lineOffset = int((distanceBetweenLines * arrowInfo[l.offset].second + distanceBetweenLines) *
+                         pixelRatio);
+        // Skip until we reach a line that jumps to a destination
+        if (l.arrow == RVA_INVALID) {
+            continue;
+        }
+
+        bool jumpDown = l.arrow > l.offset;
+        p.setPen(jumpDown ? penDown : penUp);
+        if (l.offset == currOffset || l.arrow == currOffset) {
+            QPen pen = p.pen();
+            pen.setWidthF((penSizePix * 3) / 2.0);
+            p.setPen(pen);
+        }
+        bool endVisible = true;
+
+        int currentLineYPos = linesPixPosition[l.offset];
+        int lineArrowY = linesPixPosition.value(l.arrow, -1);
+
+        if (lineArrowY == -1) {
+            lineArrowY = jumpDown
+                              ? geometry().bottom()
+                              : 0;
+            endVisible = false;
+        }
+
+        // Draw the lines
+        p.drawLine(rightOffset, currentLineYPos, rightOffset - lineOffset, currentLineYPos);
+        p.drawLine(rightOffset - lineOffset, currentLineYPos, rightOffset - lineOffset, lineArrowY);
+
+        if (endVisible) {
+            p.drawLine(rightOffset - lineOffset, lineArrowY, rightOffset, lineArrowY);
+
+            QPainterPath arrow;
+            arrow.moveTo(rightOffset - arrowWidth, lineArrowY + arrowWidth);
+            arrow.lineTo(rightOffset - arrowWidth, lineArrowY - arrowWidth);
+            arrow.lineTo(rightOffset, lineArrowY);
+            p.fillPath(arrow, p.pen().brush());
+        }
+    }
 }

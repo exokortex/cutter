@@ -1,5 +1,5 @@
 #include "ImportsWidget.h"
-#include "ui_ImportsWidget.h"
+#include "ui_ListDockWidget.h"
 #include "WidgetShortcuts.h"
 #include "core/MainWindow.h"
 #include "common/Helpers.h"
@@ -10,7 +10,7 @@
 #include <QTreeWidget>
 
 ImportsModel::ImportsModel(QList<ImportDescription> *imports, QObject *parent) :
-    QAbstractTableModel(parent),
+    AddressableItemModel(parent),
     imports(imports)
 {}
 
@@ -46,6 +46,8 @@ QVariant ImportsModel::data(const QModelIndex &index, int role) const
             return import.type;
         case ImportsModel::SafetyColumn:
             return banned.match(import.name).hasMatch() ? tr("Unsafe") : QStringLiteral("");
+        case ImportsModel::LibraryColumn:
+            return import.libname;
         case ImportsModel::NameColumn:
             return import.name;
         default:
@@ -72,6 +74,8 @@ QVariant ImportsModel::headerData(int section, Qt::Orientation, int role) const
             return tr("Type");
         case ImportsModel::SafetyColumn:
             return tr("Safety");
+        case ImportsModel::LibraryColumn:
+            return tr("Library");
         case ImportsModel::NameColumn:
             return tr("Name");
         default:
@@ -81,10 +85,27 @@ QVariant ImportsModel::headerData(int section, Qt::Orientation, int role) const
     return QVariant();
 }
 
-ImportsProxyModel::ImportsProxyModel(ImportsModel *sourceModel, QObject *parent)
-    : QSortFilterProxyModel(parent)
+RVA ImportsModel::address(const QModelIndex &index) const
 {
-    setSourceModel(sourceModel);
+    const ImportDescription &import = imports->at(index.row());
+    return import.plt;
+}
+
+QString ImportsModel::name(const QModelIndex &index) const
+{
+    const ImportDescription &import = imports->at(index.row());
+    return import.name;
+}
+
+QString ImportsModel::libname(const QModelIndex &index) const
+{
+    const ImportDescription &import = imports->at(index.row());
+    return import.libname;
+}
+
+ImportsProxyModel::ImportsProxyModel(ImportsModel *sourceModel, QObject *parent)
+    : AddressableFilterProxyModel(sourceModel, parent)
+{
     setFilterCaseSensitivity(Qt::CaseInsensitive);
     setSortCaseSensitivity(Qt::CaseInsensitive);
 }
@@ -115,8 +136,13 @@ bool ImportsProxyModel::lessThan(const QModelIndex &left, const QModelIndex &rig
         return leftImport.type < rightImport.type;
     case ImportsModel::SafetyColumn:
         break;
+    case ImportsModel::LibraryColumn:
+        if (leftImport.libname != rightImport.libname)
+            return leftImport.libname < rightImport.libname;
+    // Fallthrough. Sort by Library and then by import name
     case ImportsModel::NameColumn:
         return leftImport.name < rightImport.name;
+        
     default:
         break;
     }
@@ -128,48 +154,24 @@ bool ImportsProxyModel::lessThan(const QModelIndex &left, const QModelIndex &rig
  * Imports Widget
  */
 
-ImportsWidget::ImportsWidget(MainWindow *main, QAction *action) :
-    CutterDockWidget(main, action),
-    ui(new Ui::ImportsWidget),
+ImportsWidget::ImportsWidget(MainWindow *main) :
+    ListDockWidget(main),
     importsModel(new ImportsModel(&imports, this)),
-    importsProxyModel(new ImportsProxyModel(importsModel, this)),
-    tree(new CutterTreeWidget(this))
+    importsProxyModel(new ImportsProxyModel(importsModel, this))
 {
-    ui->setupUi(this);
+    setWindowTitle(tr("Imports"));
+    setObjectName("ImportsWidget");
 
-    // Add Status Bar footer
-    tree->addStatusBar(ui->verticalLayout);
-
-    ui->importsTreeView->setModel(importsProxyModel);
-    ui->importsTreeView->sortByColumn(ImportsModel::NameColumn, Qt::AscendingOrder);
-
+    setModels(importsProxyModel);
+    // Sort by library name by default to create a solid context per each group of imports
+    ui->treeView->sortByColumn(ImportsModel::LibraryColumn, Qt::AscendingOrder);
     QShortcut *toggle_shortcut = new QShortcut(widgetShortcuts["ImportsWidget"], main);
     connect(toggle_shortcut, &QShortcut::activated, this, [=] (){ 
-            toggleDockWidget(true); 
-            main->updateDockActionChecked(action);
+            toggleDockWidget(true);
             } );
 
-    // Ctrl-F to show/hide the filter entry
-    QShortcut *searchShortcut = new QShortcut(QKeySequence::Find, this);
-    connect(searchShortcut, &QShortcut::activated, ui->quickFilterView, &QuickFilterView::showFilter);
-    searchShortcut->setContext(Qt::WidgetWithChildrenShortcut);
-
-    // Esc to clear the filter entry
-    QShortcut *clearShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
-    connect(clearShortcut, &QShortcut::activated, ui->quickFilterView, &QuickFilterView::clearFilter);
-    clearShortcut->setContext(Qt::WidgetWithChildrenShortcut);
-
-    connect(ui->quickFilterView, SIGNAL(filterTextChanged(const QString &)),
-            importsProxyModel, SLOT(setFilterWildcard(const QString &)));
-    connect(ui->quickFilterView, SIGNAL(filterClosed()), ui->importsTreeView, SLOT(setFocus()));
-
-    connect(ui->quickFilterView, &QuickFilterView::filterTextChanged, this, [this] {
-        tree->showItemsNumber(importsProxyModel->rowCount());
-    });
-    
-    setScrollMode();
-
-    connect(Core(), SIGNAL(refreshAll()), this, SLOT(refreshImports()));
+    connect(Core(), &CutterCore::codeRebased, this, &ImportsWidget::refreshImports);
+    connect(Core(), &CutterCore::refreshAll, this, &ImportsWidget::refreshImports);
 }
 
 ImportsWidget::~ImportsWidget() {}
@@ -179,20 +181,5 @@ void ImportsWidget::refreshImports()
     importsModel->beginResetModel();
     imports = Core()->getAllImports();
     importsModel->endResetModel();
-    qhelpers::adjustColumns(ui->importsTreeView, 4, 0);
-
-    tree->showItemsNumber(importsProxyModel->rowCount());
-}
-
-void ImportsWidget::setScrollMode()
-{
-    qhelpers::setVerticalScrollMode(ui->importsTreeView);
-}
-
-void ImportsWidget::on_importsTreeView_doubleClicked(const QModelIndex &index)
-{
-    if (!index.isValid())
-        return;
-
-    Core()->seek(index.data(ImportsModel::AddressRole).toLongLong());
+    qhelpers::adjustColumns(ui->treeView, 4, 0);
 }

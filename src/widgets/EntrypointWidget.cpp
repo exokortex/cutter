@@ -12,15 +12,16 @@
  * Entrypoint Widget
  */
 
-EntrypointWidget::EntrypointWidget(MainWindow *main, QAction *action) :
-    CutterDockWidget(main, action),
+EntrypointWidget::EntrypointWidget(MainWindow *main) :
+    CutterDockWidget(main),
     ui(new Ui::EntrypointWidget)
 {
     ui->setupUi(this);
 
     setScrollMode();
 
-    connect(Core(), SIGNAL(refreshAll()), this, SLOT(fillEntrypoint()));
+    connect(Core(), &CutterCore::codeRebased, this, &EntrypointWidget::fillEntrypoint);
+    connect(Core(), &CutterCore::refreshAll, this, &EntrypointWidget::fillEntrypoint);
 }
 
 EntrypointWidget::~EntrypointWidget() {}
@@ -51,5 +52,5 @@ void EntrypointWidget::on_entrypointTreeWidget_itemDoubleClicked(QTreeWidgetItem
         return;
 
     EntrypointDescription ep = item->data(0, Qt::UserRole).value<EntrypointDescription>();
-    Core()->seek(ep.vaddr);
+    Core()->seekAndShow(ep.vaddr);
 }

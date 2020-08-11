@@ -3,6 +3,8 @@
 #include "CutterApplication.h"
 #include "plugins/PluginManager.h"
 #include "CutterConfig.h"
+#include "common/Decompiler.h"
+#include "common/ResourcePaths.h"
 
 #include <QApplication>
 #include <QFileOpenEvent>
@@ -24,12 +26,15 @@
 
 #include <cstdlib>
 
+#if CUTTER_R2GHIDRA_STATIC
+#include <R2GhidraDecompiler.h>
+#endif
+
 CutterApplication::CutterApplication(int &argc, char **argv) : QApplication(argc, argv)
 {
     // Setup application information
     setApplicationVersion(CUTTER_VERSION_FULL);
     setWindowIcon(QIcon(":/img/cutter.svg"));
-    setAttribute(Qt::AA_DontShowIconsInMenus);
     setAttribute(Qt::AA_UseHighDpiPixmaps);
     setLayoutDirection(Qt::LeftToRight);
 
@@ -64,30 +69,10 @@ CutterApplication::CutterApplication(int &argc, char **argv) : QApplication(argc
     QTextCodec::setCodecForCStrings(QTextCodec::codecForName("UTF-8"));
     QTextCodec::setCodecForTr(QTextCodec::codecForName("UTF-8"));
 #endif
-    QCommandLineParser cmd_parser;
-    cmd_parser.setApplicationDescription(
-        QObject::tr("A Qt and C++ GUI for radare2 reverse engineering framework"));
-    cmd_parser.addHelpOption();
-    cmd_parser.addVersionOption();
-    cmd_parser.addPositionalArgument("filename", QObject::tr("Filename to open."));
 
-    QCommandLineOption analOption({"A", "anal"},
-                                  QObject::tr("Automatically open file and optionally start analysis. Needs filename to be specified. May be a value between 0 and 2: 0 = no analysis, 1 = aaa, 2 = aaaa (experimental)"),
-                                  QObject::tr("level"));
-    cmd_parser.addOption(analOption);
-
-    QCommandLineOption scriptOption("i",
-                                    QObject::tr("Run script file"),
-                                    QObject::tr("file"));
-    cmd_parser.addOption(scriptOption);
-
-    QCommandLineOption pythonHomeOption("pythonhome", QObject::tr("PYTHONHOME to use for embeded python interpreter"),
-                                        "PYTHONHOME");
-    cmd_parser.addOption(pythonHomeOption);
-
-    cmd_parser.process(*this);
-
-    QStringList args = cmd_parser.positionalArguments();
+    if (!parseCommandLineOptions()) {
+        std::exit(1);
+    }
 
     // Check r2 version
     QString r2version = r_core_version();
@@ -107,30 +92,37 @@ CutterApplication::CutterApplication(int &argc, char **argv) : QApplication(argc
 
 #ifdef CUTTER_ENABLE_PYTHON
     // Init python
-    if (cmd_parser.isSet(pythonHomeOption)) {
-        Python()->setPythonHome(cmd_parser.value(pythonHomeOption));
+    if (!clOptions.pythonHome.isEmpty()) {
+        Python()->setPythonHome(clOptions.pythonHome);
     }
     Python()->initialize();
 #endif
 
-    Core()->initialize();
+#ifdef Q_OS_WIN
+    // Redefine r_sys_prefix() behaviour
+    qputenv("R_ALT_SRC_DIR", "1");
+#endif
+
+    Core()->initialize(clOptions.enableR2Plugins);
     Core()->setSettings();
     Config()->loadInitial();
+    Core()->loadCutterRC();
 
-    bool analLevelSpecified = false;
-    int analLevel = 0;
+    Config()->setOutputRedirectionEnabled(clOptions.outputRedirectionEnabled);
 
-    if (cmd_parser.isSet(analOption)) {
-        analLevel = cmd_parser.value(analOption).toInt(&analLevelSpecified);
-
-        if (!analLevelSpecified || analLevel < 0 || analLevel > 2) {
-            printf("%s\n",
-                   QObject::tr("Invalid Analysis Level. May be a value between 0 and 2.").toLocal8Bit().constData());
-            std::exit(1);
-        }
+    if (R2DecDecompiler::isAvailable()) {
+        Core()->registerDecompiler(new R2DecDecompiler(Core()));
     }
 
-    Plugins()->loadPlugins();
+#if CUTTER_R2GHIDRA_STATIC
+    Core()->registerDecompiler(new R2GhidraDecompiler(Core()));
+#endif
+
+    Plugins()->loadPlugins(clOptions.enableCutterPlugins);
+
+    for (auto &plugin : Plugins()->getPlugins()) {
+        plugin->registerDecompilers();
+    }
 
     mainWindow = new MainWindow();
     installEventFilter(mainWindow);
@@ -140,54 +132,84 @@ CutterApplication::CutterApplication(int &argc, char **argv) : QApplication(argc
     setStyle(new CutterProxyStyle());
 #endif // QT_VERSION_CHECK(5, 10, 0) < QT_VERSION
 
-    if (args.empty()) {
-        if (analLevelSpecified) {
-            printf("%s\n",
-                   QObject::tr("Filename must be specified to start analysis automatically.").toLocal8Bit().constData());
-            std::exit(1);
-        }
-
+    if (clOptions.args.empty()) {
         // check if this is the first execution of Cutter in this computer
-        // Note: the execution after the preferences benn reset, will be considered as first-execution
+        // Note: the execution after the preferences been reset, will be considered as first-execution
         if (Config()->isFirstExecution()) {
             mainWindow->displayWelcomeDialog();
         }
         mainWindow->displayNewFileDialog();
     } else { // filename specified as positional argument
-        InitialOptions options;
-        options.filename = args[0];
-        if (analLevelSpecified) {
-            switch (analLevel) {
-            case 0:
-            default:
-                options.analCmd = {};
-                break;
-            case 1:
-                options.analCmd = { "aaa" };
-                break;
-            case 2:
-                options.analCmd = { "aaaa" };
-                break;
-            }
-        }
-        options.script = cmd_parser.value(scriptOption);
-        mainWindow->openNewFile(options, analLevelSpecified);
+        bool askOptions = clOptions.analLevel != AutomaticAnalysisLevel::Ask;
+        mainWindow->openNewFile(clOptions.fileOpenOptions, askOptions);
     }
 
+
+#ifdef APPIMAGE
+    {
+        auto appdir = QDir(QCoreApplication::applicationDirPath()); // appdir/bin
+        appdir.cdUp(); // appdir
+
+        auto sleighHome = appdir;
+        sleighHome.cd("share/radare2/plugins/r2ghidra_sleigh"); // appdir/share/radare2/plugins/r2ghidra_sleigh
+        Core()->setConfig("r2ghidra.sleighhome", sleighHome.absolutePath());
+
+        auto r2decHome = appdir;
+        r2decHome.cd("share/radare2/plugins/r2dec-js"); // appdir/share/radare2/plugins/r2dec-js
+        qputenv("R2DEC_HOME", r2decHome.absolutePath().toLocal8Bit());
+    }
+#endif
+
+#ifdef Q_OS_MACOS
+    {
+        auto r2prefix = QDir(QCoreApplication::applicationDirPath()); // Contents/MacOS
+        r2prefix.cdUp(); // Contents
+        r2prefix.cd("Resources/r2"); // Contents/Resources/r2
+
+        auto sleighHome = r2prefix;
+        sleighHome.cd("share/radare2/plugins/r2ghidra_sleigh"); // Contents/Resources/r2/share/radare2/plugins/r2ghidra_sleigh
+        Core()->setConfig("r2ghidra.sleighhome", sleighHome.absolutePath());
+
+        auto r2decHome = r2prefix;
+        r2decHome.cd("share/radare2/plugins/r2dec-js"); // Contents/Resources/r2/share/radare2/plugins/r2dec-js
+        qputenv("R2DEC_HOME", r2decHome.absolutePath().toLocal8Bit());
+    }
+#endif
+
 #ifdef CUTTER_APPVEYOR_R2DEC
-    qputenv("R2DEC_HOME", "radare2\\lib\\plugins\\r2dec-js");
+    qputenv("R2DEC_HOME", "lib\\plugins\\r2dec-js");
+#endif
+#ifdef Q_OS_WIN
+    {
+        auto sleighHome = QDir(QCoreApplication::applicationDirPath());
+        sleighHome.cd("lib/plugins/r2ghidra_sleigh");
+        Core()->setConfig("r2ghidra.sleighhome", sleighHome.absolutePath());
+    }
 #endif
 }
 
 CutterApplication::~CutterApplication()
 {
-#ifdef CUTTER_ENABLE_PYTHON
     Plugins()->destroyPlugins();
-#endif
     delete mainWindow;
 #ifdef CUTTER_ENABLE_PYTHON
     Python()->shutdown();
 #endif
+}
+
+void CutterApplication::launchNewInstance(const QStringList &args)
+{
+    QProcess process(this);
+    process.setEnvironment(QProcess::systemEnvironment());
+    QStringList allArgs;
+    if (!clOptions.enableCutterPlugins) {
+        allArgs.push_back("--no-cutter-plugins");
+    }
+    if (!clOptions.enableR2Plugins) {
+        allArgs.push_back("--no-r2-plugins");
+    }
+    allArgs.append(args);
+    process.startDetached(qApp->applicationFilePath(), allArgs);
 }
 
 bool CutterApplication::event(QEvent *e)
@@ -199,10 +221,7 @@ bool CutterApplication::event(QEvent *e)
                 // We already dropped a file in macOS, let's spawn another instance
                 // (Like the File -> Open)
                 QString fileName = openEvent->file();
-                QProcess process(this);
-                process.setEnvironment(QProcess::systemEnvironment());
-                QStringList args = QStringList(fileName);
-                process.startDetached(qApp->applicationFilePath(), args);
+                launchNewInstance({fileName});
             } else {
                 QString fileName = openEvent->file();
                 m_FileAlreadyDropped = true;
@@ -223,7 +242,7 @@ bool CutterApplication::loadTranslations()
         return true;
     }
     const auto &allLocales = QLocale::matchingLocales(QLocale::AnyLanguage, QLocale::AnyScript,
-        QLocale::AnyCountry);
+                                                      QLocale::AnyCountry);
 
     bool cutterTrLoaded = false;
 
@@ -237,7 +256,7 @@ bool CutterApplication::loadTranslations()
             QTranslator *trQtBase = new QTranslator;
             QTranslator *trQt = new QTranslator;
 
-            const QStringList &cutterTrPaths = Config()->getTranslationsDirectories();
+            const QStringList &cutterTrPaths = Cutter::getTranslationsDirectories();
 
             for (const auto &trPath : cutterTrPaths) {
                 if (trCutter && trCutter->load(it, QLatin1String("cutter"), QLatin1String("_"), trPath)) {
@@ -255,7 +274,7 @@ bool CutterApplication::loadTranslations()
                     trQtBase = nullptr;
                 }
             }
-            
+
             if (trCutter) {
                 delete trCutter;
             }
@@ -274,6 +293,152 @@ bool CutterApplication::loadTranslations()
     return false;
 }
 
+bool CutterApplication::parseCommandLineOptions()
+{
+    // Keep this function in sync with documentation
+
+    QCommandLineParser cmd_parser;
+    cmd_parser.setApplicationDescription(
+        QObject::tr("A Qt and C++ GUI for radare2 reverse engineering framework"));
+    cmd_parser.addHelpOption();
+    cmd_parser.addVersionOption();
+    cmd_parser.addPositionalArgument("filename", QObject::tr("Filename to open."));
+
+    QCommandLineOption analOption({"A", "analysis"},
+                                  QObject::tr("Automatically open file and optionally start analysis. "
+                                              "Needs filename to be specified. May be a value between 0 and 2:"
+                                              " 0 = no analysis, 1 = aaa, 2 = aaaa (experimental)"),
+                                  QObject::tr("level"));
+    cmd_parser.addOption(analOption);
+
+    QCommandLineOption formatOption({"F", "format"},
+                                    QObject::tr("Force using a specific file format (bin plugin)"),
+                                    QObject::tr("name"));
+    cmd_parser.addOption(formatOption);
+
+    QCommandLineOption baddrOption({"B", "base"},
+                                   QObject::tr("Load binary at a specific base address"),
+                                   QObject::tr("base address"));
+    cmd_parser.addOption(baddrOption);
+
+    QCommandLineOption scriptOption("i",
+                                    QObject::tr("Run script file"),
+                                    QObject::tr("file"));
+    cmd_parser.addOption(scriptOption);
+
+    QCommandLineOption writeModeOption({"w", "writemode"},
+                                       QObject::tr("Open file in write mode"));
+    cmd_parser.addOption(writeModeOption);
+
+
+    QCommandLineOption pythonHomeOption("pythonhome",
+                                        QObject::tr("PYTHONHOME to use for embedded python interpreter"),
+                                        "PYTHONHOME");
+    cmd_parser.addOption(pythonHomeOption);
+
+    QCommandLineOption disableRedirectOption("no-output-redirect",
+                                             QObject::tr("Disable output redirection."
+                                                         " Some of the output in console widget will not be visible."
+                                                         " Use this option when debuging a crash or freeze and output "
+                                                         " redirection is causing some messages to be lost."));
+    cmd_parser.addOption(disableRedirectOption);
+
+    QCommandLineOption disablePlugins("no-plugins",
+                                      QObject::tr("Do not load plugins"));
+    cmd_parser.addOption(disablePlugins);
+
+    QCommandLineOption disableCutterPlugins("no-cutter-plugins",
+                                            QObject::tr("Do not load Cutter plugins"));
+    cmd_parser.addOption(disableCutterPlugins);
+
+    QCommandLineOption disableR2Plugins("no-r2-plugins",
+                                        QObject::tr("Do not load radare2 plugins"));
+    cmd_parser.addOption(disableR2Plugins);
+
+    cmd_parser.process(*this);
+
+    CutterCommandLineOptions opts;
+    opts.args = cmd_parser.positionalArguments();
+
+    if (cmd_parser.isSet(analOption)) {
+        bool analLevelSpecified = false;
+        int analLevel = cmd_parser.value(analOption).toInt(&analLevelSpecified);
+
+        if (!analLevelSpecified || analLevel < 0 || analLevel > 2) {
+            fprintf(stderr, "%s\n",
+                    QObject::tr("Invalid Analysis Level. May be a value between 0 and 2.").toLocal8Bit().constData());
+            return false;
+        }
+        switch (analLevel) {
+        case 0:
+            opts.analLevel = AutomaticAnalysisLevel::None;
+            break;
+        case 1:
+            opts.analLevel = AutomaticAnalysisLevel::AAA;
+            break;
+        case 2:
+            opts.analLevel = AutomaticAnalysisLevel::AAAA;
+            break;
+        }
+    }
+
+    if (opts.args.empty() && opts.analLevel != AutomaticAnalysisLevel::Ask) {
+        fprintf(stderr, "%s\n",
+                QObject::tr("Filename must be specified to start analysis automatically.").toLocal8Bit().constData());
+        return false;
+    }
+
+    InitialOptions options;
+    if (!opts.args.isEmpty()) {
+        opts.fileOpenOptions.filename = opts.args[0];
+        opts.fileOpenOptions.forceBinPlugin = cmd_parser.value(formatOption);
+        if (cmd_parser.isSet(baddrOption)) {
+            bool ok;
+            RVA baddr = cmd_parser.value(baddrOption).toULongLong(&ok, 0);
+            if (ok) {
+                options.binLoadAddr = baddr;
+            }
+        }
+        switch (opts.analLevel) {
+        case AutomaticAnalysisLevel::Ask:
+            break;
+        case AutomaticAnalysisLevel::None:
+            opts.fileOpenOptions.analCmd = {};
+            break;
+        case AutomaticAnalysisLevel::AAA:
+            opts.fileOpenOptions.analCmd = { {"aaa", "Auto analysis"} };
+            break;
+        case AutomaticAnalysisLevel::AAAA:
+            opts.fileOpenOptions.analCmd = { {"aaaa", "Auto analysis (experimental)"} };
+            break;
+        }
+        opts.fileOpenOptions.script = cmd_parser.value(scriptOption);
+
+        opts.fileOpenOptions.writeEnabled = cmd_parser.isSet(writeModeOption);
+    }
+
+    if (cmd_parser.isSet(pythonHomeOption)) {
+        opts.pythonHome = cmd_parser.value(pythonHomeOption);
+    }
+
+    opts.outputRedirectionEnabled = !cmd_parser.isSet(disableRedirectOption);
+    if (cmd_parser.isSet(disablePlugins)) {
+        opts.enableCutterPlugins = false;
+        opts.enableR2Plugins = false;
+    }
+
+    if (cmd_parser.isSet(disableCutterPlugins)) {
+        opts.enableCutterPlugins = false;
+    }
+
+    if (cmd_parser.isSet(disableR2Plugins)) {
+        opts.enableR2Plugins = false;
+    }
+
+    this->clOptions = opts;
+    return true;
+}
+
 
 void CutterProxyStyle::polish(QWidget *widget)
 {
@@ -282,7 +447,7 @@ void CutterProxyStyle::polish(QWidget *widget)
     // HACK: This is the only way I've found to force Qt (5.10 and newer) to
     //       display shortcuts in context menus on all platforms. It's ugly,
     //       but it gets the job done.
-    if (auto menu = qobject_cast<QMenu*>(widget)) {
+    if (auto menu = qobject_cast<QMenu *>(widget)) {
         const auto &actions = menu->actions();
         for (auto action : actions) {
             action->setShortcutVisibleInContextMenu(true);
@@ -290,4 +455,3 @@ void CutterProxyStyle::polish(QWidget *widget)
     }
 #endif // QT_VERSION_CHECK(5, 10, 0) < QT_VERSION
 }
-

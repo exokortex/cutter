@@ -12,6 +12,8 @@
 #include <QAbstractItemView>
 #include <QAbstractButton>
 #include <QDockWidget>
+#include <QMenu>
+#include <QComboBox>
 
 static QAbstractItemView::ScrollMode scrollMode()
 {
@@ -22,16 +24,18 @@ static QAbstractItemView::ScrollMode scrollMode()
 
 namespace qhelpers {
 
-QString formatBytecount(const long bytecount)
+QString formatBytecount(const uint64_t bytecount)
 {
-    if (bytecount == 0)
+    if (bytecount == 0) {
         return "0";
-    const int exp = log(bytecount) / log(1000);
+    }
+
+    const int exp = log(bytecount) / log(1024);
     constexpr char suffixes[] = {' ', 'k', 'M', 'G', 'T', 'P', 'E'};
 
     QString str;
     QTextStream stream(&str);
-    stream << qSetRealNumberPrecision(3) << bytecount / pow(1000, exp)
+    stream << qSetRealNumberPrecision(3) << bytecount / pow(1024, exp)
            << ' ' << suffixes[exp] << 'B';
     return stream.readAll();
 }
@@ -74,14 +78,21 @@ QTreeWidgetItem *appendRow(QTreeWidget *tw, const QString &str, const QString &s
 }
 
 /**
- * @brief select first item of QTreeWidget if tree is not empty.
- * @param tw - QTreeWidget instance
- * @return true - setCurrentItem was set, false - tree is empty
+ * @brief Select first item of a QAbstractItemView if not empty
+ * @param itemView
+ * @return true if first item was selected
  */
-bool selectFirstItem(QTreeWidget* tw)
+bool selectFirstItem(QAbstractItemView *itemView)
 {
-    if (tw->topLevelItem(0)) {
-        tw->setCurrentItem(tw->topLevelItem(0));
+    if (!itemView) {
+        return false;
+    }
+    auto model = itemView->model();
+    if (!model) {
+        return false;
+    }
+    if (model->hasIndex(0, 0)) {
+        itemView->setCurrentIndex(model->index(0, 0));
         return true;
     }
     return false;
@@ -134,14 +145,14 @@ SizePolicyMinMax forceHeight(QWidget *widget, int height)
 
 void SizePolicyMinMax::restoreWidth(QWidget *widget)
 {
-    widget->setSizePolicy(sizePolicy);
+    widget->setSizePolicy(sizePolicy.horizontalPolicy(), widget->sizePolicy().verticalPolicy());
     widget->setMinimumWidth(min);
     widget->setMaximumWidth(max);
 }
 
 void SizePolicyMinMax::restoreHeight(QWidget *widget)
 {
-    widget->setSizePolicy(sizePolicy);
+    widget->setSizePolicy(widget->sizePolicy().horizontalPolicy(), sizePolicy.verticalPolicy());
     widget->setMinimumHeight(min);
     widget->setMaximumHeight(max);
 }
@@ -205,7 +216,8 @@ QByteArray applyColorToSvg(const QString &filename, QColor color)
  * @param setter functor which has to be called
  *   for example we need to set an action icon, the functor can be just [](void* o, const QIcon &icon) { static_cast<QAction*>(o)->setIcon(icon); }
  */
-void setThemeIcons(QList<QPair<void*, QString>> supportedIconsNames, std::function<void(void *, const QIcon &)> setter)
+void setThemeIcons(QList<QPair<void *, QString>> supportedIconsNames,
+                   std::function<void(void *, const QIcon &)> setter)
 {
     if (supportedIconsNames.isEmpty() || !setter) {
         return;
@@ -226,5 +238,36 @@ void setThemeIcons(QList<QPair<void*, QString>> supportedIconsNames, std::functi
         setter(p.first, QIcon(iconPath + p.second));
     }
 }
+
+void prependQAction(QAction *action, QMenu *menu)
+{
+    auto actions = menu->actions();
+    if (actions.empty()) {
+        menu->addAction(action);
+    } else {
+        menu->insertAction(actions.first(), action);
+    }
+}
+
+qreal devicePixelRatio(const QPaintDevice *p)
+{
+#if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)
+    return p->devicePixelRatioF();
+#else
+    return p->devicePixelRatio();
+#endif
+}
+
+void selectIndexByData(QComboBox *widget, QVariant data, int defaultIndex)
+{
+    for (int i = 0; i < widget->count(); i++) {
+        if (widget->itemData(i) == data) {
+            widget->setCurrentIndex(i);
+            return;
+        }
+    }
+    widget->setCurrentIndex(defaultIndex);
+}
+
 
 } // end namespace

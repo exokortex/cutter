@@ -3,8 +3,8 @@
 #include "GraphWidget.h"
 #include "OverviewView.h"
 
-OverviewWidget::OverviewWidget(MainWindow *main, QAction *action) :
-    CutterDockWidget(main, action)
+OverviewWidget::OverviewWidget(MainWindow *main) :
+    CutterDockWidget(main)
 {
     setWindowTitle("Graph Overview");
     setObjectName("Graph Overview");
@@ -13,11 +13,19 @@ OverviewWidget::OverviewWidget(MainWindow *main, QAction *action) :
     setWidget(graphView);
     targetGraphWidget = nullptr;
 
-    connect(graphView, SIGNAL(mouseMoved()), this, SLOT(updateTargetView()));
+    connect(graphView, &OverviewView::mouseMoved, this, &OverviewWidget::updateTargetView);
 
     graphDataRefreshDeferrer = createRefreshDeferrer([this]() {
         updateGraphData();
     });
+
+    // Zoom shortcuts
+    QShortcut *shortcut_zoom_in = new QShortcut(QKeySequence(Qt::Key_Plus), this);
+    shortcut_zoom_in->setContext(Qt::WidgetWithChildrenShortcut);
+    connect(shortcut_zoom_in, &QShortcut::activated, this, [this](){ zoomTarget(1); });
+    QShortcut *shortcut_zoom_out = new QShortcut(QKeySequence(Qt::Key_Minus), this);
+    shortcut_zoom_out->setContext(Qt::WidgetWithChildrenShortcut);
+    connect(shortcut_zoom_out, &QShortcut::activated, this, [this](){ zoomTarget(-1); });
 }
 
 OverviewWidget::~OverviewWidget() {}
@@ -65,6 +73,14 @@ void OverviewWidget::setUserOpened(bool userOpened)
     emit userOpenedChanged(userOpened);
 }
 
+void OverviewWidget::zoomTarget(int d)
+{
+    if (!targetGraphWidget) {
+        return;
+    }
+    targetGraphWidget->getGraphView()->zoom(QPointF(0.5, 0.5), d);
+}
+
 void OverviewWidget::setTargetGraphWidget(GraphWidget *widget)
 {
     if (widget == targetGraphWidget) {
@@ -88,6 +104,12 @@ void OverviewWidget::setTargetGraphWidget(GraphWidget *widget)
     updateGraphData();
     updateRangeRect();
     setIsAvailable(targetGraphWidget != nullptr);
+}
+
+void OverviewWidget::wheelEvent(QWheelEvent *event)
+{
+    zoomTarget(event->angleDelta().y() / 90);
+    graphView->centreRect();
 }
 
 void OverviewWidget::targetClosed()

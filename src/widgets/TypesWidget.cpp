@@ -2,7 +2,7 @@
 #include "ui_TypesWidget.h"
 #include "core/MainWindow.h"
 #include "common/Helpers.h"
-#include "dialogs/LoadNewTypesDialog.h"
+#include "dialogs/TypesInteractionDialog.h"
 #include "dialogs/LinkTypeDialog.h"
 
 #include <QMenu>
@@ -60,7 +60,7 @@ QVariant TypesModel::headerData(int section, Qt::Orientation, int role) const
     case Qt::DisplayRole:
         switch (section) {
         case TYPE:
-            return tr("Type");
+            return tr("Type / Name");
         case SIZE:
             return tr("Size");
         case FORMAT:
@@ -127,8 +127,8 @@ bool TypesSortFilterProxyModel::lessThan(const QModelIndex &left, const QModelIn
 
 
 
-TypesWidget::TypesWidget(MainWindow *main, QAction *action) :
-    CutterDockWidget(main, action),
+TypesWidget::TypesWidget(MainWindow *main) :
+    CutterDockWidget(main),
     ui(new Ui::TypesWidget),
     tree(new CutterTreeWidget(this))
 {
@@ -150,14 +150,14 @@ TypesWidget::TypesWidget(MainWindow *main, QAction *action) :
     setScrollMode();
 
     // Setup custom context menu
-    connect(ui->typesTreeView, SIGNAL(customContextMenuRequested(const QPoint &)),
-            this, SLOT(showTypesContextMenu(const QPoint &)));
+    connect(ui->typesTreeView, &QWidget::customContextMenuRequested,
+            this, &TypesWidget::showTypesContextMenu);
 
     ui->typesTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
 
 
-    connect(ui->quickFilterView, SIGNAL(filterTextChanged(const QString &)), types_proxy_model,
-            SLOT(setFilterWildcard(const QString &)));
+    connect(ui->quickFilterView, &ComboQuickFilterView::filterTextChanged, types_proxy_model,
+            &QSortFilterProxyModel::setFilterWildcard);
 
     connect(ui->quickFilterView, &ComboQuickFilterView::filterTextChanged, this, [this] {
         tree->showItemsNumber(types_proxy_model->rowCount());
@@ -171,7 +171,7 @@ TypesWidget::TypesWidget(MainWindow *main, QAction *action) :
     connect(clearShortcut, &QShortcut::activated, ui->quickFilterView, &ComboQuickFilterView::clearFilter);
     clearShortcut->setContext(Qt::WidgetWithChildrenShortcut);
 
-    connect(Core(), SIGNAL(refreshAll()), this, SLOT(refreshTypes()));
+    connect(Core(), &CutterCore::refreshAll, this, &TypesWidget::refreshTypes);
 
     connect(
         ui->quickFilterView->comboBox(), &QComboBox::currentTextChanged, this,
@@ -181,6 +181,13 @@ TypesWidget::TypesWidget(MainWindow *main, QAction *action) :
             tree->showItemsNumber(types_proxy_model->rowCount());
         }
     );
+
+    actionViewType = new QAction(tr("View Type"), this);
+    actionEditType = new QAction(tr("Edit Type"), this);
+
+    connect (actionViewType, &QAction::triggered, [this]() { viewType(true) ;});
+    connect (actionEditType, &QAction::triggered, [this]() { viewType(false) ;});
+    connect (ui->typesTreeView, &QTreeView::doubleClicked, this, &TypesWidget::typeItemDoubleClicked);
 }
 
 TypesWidget::~TypesWidget() {}
@@ -229,9 +236,13 @@ void TypesWidget::showTypesContextMenu(const QPoint &pt)
 
     if (index.isValid()) {
         TypeDescription t = index.data(TypesModel::TypeDescriptionRole).value<TypeDescription>();
-        if (t.category == "Struct") {
+        if (t.category != "Primitive") {
             // Add "Link To Address" option
-            menu.addAction(ui->actionLink_Type_To_Address);
+            menu.addAction(actionViewType);
+            menu.addAction(actionEditType);
+            if (t.category == "Struct") {
+                menu.addAction(ui->actionLink_Type_To_Address);
+            }
         }
     }
 
@@ -262,17 +273,39 @@ void TypesWidget::on_actionExport_Types_triggered()
         return;
     }
     QTextStream fileOut(&file);
-    fileOut << Core()->cmd("tc");
+    fileOut << Core()->cmdRaw("tc");
     file.close();
 }
 
 void TypesWidget::on_actionLoad_New_Types_triggered()
 {
-    LoadNewTypesDialog dialog(this);
-    connect(&dialog, SIGNAL(newTypesLoaded()), this, SLOT(refreshTypes()));
+    TypesInteractionDialog dialog(this);
+    connect(&dialog, &TypesInteractionDialog::newTypesLoaded, this, &TypesWidget::refreshTypes);
     dialog.setWindowTitle(tr("Load New Types"));
     dialog.exec();
 }
+
+void TypesWidget::viewType(bool readOnly)
+{
+
+    QModelIndex index = ui->typesTreeView->currentIndex();
+
+    if (!index.isValid()) {
+        return;
+    }
+
+    TypesInteractionDialog dialog(this, readOnly);
+    TypeDescription t = index.data(TypesModel::TypeDescriptionRole).value<TypeDescription>();
+    if (!readOnly) {
+        dialog.setWindowTitle(tr("Edit Type: ") + t.type);
+    connect(&dialog, &TypesInteractionDialog::newTypesLoaded, this, &TypesWidget::refreshTypes);
+    } else {
+        dialog.setWindowTitle(tr("View Type: ") + t.type + tr(" (Read Only)"));
+    }
+    dialog.fillTextArea(Core()->getTypeAsC(t.type, t.category));
+    dialog.exec();
+}
+
 
 void TypesWidget::on_actionDelete_Type_triggered()
 {
@@ -301,7 +334,21 @@ void TypesWidget::on_actionLink_Type_To_Address_triggered()
         TypeDescription t = index.data(TypesModel::TypeDescriptionRole).value<TypeDescription>();
         dialog.setDefaultType(t.type);
         dialog.setDefaultAddress(RAddressString(Core()->getOffset()));
+        dialog.exec();
+    }
+}
+
+void TypesWidget::typeItemDoubleClicked(const QModelIndex &index) {
+    if (!index.isValid()) {
+        return;
     }
 
+    TypesInteractionDialog dialog(this, true);
+    TypeDescription t = index.data(TypesModel::TypeDescriptionRole).value<TypeDescription>();
+    if (t.category == "Primitive") {
+        return;
+    }
+    dialog.fillTextArea(Core()->getTypeAsC(t.type, t.category));
+    dialog.setWindowTitle(tr("View Type: ") + t.type + tr(" (Read Only)"));
     dialog.exec();
 }

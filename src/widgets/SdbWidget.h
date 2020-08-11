@@ -17,7 +17,7 @@ class SdbWidget : public CutterDockWidget
     Q_OBJECT
 
 public:
-    explicit SdbWidget(MainWindow *main, QAction *action = nullptr);
+    explicit SdbWidget(MainWindow *main);
     ~SdbWidget();
 
 private slots:
@@ -25,7 +25,7 @@ private slots:
     void on_lockButton_clicked();
     void on_treeWidget_itemChanged(QTreeWidgetItem *item, int column);
 
-    void reload(QString _path = nullptr);
+    void reload(QString _path = QString());
 
 private:
     std::unique_ptr<Ui::SdbWidget> ui;

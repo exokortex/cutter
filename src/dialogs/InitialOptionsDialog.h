@@ -2,6 +2,7 @@
 #define OPTIONSDIALOG_H
 
 #include <QDialog>
+#include <QCheckBox>
 #include <memory>
 #include "common/InitialOptions.h"
 
@@ -45,17 +46,32 @@ private:
     QString analysisDescription(int level);
     QString shellcode;
     int analLevel;
-    QStringList asm_plugins;
+    QList<RAsmPluginDescription> asmPlugins;
 
 
     void updateCPUComboBox();
+    struct AnalysisCommands {
+        CommandDescription commandDesc;
+        QCheckBox *checkbox;
+        bool checked;
+    };
+    QList<AnalysisCommands> analysisCommands;
 
+    QList<QString> getAnalysisCommands(const InitialOptions &options);
     QString getSelectedArch() const;
     QString getSelectedCPU() const;
     int getSelectedBits() const;
     InitialOptions::Endianness getSelectedEndianness() const;
     QString getSelectedOS() const;
-    QList<QString> getSelectedAdvancedAnalCmds() const;
+    QList<CommandDescription> getSelectedAdvancedAnalCmds() const;
+
+    /**
+     * @brief setTooltipWithConfigHelp is an helper function that add a tolltip to a widget with
+     * a description of a given radare2 eval config.
+     * @param w - a widget to which to add the tooltip
+     * @param config - name of a configuration variable such as "asm.bits".
+     */
+    void setTooltipWithConfigHelp(QWidget *w, const char *config);
 
 public:
     void loadOptions(const InitialOptions &options);

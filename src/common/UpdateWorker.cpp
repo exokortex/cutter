@@ -1,5 +1,6 @@
 #include "UpdateWorker.h"
 
+#if CUTTER_UPDATE_WORKER_AVAILABLE
 #include <QUrl>
 #include <QFile>
 #include <QTimer>
@@ -19,10 +20,11 @@
 #include "common/Configuration.h"
 #include "CutterConfig.h"
 
+
 UpdateWorker::UpdateWorker(QObject *parent) :
     QObject(parent), pending(false)
 {
-    connect(&t, &QTimer::timeout, [this]() {
+    connect(&t, &QTimer::timeout, this, [this]() {
         if (pending) {
             disconnect(checkReply, nullptr, this, nullptr);
             checkReply->close();
@@ -100,7 +102,7 @@ void UpdateWorker::showUpdateDialog(bool showDontCheckForUpdatesButton)
             QProgressDialog progressDial(tr("Downloading update..."),
                                          tr("Cancel"),
                                          0, 100);
-            connect(this, &UpdateWorker::downloadProcess,
+            connect(this, &UpdateWorker::downloadProcess, &progressDial,
                     [&progressDial](size_t curr, size_t total) {
                 progressDial.setValue(100.0f * curr / total);
             });
@@ -108,7 +110,7 @@ void UpdateWorker::showUpdateDialog(bool showDontCheckForUpdatesButton)
                     this, &UpdateWorker::abortDownload);
             connect(this, &UpdateWorker::downloadFinished,
                     &progressDial, &QProgressDialog::cancel);
-            connect(this, &UpdateWorker::downloadFinished,
+            connect(this, &UpdateWorker::downloadFinished, this,
                     [](QString filePath){
                 QMessageBox info(QMessageBox::Information,
                                  tr("Download finished!"),
@@ -128,7 +130,7 @@ void UpdateWorker::showUpdateDialog(bool showDontCheckForUpdatesButton)
             });
             download(fullFileName, latestVersion.toString());
             // Calling show() before exec() is only way make dialog non-modal
-            // it seems wierd, but it works
+            // it seems weird, but it works
             progressDial.show();
             progressDial.exec();
         }
@@ -217,3 +219,4 @@ QVersionNumber UpdateWorker::currentVersionNumber()
 {
     return QVersionNumber(CUTTER_VERSION_MAJOR, CUTTER_VERSION_MINOR, CUTTER_VERSION_PATCH);
 }
+#endif // CUTTER_UPDATE_WORKER_AVAILABLE

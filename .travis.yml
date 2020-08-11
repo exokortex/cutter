@@ -11,31 +11,99 @@ branches:
 
 matrix:
   include:
-  - name: Linux QMake + Deploy
+  - name: Linux QMake
     os: linux
-    env: BUILD_SYSTEM=qmake DEPLOY=1
+    dist: xenial
+    env: BUILD_SYSTEM=qmake
+    addons:
+      apt:
+        packages:
+         - mesa-common-dev
+         - libgl1-mesa-glx
+         - libgl1-mesa-dev
+         - libxkbcommon-x11-dev
+         - ninja-build/xenial-backports
+
   - name: Linux CMake
     os: linux
-    env: BUILD_SYSTEM=cmake
+    env: BUILD_SYSTEM=cmake_nodep
+    before_install:
+      - ls $(pyenv root)/versions
+      - pyenv global 3.7
+      - pip3 install meson
+    addons:
+      apt:
+        packages:
+         - mesa-common-dev
+         - ninja-build
+         - libgraphviz-dev
+         - qt5-default
+         - libqt5svg5-dev
+         - qttools5-dev
+
+  - name: Linux CMake + Deploy
+    os: linux
+    env: BUILD_SYSTEM=cmake DEPLOY=1
+    dist: xenial
+    addons:
+      apt:
+        packages:
+         - mesa-common-dev
+         - libgl1-mesa-glx
+         - libgl1-mesa-dev
+         - libxkbcommon-x11-dev
+         - ninja-build/xenial-backports
+
+  - name: Linux Ubuntu 16.04 # test that Cutter can be built on an old distro using system libraries
+    os: linux
+    env: BUILD_SYSTEM=cmake_nodep PATH="/usr/bin:$PATH"
+    dist: xenial
+    addons:
+      apt:
+        packages:
+         - ninja-build
+         - libgraphviz-dev
+         - qt5-default
+         - libqt5svg5-dev
+         - qttools5-dev
+         - qttools5-dev-tools
+         - cmake
+    before_install:
+      - pyenv install 3.5.2
+      - pyenv global 3.5.2
+      - pip install meson==0.52.1
+
+
   - name: macOS QMake + Deploy
     os: osx
-    osx_image: xcode10.1
+    osx_image: xcode11
     env: BUILD_SYSTEM=qmake DEPLOY=1
+    before_install: ~
+
   - name: macOS CMake
     os: osx
-    osx_image: xcode10.1
+    osx_image: xcode11
     env: BUILD_SYSTEM=cmake
+    before_install: ~
+    addons:
+      homebrew:
+        brewfile: scripts/Brewfile
+        update: true # updating brew to get slightly newer meson, 0.54 doesn't work on macOS.
+
   - name: Documentation + Deploy
     os: linux
     cache: ~
     addons:
       apt:
-        update: true
         packages:
-        - doxygen
-        - python3-sphinx
-        - python3-breathe
-    before_install: ~
+         - doxygen
+         - libgraphviz-dev
+    before_install:
+      - pyenv global 3.7
+      - pip3 install -U sphinx
+      - pip3 install -U breathe
+      - pip3 install -U sphinx-rtd-theme
+      - pip3 install -U recommonmark
     install: ~
     before_script: ~
     after_success: ~
@@ -48,7 +116,7 @@ matrix:
     - chmod 600 scripts/deploy_docs_rsa
     - export GIT_SSH_COMMAND="/usr/bin/ssh -i $TRAVIS_BUILD_DIR/scripts/deploy_docs_rsa"
     - git config --global user.name "Travis CI"
-    - git config --global user.email "travis@travis-ci.org"
+    - git config --global user.email "travis@travis-ci.com"
     deploy:
       skip_cleanup: true
       provider: script
@@ -59,15 +127,23 @@ matrix:
 
 
 sudo: required
-dist: xenial
+dist: bionic
 
 addons:
   homebrew:
     brewfile: scripts/Brewfile
+    # update: true
+
+before_install:
+  - ls $(pyenv root)/versions
+  - pyenv global 3.7.1
+  - pip3 install meson
 
 install:
-  - scripts/fetch_deps.sh
-  - source cutter-deps/env.sh
+  - if [[ "$BUILD_SYSTEM" != "cmake_nodep" ]]; then
+      scripts/fetch_deps.sh;
+      source cutter-deps/env.sh;
+    fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
         export PATH=/usr/local/opt/llvm/bin:$PATH;
         source scripts/prepare_breakpad_macos.sh;
@@ -78,12 +154,13 @@ install:
     fi
 
 before_script:
-  - git submodule init ; git submodule update
   - cd radare2
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-        INSTALL_TARGET=install sys/install.sh;
-    else
-        LDFLAGS=-headerpad_max_install_names INSTALL_TARGET=install sys/install.sh;
+  - if [[ "$BUILD_SYSTEM" == "qmake" ]] || ([[ "$BUILD_SYSTEM" == "cmake" ]] && [[ "$TRAVIS_OS_NAME" == "linux" ]]) ; then
+        if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+            INSTALL_TARGET=install sys/install.sh /usr;
+        else
+            LDFLAGS=-headerpad_max_install_names INSTALL_TARGET=install sys/install.sh;
+        fi
     fi
   - cd ..
 
@@ -98,18 +175,27 @@ script:
                 CUTTER_ENABLE_PYTHON_BINDINGS=true
                 CUTTER_ENABLE_CRASH_REPORTS=true
                 PREFIX=/usr
-                APPIMAGE=1
                 ../src &&
             make -j4;
         elif [[ "$BUILD_SYSTEM" == "cmake" ]]; then
             cmake
                 -DCMAKE_BUILD_TYPE=Release
+                -DCMAKE_PREFIX_PATH="$Qt5_ROOT"
                 -DPYTHON_LIBRARY="$CUTTER_DEPS_PYTHON_PREFIX/lib/libpython3.6m.so.1.0"
                 -DPYTHON_INCLUDE_DIR="$CUTTER_DEPS_PYTHON_PREFIX/include/python3.6m"
                 -DPYTHON_EXECUTABLE="$CUTTER_DEPS_PYTHON_PREFIX/bin/python3"
                 -DCUTTER_ENABLE_PYTHON=ON
                 -DCUTTER_ENABLE_PYTHON_BINDINGS=ON
                 -DCUTTER_ENABLE_CRASH_REPORTS=ON
+                -DCUTTER_USE_BUNDLED_RADARE2=OFF
+                -DCUTTER_APPIMAGE_BUILD=ON
+                -DCMAKE_INSTALL_PREFIX=appdir/usr
+                ../src &&
+            make -j4;
+       elif [[ "$BUILD_SYSTEM" == "cmake_nodep" ]]; then
+            cmake
+                -DCMAKE_BUILD_TYPE=Release
+                -DCUTTER_USE_BUNDLED_RADARE2=ON
                 ../src &&
             make -j4;
        fi
@@ -118,6 +204,7 @@ script:
             qmake
                 CUTTER_ENABLE_PYTHON=true
                 CUTTER_ENABLE_PYTHON_BINDINGS=true
+                SHIBOKEN_EXTRA_OPTIONS=-isystem/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.14.sdk/usr/include
                 CUTTER_BUNDLE_R2_APPBUNDLE=true
                 CUTTER_ENABLE_CRASH_REPORTS=true
                 PYTHON_FRAMEWORK_DIR=$CUTTER_DEPS_PYTHON_FRAMEWORK_DIR
@@ -132,7 +219,9 @@ script:
                 -DPYTHON_EXECUTABLE="$CUTTER_DEPS_PYTHON_PREFIX/bin/python3"
                 -DCUTTER_ENABLE_PYTHON=ON
                 -DCUTTER_ENABLE_PYTHON_BINDINGS=ON
+                -DSHIBOKEN_EXTRA_OPTIONS=-isystem/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.14.sdk/usr/include
                 -DCUTTER_ENABLE_CRASH_REPORTS=ON
+                -DCUTTER_USE_BUNDLED_RADARE2=ON
                 -DBREAKPAD_FRAMEWORK_DIR="$BREAKPAD_FRAMEWORK_DIR"
                 ../src &&
             make -j4;
@@ -141,8 +230,8 @@ script:
 
 after_success:
   - export CUTTER_VERSION=$(python ../scripts/get_version.py)
-  - lrelease ../src/Cutter.pro
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+      lrelease ../src/Cutter.pro &&
       mkdir -p Cutter.app/Contents/Resources/translations &&
       cp ../src/translations/*.qm Cutter.app/Contents/Resources/translations/ &&
       macdeployqt Cutter.app -executable=Cutter.app/Contents/MacOS/Cutter -libpath="../Frameworks" &&
@@ -155,6 +244,8 @@ after_success:
       chmod +x Cutter.app/Contents/MacOS/Cutter &&
       mkdir -p Cutter.app/Contents/Resources/r2/share &&
       cp -a /usr/local/share/radare2 Cutter.app/Contents/Resources/r2/share/ &&
+      "$TRAVIS_BUILD_DIR/scripts/r2ghidra.sh" -DCMAKE_INSTALL_PREFIX="`pwd`/Cutter.app/Contents/Resources/r2" -DBUILD_CUTTER_PLUGIN=ON -DCUTTER_INSTALL_PLUGDIR="`pwd`/Cutter.app/Contents/Resources/plugins/native" -DCUTTER_SOURCE_DIR="$TRAVIS_BUILD_DIR" &&
+      "$TRAVIS_BUILD_DIR/scripts/r2dec.sh" --prefix="`pwd`/Cutter.app/Contents/Resources/r2" &&
       mkdir image && cp -a Cutter.app image/ &&
       export VOL_NAME="Cutter v${CUTTER_VERSION}" &&
       export DMG_TMP_FILE="Cutter-v$CUTTER_VERSION-x64.macOS-tmp.dmg" &&
@@ -169,16 +260,18 @@ after_success:
       hdiutil convert "${DMG_TMP_FILE}" -format UDZO -imagekey zlib-level=9 -o "${DMG_FILE}" &&
       export FILE_TO_UPLOAD="$DMG_FILE"
     ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-      make INSTALL_ROOT=appdir install &&
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]] && [[ $DEPLOY == 1 ]]; then
+      export VERSION=$CUTTER_VERSION &&
+      make install &&
       cp -r /usr/share/radare2 appdir/usr/share/ &&
-      mkdir -p appdir/usr/bin/translations &&
-      cp ../src/translations/*.qm appdir/usr/bin/translations/ &&
       "$TRAVIS_BUILD_DIR/scripts/appimage_embed_python.sh" appdir &&
+      "$TRAVIS_BUILD_DIR/scripts/r2ghidra.sh" -DCMAKE_INSTALL_PREFIX="`pwd`/appdir/usr" -DBUILD_CUTTER_PLUGIN=ON -DCUTTER_SOURCE_DIR="$TRAVIS_BUILD_DIR" &&
+      "$TRAVIS_BUILD_DIR/scripts/r2dec.sh" --prefix=`pwd`/appdir/usr &&
       wget -c "https://github.com/probonopd/linuxdeployqt/releases/download/6/linuxdeployqt-6-x86_64.AppImage" &&
       chmod a+x linuxdeployqt*.AppImage &&
-      ./linuxdeployqt*.AppImage ./appdir/usr/share/applications/*.desktop -bundle-non-qt-libs -no-strip -exclude-libs=libnss3.so,libnssutil3.so -ignore-glob=usr/lib/python3.6/** -verbose=2 &&
-      ./linuxdeployqt*.AppImage ./appdir/usr/share/applications/*.desktop -appimage -no-strip -exclude-libs=libnss3.so,libnssutil3.so -ignore-glob=usr/lib/python3.6/** -verbose=2 &&
+      rm -fv "$TRAVIS_BUILD_DIR/cutter-deps/qt/plugins/imageformats/libqjp2.so" &&
+      ./linuxdeployqt*.AppImage ./appdir/usr/share/applications/*.desktop -executable=./appdir/usr/bin/python3 -bundle-non-qt-libs -no-strip -exclude-libs=libnss3.so,libnssutil3.so,libqjp2.so -ignore-glob=usr/lib/python3.6/**/* -verbose=2 &&
+      ./linuxdeployqt*.AppImage ./appdir/usr/share/applications/*.desktop -executable=./appdir/usr/bin/python3 -appimage -no-strip -exclude-libs=libnss3.so,libnssutil3.so,libqjp2.so -ignore-glob=usr/lib/python3.6/**/* -verbose=2 &&
       find ./appdir -executable -type f -exec ldd {} \; | grep " => /usr" | cut -d " " -f 2-3 | sort | uniq &&
       export APPIMAGE_FILE="Cutter-v$CUTTER_VERSION-x64.Linux.AppImage" &&
       mv Cutter-*-x86_64.AppImage "$APPIMAGE_FILE" &&

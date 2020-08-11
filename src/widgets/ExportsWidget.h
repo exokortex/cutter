@@ -5,7 +5,7 @@
 
 #include "core/Cutter.h"
 #include "CutterDockWidget.h"
-#include "CutterTreeWidget.h"
+#include "widgets/ListDockWidget.h"
 
 #include <QAbstractListModel>
 #include <QSortFilterProxyModel>
@@ -18,7 +18,7 @@ namespace Ui {
 class ExportsWidget;
 }
 
-class ExportsModel : public QAbstractListModel
+class ExportsModel : public AddressableItemModel<QAbstractListModel>
 {
     Q_OBJECT
 
@@ -33,14 +33,17 @@ public:
 
     ExportsModel(QList<ExportDescription> *exports, QObject *parent = nullptr);
 
-    int rowCount(const QModelIndex &parent = QModelIndex()) const;
-    int columnCount(const QModelIndex &parent = QModelIndex()) const;
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+    int columnCount(const QModelIndex &parent = QModelIndex()) const override;
 
-    QVariant data(const QModelIndex &index, int role) const;
-    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
+    QVariant data(const QModelIndex &index, int role) const override;
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
+
+    RVA address(const QModelIndex &index) const override;
+    QString name(const QModelIndex &index) const override;
 };
 
-class ExportsProxyModel : public QSortFilterProxyModel
+class ExportsProxyModel : public AddressableFilterProxyModel
 {
     Q_OBJECT
 
@@ -52,28 +55,21 @@ protected:
     bool lessThan(const QModelIndex &left, const QModelIndex &right) const override;
 };
 
-class ExportsWidget : public CutterDockWidget
+class ExportsWidget : public ListDockWidget
 {
     Q_OBJECT
 
 public:
-    explicit ExportsWidget(MainWindow *main, QAction *action = nullptr);
+    explicit ExportsWidget(MainWindow *main);
     ~ExportsWidget();
 
 private slots:
-    void on_exportsTreeView_doubleClicked(const QModelIndex &index);
-
     void refreshExports();
 
 private:
-    std::unique_ptr<Ui::ExportsWidget> ui;
-
     ExportsModel *exportsModel;
     ExportsProxyModel *exportsProxyModel;
     QList<ExportDescription> exports;
-    CutterTreeWidget *tree;
-
-    void setScrollMode();
 };
 
 #endif // EXPORTSWIDGET_H

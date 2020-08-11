@@ -1,28 +1,38 @@
 #include "MemoryDockWidget.h"
-
+#include "common/CutterSeekable.h"
+#include "MainWindow.h"
 #include <QAction>
+#include <QEvent>
+#include <QMenu>
+#include <QContextMenuEvent>
 
-MemoryDockWidget::MemoryDockWidget(CutterCore::MemoryWidgetType type, MainWindow *parent, QAction *action)
-    : CutterDockWidget(parent, action)
+MemoryDockWidget::MemoryDockWidget(MemoryWidgetType type, MainWindow *parent)
+    : AddressableDockWidget(parent)
     , mType(type)
 {
-    connect(Core(), &CutterCore::raisePrioritizedMemoryWidget, this, &MemoryDockWidget::handleRaiseMemoryWidget);
+    if (parent) {
+        parent->addMemoryDockWidget(this);
+    }
 }
 
-void MemoryDockWidget::handleRaiseMemoryWidget(CutterCore::MemoryWidgetType raiseType)
+bool MemoryDockWidget::tryRaiseMemoryWidget()
 {
-    bool raisingEmptyGraph = (raiseType == CutterCore::MemoryWidgetType::Graph && Core()->isGraphEmpty());
-    if (raisingEmptyGraph) {
-        raiseType = CutterCore::MemoryWidgetType::Disassembly;
+    if (!seekable->isSynchronized()) {
+        return false;
     }
 
-    if (raiseType == mType) {
-        if (getBoundAction()) {
-            getBoundAction()->setChecked(true);
-        }
-
-        show();
-        raise();
-        widgetToFocusOnRaise()->setFocus(Qt::FocusReason::TabFocusReason);
+    if (mType == MemoryWidgetType::Graph && Core()->isGraphEmpty()) {
+        return false;
     }
+    raiseMemoryWidget();
+
+    return true;
+}
+
+bool MemoryDockWidget::eventFilter(QObject *object, QEvent *event)
+{
+    if (mainWindow && event->type() == QEvent::FocusIn) {
+        mainWindow->setCurrentMemoryWidget(this);
+    }
+    return CutterDockWidget::eventFilter(object, event);
 }

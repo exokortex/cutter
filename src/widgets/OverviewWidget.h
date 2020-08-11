@@ -12,7 +12,7 @@ class OverviewWidget : public CutterDockWidget
     Q_OBJECT
 
 public:
-    explicit OverviewWidget(MainWindow *main, QAction *action = nullptr);
+    explicit OverviewWidget(MainWindow *main);
     ~OverviewWidget();
 
 private:
@@ -31,6 +31,7 @@ private:
 
     void setIsAvailable(bool isAvailable);
     void setUserOpened(bool userOpened);
+    void zoomTarget(int d);
 
 private slots:
     void showEvent(QShowEvent *event) override;
@@ -87,6 +88,7 @@ public:
     bool getUserOpened() const          { return userOpened; }
 
     OverviewView *getGraphView() const  { return graphView; }
+    void wheelEvent(QWheelEvent *event) override;
 };
 
 #endif // OverviewWIDGET_H

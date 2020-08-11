@@ -29,22 +29,27 @@ void R2Task::taskFinished()
 
 void R2Task::startTask()
 {
-    r_core_task_enqueue(Core()->core(), task);
+    r_core_task_enqueue(&Core()->core_->tasks, task);
 }
 
 void R2Task::breakTask()
 {
-    r_core_task_break(Core()->core(), task->id);
+    r_core_task_break(&Core()->core_->tasks, task->id);
 }
 
 void R2Task::joinTask()
 {
-    r_core_task_join(Core()->core(), nullptr, task->id);
+    r_core_task_join(&Core()->core_->tasks, nullptr, task->id);
 }
 
 QString R2Task::getResult()
 {
     return QString::fromUtf8(task->res);
+}
+
+QJsonDocument R2Task::getResultJson()
+{
+    return Core()->parseJson(task->res, task->cmd);
 }
 
 const char *R2Task::getResultRaw()

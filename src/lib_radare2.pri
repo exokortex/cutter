@@ -1,13 +1,8 @@
 win32 {
     DEFINES += _CRT_NONSTDC_NO_DEPRECATE
     DEFINES += _CRT_SECURE_NO_WARNINGS
-    !contains(QT_ARCH, x86_64) {
-        LIBS += -L"$$PWD/../r2_dist_x86/radare2/lib"
-        R2_INCLUDEPATH += "$$PWD/../r2_dist_x86/include"
-    } else {
-        LIBS += -L"$$PWD/../r2_dist_x64/radare2/lib"
-        R2_INCLUDEPATH += "$$PWD/../r2_dist_x64/include"
-    }
+    LIBS += -L"$$PWD/../r2_dist/lib"
+    R2_INCLUDEPATH += "$$PWD/../r2_dist/include/libr"
     INCLUDEPATH += $$R2_INCLUDEPATH
 
     LIBS += \
@@ -32,13 +27,12 @@ win32 {
         -lr_socket \
         -lr_fs \
         -lr_magic \
-        -lr_crypto \
-        -lr_sdb
+        -lr_crypto
 } else {
     macx|bsd {
-        PREFIX=/usr/local
+        R2PREFIX=/usr/local
     } else {
-        PREFIX=/usr
+        R2PREFIX=/usr
     }
     USE_PKGCONFIG = 1
     R2_USER_PKGCONFIG = $$(HOME)/bin/prefix/radare2/lib/pkgconfig
@@ -47,23 +41,23 @@ win32 {
         PKG_CONFIG_PATH=$$PKG_CONFIG_PATH:$$R2_USER_PKGCONFIG
     } else {
         unix {
-            exists($$PREFIX/lib/pkgconfig/r_core.pc) {
-                PKG_CONFIG_PATH=$$PKG_CONFIG_PATH:$$PREFIX/lib/pkgconfig
+            exists($$R2PREFIX/lib/pkgconfig/r_core.pc) {
+                PKG_CONFIG_PATH=$$PKG_CONFIG_PATH:$$R2PREFIX/lib/pkgconfig
             } else {
-                LIBS += -L$$PREFIX/lib
-                R2_INCLUDEPATH += $$PREFIX/include/libr
+                LIBS += -L$$R2PREFIX/lib
+                R2_INCLUDEPATH += $$R2PREFIX/include/libr
                 USE_PKGCONFIG = 0
             }
         }
         macx {
-            LIBS += -L$$PREFIX/lib
-            R2_INCLUDEPATH += $$PREFIX/include/libr
+            LIBS += -L$$R2PREFIX/lib
+            R2_INCLUDEPATH += $$R2PREFIX/include/libr
             USE_PKGCONFIG = 0
         }
         bsd {
             !exists($$PKG_CONFIG_PATH/r_core.pc) {
-                LIBS += -L$$PREFIX/lib
-                R2_INCLUDEPATH += $$PREFIX/include/libr
+                LIBS += -L$$R2PREFIX/lib
+                R2_INCLUDEPATH += $$R2PREFIX/include/libr
                 USE_PKGCONFIG = 0
             }
         }

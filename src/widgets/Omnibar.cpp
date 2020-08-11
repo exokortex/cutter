@@ -1,5 +1,6 @@
 #include "Omnibar.h"
 #include "core/MainWindow.h"
+#include "CutterSeekable.h"
 
 #include <QStringListModel>
 #include <QCompleter>
@@ -19,11 +20,11 @@ Omnibar::Omnibar(MainWindow *main, QWidget *parent) :
     this->setTextMargins(10, 0, 0, 0);
     this->setClearButtonEnabled(true);
 
-    connect(this, SIGNAL(returnPressed()), this, SLOT(on_gotoEntry_returnPressed()));
+    connect(this, &QLineEdit::returnPressed, this, &Omnibar::on_gotoEntry_returnPressed);
 
     // Esc clears omnibar
     QShortcut *clear_shortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
-    connect(clear_shortcut, SIGNAL(activated()), this, SLOT(clear()));
+    connect(clear_shortcut, &QShortcut::activated, this, &Omnibar::clear);
     clear_shortcut->setContext(Qt::WidgetWithChildrenShortcut);
 }
 
@@ -69,7 +70,13 @@ void Omnibar::on_gotoEntry_returnPressed()
 {
     QString str = this->text();
     if (!str.isEmpty()) {
-        Core()->seek(str);
+        if (auto memoryWidget = main->getLastMemoryWidget()) {
+            RVA offset = Core()->math(str);
+            memoryWidget->getSeekable()->seek(offset);
+            memoryWidget->raiseMemoryWidget();
+        } else {
+            Core()->seekAndShow(str);
+        }
     }
 
     this->setText("");

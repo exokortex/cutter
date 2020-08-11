@@ -14,14 +14,12 @@ void CutterSamplePlugin::setupPlugin()
 
 void CutterSamplePlugin::setupInterface(MainWindow *main)
 {
-    QAction *action = new QAction("Sample C++ Plugin", main);
-    action->setCheckable(true);
-    CutterSamplePluginWidget *widget = new CutterSamplePluginWidget(main, action);
-    main->addPluginDockWidget(widget, action);
+    CutterSamplePluginWidget *widget = new CutterSamplePluginWidget(main);
+    main->addPluginDockWidget(widget);
 }
 
-CutterSamplePluginWidget::CutterSamplePluginWidget(MainWindow *main, QAction *action) :
-    CutterDockWidget(main, action)
+CutterSamplePluginWidget::CutterSamplePluginWidget(MainWindow *main) :
+    CutterDockWidget(main)
 {
     this->setObjectName("CutterSamplePluginWidget");
     this->setWindowTitle("Sample C++ Plugin");
@@ -62,6 +60,8 @@ void CutterSamplePluginWidget::on_seekChanged(RVA addr)
 void CutterSamplePluginWidget::on_buttonClicked()
 {
     QString fortune = Core()->cmd("fo").replace("\n", "");
+    // cmdRaw can be used to execute single raw commands
+    // this is especially good for user-controlled input
     QString res = Core()->cmdRaw("?E " + fortune);
     text->setText(res);
 }

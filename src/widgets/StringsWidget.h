@@ -7,6 +7,7 @@
 #include "CutterDockWidget.h"
 #include "common/StringsTask.h"
 #include "CutterTreeWidget.h"
+#include "AddressableItemModel.h"
 
 #include <QAbstractListModel>
 #include <QSortFilterProxyModel>
@@ -19,7 +20,7 @@ namespace Ui {
 class StringsWidget;
 }
 
-class StringsModel: public QAbstractListModel
+class StringsModel: public AddressableItemModel<QAbstractListModel>
 {
     Q_OBJECT
 
@@ -34,16 +35,20 @@ public:
 
     StringsModel(QList<StringDescription> *strings, QObject *parent = nullptr);
 
-    int rowCount(const QModelIndex &parent = QModelIndex()) const;
-    int columnCount(const QModelIndex &parent = QModelIndex()) const;
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+    int columnCount(const QModelIndex &parent = QModelIndex()) const override;
 
-    QVariant data(const QModelIndex &index, int role) const;
-    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
+    QVariant data(const QModelIndex &index, int role) const override;
+    QVariant headerData(int section, Qt::Orientation orientation,
+                        int role = Qt::DisplayRole) const override;
+
+    RVA address(const QModelIndex &index) const override;
+    const StringDescription *description(const QModelIndex &index) const;
 };
 
 
 
-class StringsProxyModel : public QSortFilterProxyModel
+class StringsProxyModel : public AddressableFilterProxyModel
 {
     Q_OBJECT
 
@@ -65,18 +70,14 @@ class StringsWidget : public CutterDockWidget
     Q_OBJECT
 
 public:
-    explicit StringsWidget(MainWindow *main, QAction *action = nullptr);
+    explicit StringsWidget(MainWindow *main);
     ~StringsWidget();
 
 private slots:
-    void on_stringsTreeView_doubleClicked(const QModelIndex &index);
-
     void refreshStrings();
     void stringSearchFinished(const QList<StringDescription> &strings);
     void refreshSectionCombo();
 
-    void showStringsContextMenu(const QPoint &pt);
-    void on_actionX_refs_triggered();
     void on_actionCopy();
 
 private:

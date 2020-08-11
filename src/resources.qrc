@@ -24,14 +24,23 @@
         <file>img/icons/play_light_debug.svg</file>
         <file>img/icons/play_light_emul.svg</file>
         <file>img/icons/play_light_attach.svg</file>
+        <file>img/icons/play_light_remote.svg</file>
         <file>img/icons/media-stop_light.svg</file>
+        <file>img/icons/media-suspend_light.svg</file>
         <file>img/icons/media-skip-forward_light.svg</file>
         <file>img/icons/continue_until_main.svg</file>
+        <file>img/icons/light/continue_until_main.svg</file>
         <file>img/icons/continue_until_call.svg</file>
+        <file>img/icons/light/continue_until_call.svg</file>
         <file>img/icons/continue_until_syscall.svg</file>
-        <file>img/icons/step_light.svg</file>
-        <file>img/icons/step_over_light.svg</file>
-        <file>img/icons/step_out_light.svg</file>
+        <file>img/icons/light/continue_until_syscall.svg</file>
+        <file>img/icons/detach_debugger.svg</file>
+        <file>img/icons/light/step_into.svg</file>
+        <file>img/icons/step_into.svg</file>
+        <file>img/icons/light/step_over.svg</file>
+        <file>img/icons/step_over.svg</file>
+        <file>img/icons/step_out.svg</file>
+        <file>img/icons/light/step_out.svg</file>
         <file>img/icons/cloud.svg</file>
         <file>img/icons/down.svg</file>
         <file>img/icons/down_white.svg</file>
@@ -47,11 +56,14 @@
         <file>img/icons/graph_white.svg</file>
         <file>img/icons/graph.svg</file>
         <file>img/icons/light/graph.svg</file>
+        <file>img/icons/initialization.svg</file>
+        <file>img/icons/light/initialization.svg</file>
         <file>img/icons/hexdump_light.svg</file>
         <file>img/icons/hexdump_white.svg</file>
         <file>img/icons/bug.svg</file>
         <file>img/icons/light/bug.svg</file>
         <file>img/icons/cog_light.svg</file>
+        <file>img/icons/light/cog_light.svg</file>
         <file>img/icons/cog_white.svg</file>
         <file>img/icons/new_light.svg</file>
         <file>img/icons/run_light.svg</file>

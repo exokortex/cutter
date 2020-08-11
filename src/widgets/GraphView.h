@@ -17,7 +17,12 @@
 #include "core/Cutter.h"
 #include "widgets/GraphLayout.h"
 
-#ifndef QT_NO_OPENGL
+#if defined(QT_NO_OPENGL) || QT_VERSION < QT_VERSION_CHECK(5, 6, 0)
+// QOpenGLExtraFunctions were introduced in 5.6
+#define CUTTER_NO_OPENGL_GRAPH
+#endif
+
+#ifndef CUTTER_NO_OPENGL_GRAPH
 class QOpenGLWidget;
 #endif
 
@@ -33,34 +38,76 @@ public:
     using GraphBlock = GraphLayout::GraphBlock;
     using GraphEdge = GraphLayout::GraphEdge;
 
+    enum class Layout {
+        GridNarrow
+        , GridMedium
+        , GridWide
+        , GridAAA
+        , GridAAB
+        , GridABA
+        , GridABB
+        , GridBAA
+        , GridBAB
+        , GridBBA
+        , GridBBB
+#ifdef CUTTER_ENABLE_GRAPHVIZ
+        , GraphvizOrtho
+        , GraphvizPolyline
+        , GraphvizSfdp
+        , GraphvizNeato
+        , GraphvizTwoPi
+        , GraphvizCirco
+#endif
+    };
+    static std::unique_ptr<GraphLayout> makeGraphLayout(Layout layout, bool horizontal = false);
+
     struct EdgeConfiguration {
         QColor color = QColor(128, 128, 128);
         bool start_arrow = false;
         bool end_arrow = true;
         qreal width_scale = 1.0;
+        Qt::PenStyle lineStyle = Qt::PenStyle::SolidLine;
     };
 
     explicit GraphView(QWidget *parent);
     ~GraphView() override;
 
     void showBlock(GraphBlock &block, bool anywhere = false);
-    void showBlock(GraphBlock *block, bool anywhere = false);
     /**
      * @brief Move view so that area is visible.
      * @param rect Rectangle to show
      * @param anywhere - set to true for minimizing movement
      */
     void showRectangle(const QRect &rect, bool anywhere = false);
+    /**
+     * @brief Get block containing specified point logical coordinates.
+     * @param p positionin graph logical coordinates
+     * @return Block or nullptr if position is outside all blocks.
+     */
+    GraphView::GraphBlock *getBlockContaining(QPoint p);
+    QPoint viewToLogicalCoordinates(QPoint p);
+    QPoint logicalToViewCoordinates(QPoint p);
+
+    void setGraphLayout(std::unique_ptr<GraphLayout> layout);
+    GraphLayout &getGraphLayout() const { return *graphLayoutSystem; }
+    void setLayoutConfig(const GraphLayout::LayoutConfig &config);
+
+    void paint(QPainter &p, QPoint offset, QRect area, qreal scale = 1.0, bool interactive = true);
+
+    void saveAsBitmap(QString path, const char *format = nullptr, double scaler = 1.0,
+                      bool transparent = false);
+    void saveAsSvg(QString path);
+
+    void computeGraphPlacement();
 
     /**
-     * @brief keep the current addr of the fcn of Graph
-     * Everytime overview updates its contents, it compares this value with the one in Graph
-     * if they aren't same, then Overview needs to update the pixmap cache.
+     * @brief Remove duplicate edges and edges without target in graph.
+     * @param graph
      */
-    ut64 currentFcnAddr = RVA_INVALID; // TODO: move application specific code out of graph view
-
+    static void cleanupEdges(GraphLayout::Graph &graph);
 protected:
     std::unordered_map<ut64, GraphBlock> blocks;
+    /// image background color
     QColor backgroundColor = QColor(Qt::white);
 
     // Padding inside the block
@@ -70,19 +117,36 @@ protected:
 
     void addBlock(GraphView::GraphBlock block);
     void setEntry(ut64 e);
-    void computeGraph(ut64 entry);
 
     // Callbacks that should be overridden
-    virtual void drawBlock(QPainter &p, GraphView::GraphBlock &block);
+    /**
+     * @brief drawBlock
+     * @param p painter object, not necesarily current widget
+     * @param block
+     * @param interactive - can be used for disabling elemnts during export
+     */
+    virtual void drawBlock(QPainter &p, GraphView::GraphBlock &block, bool interactive = true) = 0;
     virtual void blockClicked(GraphView::GraphBlock &block, QMouseEvent *event, QPoint pos);
     virtual void blockDoubleClicked(GraphView::GraphBlock &block, QMouseEvent *event, QPoint pos);
     virtual void blockHelpEvent(GraphView::GraphBlock &block, QHelpEvent *event, QPoint pos);
     virtual bool helpEvent(QHelpEvent *event);
     virtual void blockTransitionedTo(GraphView::GraphBlock *to);
     virtual void wheelEvent(QWheelEvent *event) override;
-    virtual EdgeConfiguration edgeConfiguration(GraphView::GraphBlock &from, GraphView::GraphBlock *to);
+    virtual EdgeConfiguration edgeConfiguration(GraphView::GraphBlock &from, GraphView::GraphBlock *to,
+                                                bool interactive = true);
+    /**
+     * @brief Called when user requested context menu for a block. Should open a block specific contextmenu.
+     * Typically triggered by right click.
+     * @param block - the block that was clicked on
+     * @param event - context menu event that triggered the callback, can be used to display context menu
+     * at correct position
+     * @param pos - mouse click position in logical coordinates of the drawing, set only if event reason is mouse
+     */
+    virtual void blockContextMenuRequested(GraphView::GraphBlock &block, QContextMenuEvent *event,
+                                           QPoint pos);
 
     bool event(QEvent *event) override;
+    void contextMenuEvent(QContextMenuEvent *event) override;
 
     // Mouse events
     void mousePressEvent(QMouseEvent *event) override;
@@ -96,6 +160,7 @@ protected:
 
     int width = 0;
     int height = 0;
+    bool scale_thickness_multiplier = false;
 
     void clampViewOffset();
     void setViewOffsetInternal(QPoint pos, bool emitSignal = true);
@@ -114,19 +179,14 @@ private:
 
     QPoint offset = QPoint(0, 0);
 
-    ut64 entry;
+    ut64 entry = 0;
 
     std::unique_ptr<GraphLayout> graphLayoutSystem;
-
-    bool ready = false;
 
     // Scrolling data
     int scroll_base_x = 0;
     int scroll_base_y = 0;
     bool scroll_mode = false;
-
-    // Todo: remove charheight/charwidth cause it should be handled in child class
-    qreal charWidth = 10.0;
 
     bool useGL;
 
@@ -135,7 +195,7 @@ private:
      */
     QPixmap pixmap;
 
-#ifndef QT_NO_OPENGL
+#ifndef CUTTER_NO_OPENGL_GRAPH
     uint32_t cacheTexture;
     uint32_t cacheFBO;
     QSize cacheSize;
@@ -151,9 +211,7 @@ private:
     QSize getRequiredCacheSize();
     qreal getRequiredCacheDevicePixelRatioF();
 
-    QPolygonF recalculatePolygon(QPolygonF polygon);
     void beginMouseDrag(QMouseEvent *event);
-
 public:
     QPoint getViewOffset() const    { return offset; }
     void setViewOffset(QPoint offset);

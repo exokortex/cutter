@@ -4,6 +4,8 @@
 #include "common/Helpers.h"
 #include "common/Configuration.h"
 #include "common/TempConfig.h"
+#include "common/SyntaxHighlighter.h"
+#include "core/MainWindow.h"
 
 #include <QJsonObject>
 #include <QJsonArray>
@@ -15,27 +17,20 @@
 #include <QInputDialog>
 #include <QShortcut>
 
-HexdumpWidget::HexdumpWidget(MainWindow *main, QAction *action) :
-    MemoryDockWidget(CutterCore::MemoryWidgetType::Hexdump, main, action),
-    ui(new Ui::HexdumpWidget),
-    seekable(new CutterSeekable(this))
+HexdumpWidget::HexdumpWidget(MainWindow *main) :
+    MemoryDockWidget(MemoryWidgetType::Hexdump, main),
+    ui(new Ui::HexdumpWidget)
 {
     ui->setupUi(this);
 
-    /*
-     * Ugly hack just for the layout issue
-     * QSettings saves the state with the object names
-     * By doing this hack,
-     * you can at least avoid some mess by dismissing all the Extra Widgets
-     */
-    QString name = "Hexdump";
-    if (!action) {
-        name = "Extra Hexdump";
-    }
-    setObjectName(name);
+    setObjectName(main
+                  ? main->getUniqueObjectName(getWidgetType())
+                  : getWidgetType());
 
     ui->copyMD5->setIcon(QIcon(":/img/icons/copy.svg"));
     ui->copySHA1->setIcon(QIcon(":/img/icons/copy.svg"));
+    ui->copySHA256->setIcon(QIcon(":/img/icons/copy.svg"));
+    ui->copyCRC32->setIcon(QIcon(":/img/icons/copy.svg"));
 
 
     ui->splitter->setChildrenCollapsible(false);
@@ -44,7 +39,9 @@ HexdumpWidget::HexdumpWidget(MainWindow *main, QAction *action) :
     QIcon closeIcon = QIcon(":/img/icons/delete.svg");
     closeButton->setIcon(closeIcon);
     closeButton->setAutoRaise(true);
+
     ui->hexSideTab_2->setCornerWidget(closeButton);
+    syntaxHighLighter = Config()->createSyntaxHighlighter(ui->hexDisasTextEdit->document());
 
     ui->openSideViewB->hide();  // hide button at startup since side view is visible
 
@@ -56,10 +53,14 @@ HexdumpWidget::HexdumpWidget(MainWindow *main, QAction *action) :
         showSidePanel(true);
     });
 
-    ui->bytesMD5->setPlaceholderText("Select bytes to display information");
-    ui->bytesEntropy->setPlaceholderText("Select bytes to display information");
-    ui->bytesSHA1->setPlaceholderText("Select bytes to display information");
-    ui->hexDisasTextEdit->setPlaceholderText("Select bytes to display information");
+    // Set placeholders for the line-edit components
+    QString placeholder = tr("Select bytes to display information");
+    ui->bytesMD5->setPlaceholderText(placeholder);
+    ui->bytesEntropy->setPlaceholderText(placeholder);
+    ui->bytesSHA1->setPlaceholderText(placeholder);
+    ui->bytesSHA256->setPlaceholderText(placeholder);
+    ui->bytesCRC32->setPlaceholderText(placeholder);
+    ui->hexDisasTextEdit->setPlaceholderText(placeholder);
 
     setupFonts();
 
@@ -75,25 +76,20 @@ HexdumpWidget::HexdumpWidget(MainWindow *main, QAction *action) :
                                      "  border-color : #3daee9"
                                      "}");
 
-    this->setWindowTitle(tr("Hexdump"));
+    setWindowTitle(getWindowTitle());
 
     refreshDeferrer = createReplacingRefreshDeferrer<RVA>(false, [this](const RVA *offset) {
         refresh(offset ? *offset : RVA_INVALID);
     });
 
-    connect(&syncAction, SIGNAL(triggered(bool)), this, SLOT(toggleSync()));
-    syncAction.setText(tr("Sync/unsync offset"));
     this->ui->hexTextView->addAction(&syncAction);
 
-    connect(Config(), SIGNAL(fontsUpdated()), this, SLOT(fontsUpdated()));
-
-    connect(this, &QDockWidget::visibilityChanged, this, [](bool visibility) {
-        if (visibility) {
-            Core()->setMemoryWidgetPriority(CutterCore::MemoryWidgetType::Hexdump);
-        }
-    });
-
+    connect(Config(), &Configuration::fontsUpdated, this, &HexdumpWidget::fontsUpdated);
     connect(Core(), &CutterCore::refreshAll, this, [this]() { refresh(); });
+    connect(Core(), &CutterCore::refreshCodeViews, this, [this]() { refresh(); });
+    connect(Core(), &CutterCore::instructionChanged, this, [this]() { refresh(); });
+    connect(Core(), &CutterCore::stackChanged, this, [this]() { refresh(); });
+    connect(Core(), &CutterCore::registersChanged, this, [this]() { refresh(); });
 
     connect(seekable, &CutterSeekable::seekableSeekChanged, this, &HexdumpWidget::onSeekChanged);
     connect(ui->hexTextView, &HexWidget::positionChanged, this, [this](RVA addr) {
@@ -105,9 +101,13 @@ HexdumpWidget::HexdumpWidget(MainWindow *main, QAction *action) :
     });
     connect(ui->hexTextView, &HexWidget::selectionChanged, this, &HexdumpWidget::selectionChanged);
     connect(ui->hexSideTab_2, &QTabWidget::currentChanged, this, &HexdumpWidget::refreshSelectionInfo);
+    ui->hexTextView->installEventFilter(this);
 
     initParsing();
     selectHexPreview();
+
+    // apply initial offset
+    refresh(seekable->getOffset());
 }
 
 void HexdumpWidget::onSeekChanged(RVA addr)
@@ -120,6 +120,11 @@ void HexdumpWidget::onSeekChanged(RVA addr)
 }
 
 HexdumpWidget::~HexdumpWidget() {}
+
+QString HexdumpWidget::getWidgetType()
+{
+    return "Hexdump";
+}
 
 void HexdumpWidget::refresh()
 {
@@ -145,6 +150,19 @@ void HexdumpWidget::refresh(RVA addr)
 void HexdumpWidget::initParsing()
 {
     // Fill the plugins combo for the hexdump sidebar
+    ui->parseTypeComboBox->addItem(tr("Disassembly"), "pda");
+    ui->parseTypeComboBox->addItem(tr("String"), "pcs");
+    ui->parseTypeComboBox->addItem(tr("Assembler"), "pca");
+    ui->parseTypeComboBox->addItem(tr("C bytes"), "pc");
+    ui->parseTypeComboBox->addItem(tr("C bytes with instructions"), "pci");
+    ui->parseTypeComboBox->addItem(tr("C half-words (2 byte)"), "pch");
+    ui->parseTypeComboBox->addItem(tr("C words (4 byte)"), "pcw");
+    ui->parseTypeComboBox->addItem(tr("C dwords (8 byte)"), "pcd");
+    ui->parseTypeComboBox->addItem(tr("Python"), "pcp");
+    ui->parseTypeComboBox->addItem(tr("JSON"), "pcj");
+    ui->parseTypeComboBox->addItem(tr("JavaScript"), "pcJ");
+    ui->parseTypeComboBox->addItem(tr("Yara"), "pcy");
+
     ui->parseArchComboBox->insertItems(0, Core()->getAsmPluginNames());
 
     ui->parseEndianComboBox->setCurrentIndex(Core()->getConfigb("cfg.bigendian") ? 1 : 0);
@@ -169,19 +187,6 @@ void HexdumpWidget::on_parseBitsComboBox_currentTextChanged(const QString &/*arg
     refreshSelectionInfo();
 }
 
-
-void HexdumpWidget::toggleSync()
-{
-    QString windowTitle = tr("Hexdump");
-    seekable->toggleSynchronization();
-    if (seekable->isSynchronized()) {
-        setWindowTitle(windowTitle);
-    } else {
-        setWindowTitle(windowTitle + CutterSeekable::tr(" (unsynced)"));
-    }
-}
-
-
 void HexdumpWidget::setupFonts()
 {
     QFont font = Config()->getFont();
@@ -205,6 +210,8 @@ void HexdumpWidget::clearParseWindow()
     ui->bytesEntropy->setText("");
     ui->bytesMD5->setText("");
     ui->bytesSHA1->setText("");
+    ui->bytesSHA256->setText("");
+    ui->bytesCRC32->setText("");
 }
 
 void HexdumpWidget::showSidePanel(bool show)
@@ -216,14 +223,16 @@ void HexdumpWidget::showSidePanel(bool show)
     }
 }
 
+QString HexdumpWidget::getWindowTitle() const
+{
+    return tr("Hexdump");
+}
+
 void HexdumpWidget::updateParseWindow(RVA start_address, int size)
 {
     if (!ui->hexSideTab_2->isVisible()) {
         return;
     }
-
-    QString address = RAddressString(start_address);
-    QString argument = QString("%1@" + address).arg(size);
 
     if (ui->hexSideTab_2->currentIndex() == 0) {
         // scope for TempConfig
@@ -231,6 +240,8 @@ void HexdumpWidget::updateParseWindow(RVA start_address, int size)
         // Get selected combos
         QString arch = ui->parseArchComboBox->currentText();
         QString bits = ui->parseBitsComboBox->currentText();
+        QString selectedCommand = ui->parseTypeComboBox->currentData().toString();
+        QString commandResult = "";
         bool bigEndian = ui->parseEndianComboBox->currentIndex() == 1;
 
         TempConfig tempConfig;
@@ -239,53 +250,28 @@ void HexdumpWidget::updateParseWindow(RVA start_address, int size)
         .set("asm.bits", bits)
         .set("cfg.bigendian", bigEndian);
 
-        switch (ui->parseTypeComboBox->currentIndex()) {
-        case 0: // Disassembly
-            ui->hexDisasTextEdit->setPlainText(Core()->cmd("pda " + argument));
-            break;
-        case 1: // String
-            ui->hexDisasTextEdit->setPlainText(Core()->cmd("pcs " + argument));
-            break;
-        case 2: // Assembler
-            ui->hexDisasTextEdit->setPlainText(Core()->cmd("pca " + argument));
-            break;
-        case 3: // C byte array
-            ui->hexDisasTextEdit->setPlainText(Core()->cmd("pc " + argument));
-            break;
-        case 4: // C half-word
-            ui->hexDisasTextEdit->setPlainText(Core()->cmd("pch " + argument));
-            break;
-        case 5: // C word
-            ui->hexDisasTextEdit->setPlainText(Core()->cmd("pcw " + argument));
-            break;
-        case 6: // C dword
-            ui->hexDisasTextEdit->setPlainText(Core()->cmd("pcd " + argument));
-            break;
-        case 7: // Python
-            ui->hexDisasTextEdit->setPlainText(Core()->cmd("pcp " + argument));
-            break;
-        case 8: // JSON
-            ui->hexDisasTextEdit->setPlainText(Core()->cmd("pcj " + argument));
-            break;
-        case 9: // JavaScript
-            ui->hexDisasTextEdit->setPlainText(Core()->cmd("pcJ " + argument));
-            break;
-        default:
-            ui->hexDisasTextEdit->setPlainText("");
-        }
+        ui->hexDisasTextEdit->setPlainText(selectedCommand != "" ? Core()->cmdRawAt(QString("%1 %2")
+                                                                    .arg(selectedCommand)
+                                                                    .arg(size)
+                                                                    , start_address) : "");
     } else {
         // Fill the information tab hashes and entropy
-        ui->bytesMD5->setText(Core()->cmd("ph md5 " + argument).trimmed());
-        ui->bytesSHA1->setText(Core()->cmd("ph sha1 " + argument).trimmed());
-        ui->bytesEntropy->setText(Core()->cmd("ph entropy " + argument).trimmed());
+        ui->bytesMD5->setText(Core()->cmdRawAt(QString("ph md5 %1").arg(size), start_address).trimmed());
+        ui->bytesSHA1->setText(Core()->cmdRawAt(QString("ph sha1 %1").arg(size), start_address).trimmed());
+        ui->bytesSHA256->setText(Core()->cmdRawAt(QString("ph sha256 %1").arg(size), start_address).trimmed());
+        ui->bytesCRC32->setText(Core()->cmdRawAt(QString("ph crc32 %1").arg(size), start_address).trimmed());
+        ui->bytesEntropy->setText(Core()->cmdRawAt(QString("ph entropy %1").arg(size), start_address).trimmed());
         ui->bytesMD5->setCursorPosition(0);
         ui->bytesSHA1->setCursorPosition(0);
+        ui->bytesSHA256->setCursorPosition(0);
+        ui->bytesCRC32->setCursorPosition(0);
     }
 }
 
 void HexdumpWidget::on_parseTypeComboBox_currentTextChanged(const QString &)
 {
-    if (ui->parseTypeComboBox->currentIndex() == 0) {
+    QString currentParseTypeText = ui->parseTypeComboBox->currentData().toString();
+    if (currentParseTypeText == "pda" || currentParseTypeText == "pci") {
         ui->hexSideFrame_2->show();
     } else {
         ui->hexSideFrame_2->hide();
@@ -320,6 +306,11 @@ void HexdumpWidget::on_hexSideTab_2_currentChanged(int /*index*/)
 
 void HexdumpWidget::resizeEvent(QResizeEvent *event)
 {
+    // Heuristics to hide sidebar when it hides the content of the hexdump. 600px looks just "okay"
+    // Only applied when widget width is decreased to avoid unwanted behavior
+    if (event->oldSize().width() > event->size().width() && event->size().width() < 600) {
+        showSidePanel(false);
+    }
     QDockWidget::resizeEvent(event);
     refresh();
 }
@@ -334,8 +325,7 @@ void HexdumpWidget::on_copyMD5_clicked()
     QString md5 = ui->bytesMD5->text();
     QClipboard *clipboard = QApplication::clipboard();
     clipboard->setText(md5);
-    // FIXME
-    // this->main->addOutput("MD5 copied to clipboard: " + md5);
+    Core()->message("MD5 copied to clipboard: " + md5);
 }
 
 void HexdumpWidget::on_copySHA1_clicked()
@@ -343,10 +333,24 @@ void HexdumpWidget::on_copySHA1_clicked()
     QString sha1 = ui->bytesSHA1->text();
     QClipboard *clipboard = QApplication::clipboard();
     clipboard->setText(sha1);
-    // FIXME
-    // this->main->addOutput("SHA1 copied to clipboard: " + sha1);
+    Core()->message("SHA1 copied to clipboard: " + sha1);
 }
 
+void HexdumpWidget::on_copySHA256_clicked()
+{
+    QString sha256 = ui->bytesSHA256->text();
+    QClipboard *clipboard = QApplication::clipboard();
+    clipboard->setText(sha256);
+    Core()->message("SHA256 copied to clipboard: " + sha256);
+}
+
+void HexdumpWidget::on_copyCRC32_clicked()
+{
+    QString crc32 = ui->bytesCRC32->text();
+    QClipboard *clipboard = QApplication::clipboard();
+    clipboard->setText(crc32);
+    Core()->message("CRC32 copied to clipboard: " + crc32);
+}
 
 void HexdumpWidget::selectHexPreview()
 {

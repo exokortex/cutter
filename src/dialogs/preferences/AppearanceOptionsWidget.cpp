@@ -11,6 +11,7 @@
 #include <QtSvg/QSvgRenderer>
 
 #include <QComboBox>
+#include <QtWidgets/QSpinBox>
 #include "PreferencesDialog.h"
 #include "AppearanceOptionsWidget.h"
 #include "ui_AppearanceOptionsWidget.h"
@@ -27,8 +28,7 @@ AppearanceOptionsWidget::AppearanceOptionsWidget(PreferencesDialog *dialog)
       ui(new Ui::AppearanceOptionsWidget)
 {
     ui->setupUi(this);
-    updateFontFromConfig();
-    updateThemeFromConfig(false);
+    updateFromConfig();
 
     QStringList langs = Config()->getAvailableTranslations();
     ui->languageComboBox->addItems(langs);
@@ -61,16 +61,19 @@ AppearanceOptionsWidget::AppearanceOptionsWidget(PreferencesDialog *dialog)
             &AppearanceOptionsWidget::updateFontFromConfig);
 
     connect(ui->colorComboBox, &QComboBox::currentTextChanged,
-            this, [this](const QString &str) {
-        ui->editButton->setEnabled(ThemeWorker().isCustomTheme(str));
-    });
+            this, &AppearanceOptionsWidget::updateModificationButtons);
+
+    connect(ui->fontZoomBox,
+        static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged),
+        this,
+        &AppearanceOptionsWidget::onFontZoomBoxValueChanged);
 }
 
 AppearanceOptionsWidget::~AppearanceOptionsWidget() {}
 
 void AppearanceOptionsWidget::updateFontFromConfig()
 {
-    QFont currentFont = Config()->getFont();
+    QFont currentFont = Config()->getBaseFont();
     ui->fontSelectionLabel->setText(currentFont.toString());
 }
 
@@ -80,22 +83,29 @@ void AppearanceOptionsWidget::updateThemeFromConfig(bool interfaceThemeChanged)
     QSignalBlocker signalBlockerThemeBox(ui->themeComboBox);
 
     ui->themeComboBox->clear();
-    for (auto &it : kCutterInterfaceThemesList) {
+    for (auto &it : Configuration::cutterInterfaceThemesList()) {
         ui->themeComboBox->addItem(it.name);
     }
     int currInterfaceThemeIndex = Config()->getInterfaceTheme();
-    if (currInterfaceThemeIndex >= kCutterInterfaceThemesList.size()) {
+    if (currInterfaceThemeIndex >= Configuration::cutterInterfaceThemesList().size()) {
         currInterfaceThemeIndex = 0;
         Config()->setInterfaceTheme(currInterfaceThemeIndex);
     }
     ui->themeComboBox->setCurrentIndex(currInterfaceThemeIndex);
     ui->colorComboBox->updateFromConfig(interfaceThemeChanged);
-    ui->editButton->setEnabled(ThemeWorker().isCustomTheme(ui->colorComboBox->currentText()));
+    updateModificationButtons(ui->colorComboBox->currentText());
 }
+
+void AppearanceOptionsWidget::onFontZoomBoxValueChanged(int zoom)
+{
+  qreal zoomFactor = zoom / 100.0;
+  Config()->setZoomFactor(zoomFactor);
+}
+
 
 void AppearanceOptionsWidget::on_fontSelectionButton_clicked()
 {
-    QFont currentFont = Config()->getFont();
+    QFont currentFont = Config()->getBaseFont();
     bool ok;
     QFont newFont = QFontDialog::getFont(&ok, currentFont, this, QString(),
                                          QFontDialog::DontUseNativeDialog);
@@ -245,6 +255,21 @@ void AppearanceOptionsWidget::onLanguageComboBoxCurrentIndexChanged(int index)
     qWarning() << tr("Cannot set language, not found in available ones");
 }
 
+void AppearanceOptionsWidget::updateModificationButtons(const QString& theme)
+{
+    bool editable = ThemeWorker().isCustomTheme(theme);
+    ui->editButton->setEnabled(editable);
+    ui->deleteButton->setEnabled(editable);
+    ui->renameButton->setEnabled(editable);
+}
+
+void AppearanceOptionsWidget::updateFromConfig()
+{
+    updateFontFromConfig();
+    updateThemeFromConfig(false);
+    ui->fontZoomBox->setValue(qRound(Config()->getZoomFactor() * 100));
+}
+
 QIcon AppearanceOptionsWidget::getIconFromSvg(const QString& fileName, const QColor& after, const QColor& before)
 {
     QFile file(fileName);
@@ -252,7 +277,7 @@ QIcon AppearanceOptionsWidget::getIconFromSvg(const QString& fileName, const QCo
         return QIcon();
     }
     QString data = file.readAll();
-    data.replace(QRegExp(QString("#%1").arg(before.isValid() ? before.name().remove(0, 1) : "[0-9a-fA-F]{6}")),
+    data.replace(QRegularExpression(QString("#%1").arg(before.isValid() ? before.name().remove(0, 1) : "[0-9a-fA-F]{6}")),
                  QString("%1").arg(after.name()));
 
     QSvgRenderer svgRenderer(data.toUtf8());

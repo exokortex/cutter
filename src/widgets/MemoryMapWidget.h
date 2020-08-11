@@ -4,6 +4,7 @@
 
 #include "core/Cutter.h"
 #include "CutterDockWidget.h"
+#include "ListDockWidget.h"
 
 #include <QAbstractListModel>
 #include <QSortFilterProxyModel>
@@ -21,7 +22,7 @@ class MainWindow;
 class QTreeWidgetItem;
 
 
-class MemoryMapModel: public QAbstractListModel
+class MemoryMapModel: public AddressableItemModel<QAbstractListModel>
 {
     Q_OBJECT
 
@@ -34,18 +35,20 @@ public:
     enum Column { AddrStartColumn = 0, AddrEndColumn, NameColumn, PermColumn, ColumnCount };
     enum Role { MemoryDescriptionRole = Qt::UserRole };
 
-    MemoryMapModel(QList<MemoryMapDescription> *memoryMaps, QObject *parent = 0);
+    MemoryMapModel(QList<MemoryMapDescription> *memoryMaps, QObject *parent = nullptr);
 
-    int rowCount(const QModelIndex &parent = QModelIndex()) const;
-    int columnCount(const QModelIndex &parent = QModelIndex()) const;
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+    int columnCount(const QModelIndex &parent = QModelIndex()) const override;
 
-    QVariant data(const QModelIndex &index, int role) const;
-    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
+    QVariant data(const QModelIndex &index, int role) const override;
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
+
+    RVA address(const QModelIndex &index) const override;
 };
 
 
 
-class MemoryProxyModel : public QSortFilterProxyModel
+class MemoryProxyModel : public AddressableFilterProxyModel
 {
     Q_OBJECT
 
@@ -59,27 +62,22 @@ protected:
 
 
 
-class MemoryMapWidget : public CutterDockWidget
+class MemoryMapWidget : public ListDockWidget
 {
     Q_OBJECT
 
 public:
-    explicit MemoryMapWidget(MainWindow *main, QAction *action = nullptr);
+    explicit MemoryMapWidget(MainWindow *main);
     ~MemoryMapWidget();
 
 private slots:
-    void on_memoryTreeView_doubleClicked(const QModelIndex &index);
 
     void refreshMemoryMap();
 
 private:
-    std::unique_ptr<Ui::MemoryMapWidget> ui;
-
     MemoryMapModel *memoryModel;
     MemoryProxyModel *memoryProxyModel;
     QList<MemoryMapDescription> memoryMaps;
-
-    void setScrollMode();
 
     RefreshDeferrer *refreshDeferrer;
 };

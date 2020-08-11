@@ -56,7 +56,7 @@ class VTablesWidget : public CutterDockWidget
     Q_OBJECT
 
 public:
-    explicit VTablesWidget(MainWindow *main, QAction *action = nullptr);
+    explicit VTablesWidget(MainWindow *main);
     ~VTablesWidget();
 
 private slots:
@@ -70,6 +70,7 @@ private:
     QSortFilterProxyModel *proxy;
     QList<VTableDescription> vtables;
     CutterTreeWidget *tree;
+    RefreshDeferrer *refreshDeferrer;
 };
 
 #endif // VTABLESWIDGET_H

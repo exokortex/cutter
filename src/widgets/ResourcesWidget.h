@@ -4,13 +4,14 @@
 #include "core/Cutter.h"
 #include "CutterDockWidget.h"
 #include "CutterTreeView.h"
+#include "common/AddressableItemModel.h"
+#include "widgets/ListDockWidget.h"
 
-#include <QAbstractListModel>
 
 class MainWindow;
 class ResourcesWidget;
 
-class ResourcesModel : public QAbstractListModel
+class ResourcesModel : public AddressableItemModel<QAbstractListModel>
 {
     Q_OBJECT
 
@@ -29,23 +30,24 @@ public:
     QVariant data(const QModelIndex &index, int role) const override;
     QVariant headerData(int section, Qt::Orientation orientation,
                         int role = Qt::DisplayRole) const override;
+
+    RVA address(const QModelIndex &index) const override;
 };
 
-class ResourcesWidget : public CutterDockWidget
+class ResourcesWidget : public ListDockWidget
 {
     Q_OBJECT
 
 private:
     ResourcesModel *model;
-    CutterTreeView *view;
+    AddressableFilterProxyModel *filterModel;
     QList<ResourcesDescription> resources;
 
 public:
-    explicit ResourcesWidget(MainWindow *main, QAction *action = nullptr);
+    explicit ResourcesWidget(MainWindow *main);
 
 private slots:
     void refreshResources();
-    void onDoubleClicked(const QModelIndex &);
 };
 
 #endif // RESOURCESWIDGET_H

@@ -5,6 +5,8 @@
 #include <QColor>
 #include <QJsonArray>
 #include <QStandardPaths>
+#include <QRegularExpression>
+
 #include "common/Configuration.h"
 
 const QStringList ColorThemeWorker::cutterSpecificOptions = {
@@ -74,8 +76,9 @@ ColorThemeWorker::ColorThemeWorker(QObject *parent) : QObject (parent)
     } else {
         QMessageBox::critical(nullptr,
             tr("Standard themes not found"),
-            tr("The radare2 standard themes could not be found. "
+            tr("The radare2 standard themes could not be found in '%1'. "
                "Most likely, radare2 is not properly installed.")
+                .arg(currDir.path())
         );
     }
 }
@@ -119,26 +122,27 @@ QString ColorThemeWorker::save(const QJsonDocument &theme, const QString &themeN
     }
 
     QJsonObject obj = theme.object();
-    QString line;
-    QColor::NameFormat format;
     for (auto it = obj.constBegin(); it != obj.constEnd(); it++) {
-        if (cutterSpecificOptions.contains(it.key())) {
-            line = "#~%1 %2\n";
-            format = QColor::HexArgb;
-        } else {
-            line = "ec %1 %2\n";
-            format = QColor::HexRgb;
-        }
+
         QJsonArray arr = it.value().toArray();
+        QColor color;
         if (arr.isEmpty()) {
-            fOut.write(line.arg(it.key())
-                       .arg(it.value().toVariant().value<QColor>().name(format)).toUtf8());
+            color = it.value().toVariant().value<QColor>();
         } else if (arr.size() == 4) {
-            fOut.write(line.arg(it.key())
-                       .arg(QColor(arr[0].toInt(), arr[1].toInt(), arr[2].toInt(), arr[3].toInt()).name(format)).toUtf8());
+            color = QColor(arr[0].toInt(), arr[1].toInt(), arr[2].toInt(), arr[3].toInt());
         } else if (arr.size() == 3) {
-            fOut.write(line.arg(it.key())
-                       .arg(QColor(arr[0].toInt(), arr[1].toInt(), arr[2].toInt()).name(format)).toUtf8());
+            color = QColor(arr[0].toInt(), arr[1].toInt(), arr[2].toInt());
+        } else {
+            continue;
+        }
+        if (cutterSpecificOptions.contains(it.key())) {
+            fOut.write(QString("#~%1 rgb:%2\n")
+                       .arg(it.key(), color.name(QColor::HexArgb).remove('#'))
+                       .toUtf8());
+        } else {
+            fOut.write(QString("ec %1 rgb:%2\n")
+                       .arg(it.key(), color.name(QColor::HexRgb).remove('#'))
+                       .toUtf8());
         }
     }
 
@@ -160,15 +164,31 @@ bool ColorThemeWorker::isThemeExist(const QString &name) const
 QJsonDocument ColorThemeWorker::getTheme(const QString& themeName) const
 {
     int r, g, b, a;
-    QJsonObject theme;
+    QVariantMap theme;
     QString curr = Config()->getColorTheme();
 
     if (themeName != curr) {
-        Core()->cmd(QString("eco %1").arg(themeName));
-        theme = Core()->cmdj("ecj").object();
-        Core()->cmd(QString("eco %1").arg(curr));
+        Core()->cmdRaw(QString("eco %1").arg(themeName));
+        theme = Core()->cmdj("ecj").object().toVariantMap();
+        Core()->cmdRaw(QString("eco %1").arg(curr));
     } else {
-        theme = Core()->cmdj("ecj").object();
+        theme = Core()->cmdj("ecj").object().toVariantMap();
+    }
+
+    for (auto it = theme.begin(); it != theme.end(); it++) {
+        auto arr = it.value().toList();
+        QColor(arr[0].toInt(), arr[1].toInt(), arr[2].toInt()).getRgb(&r, &g, &b, &a);
+        theme[it.key()] = QJsonArray({r, g, b, a});
+    }
+
+    ColorFlags colorFlags = ColorFlags::DarkFlag;
+    if (Configuration::relevantThemes.contains(themeName)) {
+        colorFlags = Configuration::relevantThemes[themeName];
+    }
+
+    for (auto& it : cutterSpecificOptions) {
+        Configuration::cutterOptionColors[it][colorFlags].getRgb(&r, &g, &b, &a);
+        theme.insert(it, QJsonArray{r, g, b, a});
     }
 
     if (isCustomTheme(themeName)) {
@@ -177,35 +197,35 @@ QJsonDocument ColorThemeWorker::getTheme(const QString& themeName) const
             return QJsonDocument();
         }
         QStringList sl;
-        for (auto &line : QString(src.readAll()).split('\n', QString::SkipEmptyParts)) {
-            sl = line.replace("#~", "ec ").replace("rgb:", "#").split(' ', QString::SkipEmptyParts);
+        for (auto &line : QString(src.readAll()).split('\n', CUTTER_QT_SKIP_EMPTY_PARTS)) {
+            sl = line.replace("#~", "ec ").replace("rgb:", "#").split(' ', CUTTER_QT_SKIP_EMPTY_PARTS);
             if (sl.size() != 3 || sl[0][0] == '#') {
                 continue;
             }
             QColor(sl[2]).getRgb(&r, &g, &b, &a);
             theme.insert(sl[1], QJsonArray({r, g, b, a}));
         }
-        for (auto &it : cutterSpecificOptions) {
-            if (!theme.contains(it)) {
-                mergeColors(Config()->getColor(it),
-                            Config()->getColor("gui.background")).getRgb(&r, &g, &b, &a);
-                Config()->getColor(it).getRgb(&r, &g, &b, &a);
-                theme.insert(it, QJsonArray({r, g, b, a}));
-            }
-        }
-    } else {
-        for (auto &it : cutterSpecificOptions) {
-            mergeColors(Config()->getColor(it),
-                        Config()->getColor("gui.background")).getRgb(&r, &g, &b, &a);
-            Config()->getColor(it).getRgb(&r, &g, &b, &a);
-            theme.insert(it, QJsonArray({r, g, b, a}));
-        }
     }
 
     for (auto &key : radare2UnusedOptions) {
         theme.remove(key);
     }
-    return QJsonDocument(theme);
+
+    // manualy converting instead of using QJsonObject::fromVariantMap because
+    // Qt < 5.6 QJsonValue.fromVariant doesn't expect QVariant to already contain
+    // QJson values like QJsonArray. https://github.com/qt/qtbase/commit/26237f0a2d8db80024b601f676bbce54d483e672
+    QJsonObject obj;
+    for (auto it = theme.begin(); it != theme.end(); it++) {
+        auto &value = it.value();
+        if (value.canConvert<QJsonArray>()) {
+            obj[it.key()] = it.value().value<QJsonArray>();
+        } else {
+            obj[it.key()] = QJsonValue::fromVariant(value);
+        }
+
+    }
+
+    return QJsonDocument(obj);
 }
 
 QString ColorThemeWorker::deleteTheme(const QString &themeName) const
@@ -296,13 +316,14 @@ bool ColorThemeWorker::isFileTheme(const QString& filePath, bool* ok) const
     QString options = (Core()->cmdj("ecj").object().keys() << cutterSpecificOptions)
                       .join('|')
                       .replace(".", "\\.");
-    QRegExp regexp = QRegExp(QString("((ec\\s+(%1)\\s+(((rgb:|#)[0-9a-fA-F]{3,8})|(%2))))\\s*")
-                             .arg(options)
-                             .arg(colors));
 
-    for (auto &line : QString(f.readAll()).split('\n', QString::SkipEmptyParts)) {
+    QString pattern = QString("((ec\\s+(%1)\\s+(((rgb:|#)[0-9a-fA-F]{3,8})|(%2))))\\s*").arg(options).arg(colors);
+    // The below construct mimics the behaviour of QRegexP::exactMatch(), which was here before
+    QRegularExpression regexp("\\A(?:" + pattern + ")\\z");
+
+    for (auto &line : QString(f.readAll()).split('\n', CUTTER_QT_SKIP_EMPTY_PARTS)) {
         line.replace("#~", "ec ");
-        if (!line.isEmpty() && !regexp.exactMatch(line)) {
+        if (!line.isEmpty() && !regexp.match(line).hasMatch()) {
             *ok = true;
             return false;
         }

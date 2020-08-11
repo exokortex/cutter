@@ -8,23 +8,21 @@
 #include <QTreeWidget>
 
 
-SdbWidget::SdbWidget(MainWindow *main, QAction *action) :
-    CutterDockWidget(main, action),
+SdbWidget::SdbWidget(MainWindow *main) :
+    CutterDockWidget(main),
     ui(new Ui::SdbWidget)
 {
     ui->setupUi(this);
 
     path.clear();
 
-    connect(Core(), SIGNAL(refreshAll()), this, SLOT(reload()));
-    reload(nullptr);
+    connect(Core(), &CutterCore::refreshAll, this, [this](){ reload(); });
+    reload();
 }
 
 void SdbWidget::reload(QString _path)
 {
-    if (!_path.isNull()) {
-        path = _path;
-    }
+    path = _path;
 
     ui->lineEdit->setText(path);
     /* insert root sdb keyvalue pairs */
@@ -44,7 +42,9 @@ void SdbWidget::reload(QString _path)
     qhelpers::adjustColumns(ui->treeWidget, 0);
     /* namespaces */
     keys = Core()->sdbList(path);
-    keys.append("..");
+    if (!path.isEmpty()) {
+        keys.append("..");
+    }
     for (const QString &key : keys) {
         QTreeWidgetItem *tempItem = new QTreeWidgetItem();
         tempItem->setText(0, key + "/");

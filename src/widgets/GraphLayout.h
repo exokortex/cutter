@@ -11,6 +11,10 @@ public:
     struct GraphEdge {
         ut64 target;
         QPolygonF polyline;
+        enum ArrowDirection {
+            Down, Left, Up, Right, None
+        };
+        ArrowDirection arrow = ArrowDirection::Down;
 
         explicit GraphEdge(ut64 target): target(target) {}
     };
@@ -25,16 +29,23 @@ public:
         // Edges
         std::vector<GraphEdge> edges;
     };
+    using Graph = std::unordered_map<ut64, GraphBlock>;
 
     struct LayoutConfig {
-        int block_vertical_margin = 40;
-        int block_horizontal_margin = 10;
+        int blockVerticalSpacing = 40;
+        int blockHorizontalSpacing = 20;
+        int edgeVerticalSpacing = 10;
+        int edgeHorizontalSpacing = 10;
     };
 
     GraphLayout(const LayoutConfig &layout_config) : layoutConfig(layout_config) {}
     virtual ~GraphLayout() {}
-    virtual void CalculateLayout(std::unordered_map<ut64, GraphBlock> &blocks, ut64 entry, int &width,
+    virtual void CalculateLayout(Graph &blocks, ut64 entry, int &width,
                                  int &height) const = 0;
+    virtual void setLayoutConfig(const LayoutConfig &config)
+    {
+        this->layoutConfig = config;
+    };
 protected:
     LayoutConfig layoutConfig;
 };

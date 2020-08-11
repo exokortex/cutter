@@ -8,13 +8,14 @@
 
 #include "core/Cutter.h"
 #include "CutterDockWidget.h"
+#include "AddressableItemList.h"
 
 class MainWindow;
 class QTreeWidgetItem;
 class SearchWidget;
 
 
-class SearchModel: public QAbstractListModel
+class SearchModel: public AddressableItemModel<QAbstractListModel>
 {
     Q_OBJECT
 
@@ -29,16 +30,18 @@ public:
 
     SearchModel(QList<SearchDescription> *search, QObject *parent = nullptr);
 
-    int rowCount(const QModelIndex &parent = QModelIndex()) const;
-    int columnCount(const QModelIndex &parent = QModelIndex()) const;
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+    int columnCount(const QModelIndex &parent = QModelIndex()) const override;
 
-    QVariant data(const QModelIndex &index, int role) const;
-    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
+    QVariant data(const QModelIndex &index, int role) const override;
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
+
+    RVA address(const QModelIndex &index) const override;
 };
 
 
 
-class SearchSortFilterProxyModel : public QSortFilterProxyModel
+class SearchSortFilterProxyModel : public AddressableFilterProxyModel
 {
     Q_OBJECT
 
@@ -61,13 +64,13 @@ class SearchWidget : public CutterDockWidget
     Q_OBJECT
 
 public:
-    explicit SearchWidget(MainWindow *main, QAction *action = nullptr);
+    explicit SearchWidget(MainWindow *main);
     ~SearchWidget();
 
 private slots:
-    void on_searchTreeView_doubleClicked(const QModelIndex &index);
     void on_searchInCombo_currentIndexChanged(int index);
     void searchChanged();
+    void updateSearchBoundaries();
     void refreshSearchspaces();
 
 private:
@@ -78,6 +81,7 @@ private:
     QList<SearchDescription> search;
 
     void refreshSearch();
+    void checkSearchResultEmpty();
     void setScrollMode();
     void updatePlaceholderText(int index);
 };

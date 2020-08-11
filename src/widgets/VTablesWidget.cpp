@@ -127,8 +127,8 @@ bool VTableSortFilterProxyModel::filterAcceptsRow(int source_row,
 }
 
 
-VTablesWidget::VTablesWidget(MainWindow *main, QAction *action) :
-    CutterDockWidget(main, action),
+VTablesWidget::VTablesWidget(MainWindow *main) :
+    CutterDockWidget(main),
     ui(new Ui::VTablesWidget),
     tree(new CutterTreeWidget(this))
 {
@@ -146,21 +146,25 @@ VTablesWidget::VTablesWidget(MainWindow *main, QAction *action) :
     // Esc to clear the filter entry
     QShortcut *clear_shortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
     connect(clear_shortcut, &QShortcut::activated, ui->quickFilterView, &QuickFilterView::clearFilter);
+    clear_shortcut->setContext(Qt::WidgetWithChildrenShortcut);
 
     // Ctrl-F to show/hide the filter entry
     QShortcut *search_shortcut = new QShortcut(QKeySequence::Find, this);
     connect(search_shortcut, &QShortcut::activated, ui->quickFilterView, &QuickFilterView::showFilter);
     search_shortcut->setContext(Qt::WidgetWithChildrenShortcut);
 
-    connect(ui->quickFilterView, SIGNAL(filterTextChanged(const QString &)), proxy,
-            SLOT(setFilterWildcard(const QString &)));
-    connect(ui->quickFilterView, SIGNAL(filterClosed()), ui->vTableTreeView, SLOT(setFocus()));
+    connect(ui->quickFilterView, &QuickFilterView::filterTextChanged, proxy,
+            &QSortFilterProxyModel::setFilterWildcard);
+    connect(ui->quickFilterView, &QuickFilterView::filterClosed, ui->vTableTreeView, [this](){ ui->vTableTreeView->setFocus(); });
 
     connect(ui->quickFilterView, &QuickFilterView::filterTextChanged, this, [this] {
         tree->showItemsNumber(proxy->rowCount());
     });
-    
-    connect(Core(), SIGNAL(refreshAll()), this, SLOT(refreshVTables()));
+
+    connect(Core(), &CutterCore::codeRebased, this, &VTablesWidget::refreshVTables);
+    connect(Core(), &CutterCore::refreshAll, this, &VTablesWidget::refreshVTables);
+
+    refreshDeferrer = createRefreshDeferrer([this]() { refreshVTables(); });
 }
 
 VTablesWidget::~VTablesWidget()
@@ -169,6 +173,10 @@ VTablesWidget::~VTablesWidget()
 
 void VTablesWidget::refreshVTables()
 {
+    if (!refreshDeferrer->attemptRefresh(nullptr)) {
+        return;
+    }
+
     model->beginResetModel();
     vtables = Core()->getAllVTables();
     model->endResetModel();
@@ -188,10 +196,10 @@ void VTablesWidget::on_vTableTreeView_doubleClicked(const QModelIndex &index)
 
     QModelIndex parent = index.parent();
     if (parent.isValid()) {
-        Core()->seek(index.data(
+        Core()->seekAndShow(index.data(
                          VTableModel::VTableDescriptionRole).value<BinClassMethodDescription>().addr);
     } else {
-        Core()->seek(index.data(
+        Core()->seekAndShow(index.data(
                          VTableModel::VTableDescriptionRole).value<VTableDescription>().addr);
     }
 }

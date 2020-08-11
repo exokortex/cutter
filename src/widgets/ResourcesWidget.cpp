@@ -1,10 +1,11 @@
 #include "common/Helpers.h"
 #include "ResourcesWidget.h"
+#include "ui_ListDockWidget.h"
 #include "core/MainWindow.h"
 #include <QVBoxLayout>
 
 ResourcesModel::ResourcesModel(QList<ResourcesDescription> *resources, QObject *parent)
-    : QAbstractListModel(parent),
+    : AddressableItemModel<QAbstractListModel>(parent),
       resources(resources)
 {
 }
@@ -31,11 +32,28 @@ QVariant ResourcesModel::data(const QModelIndex &index, int role) const
         case VADDR:
             return RAddressString(res.vaddr);
         case INDEX:
-            return res.index;
+            return QString::number(res.index);
         case TYPE:
             return res.type;
         case SIZE:
             return qhelpers::formatBytecount(res.size);
+        case LANG:
+            return res.lang;
+        default:
+            return QVariant();
+        }
+    case Qt::EditRole:
+        switch (index.column()) {
+        case NAME:
+            return res.name;
+        case VADDR:
+            return res.vaddr;
+        case INDEX:
+            return res.index;
+        case TYPE:
+            return res.type;
+        case SIZE:
+            return res.size;
         case LANG:
             return res.lang;
         default:
@@ -73,25 +91,30 @@ QVariant ResourcesModel::headerData(int section, Qt::Orientation, int role) cons
     }
 }
 
-ResourcesWidget::ResourcesWidget(MainWindow *main, QAction *action) :
-    CutterDockWidget(main, action)
+RVA ResourcesModel::address(const QModelIndex &index) const
+{
+    const ResourcesDescription &res = resources->at(index.row());
+    return res.vaddr;
+}
+
+ResourcesWidget::ResourcesWidget(MainWindow *main) :
+    ListDockWidget(main, ListDockWidget::SearchBarPolicy::HideByDefault)
 {
     setObjectName("ResourcesWidget");
 
     model = new ResourcesModel(&resources, this);
+    filterModel = new AddressableFilterProxyModel(model, this);
+    filterModel->setSortRole(Qt::EditRole);
+    setModels(filterModel);
+
+    ui->treeView->sortByColumn(0, Qt::AscendingOrder);
+
+    showCount(false);
 
     // Configure widget
     this->setWindowTitle(tr("Resources"));
 
-    // Add resources tree view
-    view = new CutterTreeView(this);
-    view->setModel(model);
-    view->show();
-    this->setWidget(view);
-
-    connect(Core(), SIGNAL(refreshAll()), this, SLOT(refreshResources()));
-    connect(view, SIGNAL(doubleClicked(const QModelIndex &)), this,
-            SLOT(onDoubleClicked(const QModelIndex &)));
+    connect(Core(), &CutterCore::refreshAll, this, &ResourcesWidget::refreshResources);
 }
 
 void ResourcesWidget::refreshResources()
@@ -99,13 +122,4 @@ void ResourcesWidget::refreshResources()
     model->beginResetModel();
     resources = Core()->getAllResources();
     model->endResetModel();
-}
-
-void ResourcesWidget::onDoubleClicked(const QModelIndex &index)
-{
-    if (!index.isValid())
-        return;
-
-    ResourcesDescription res = index.data(Qt::UserRole).value<ResourcesDescription>();
-    Core()->seek(res.vaddr);
 }

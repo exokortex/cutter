@@ -6,6 +6,8 @@
 #include "GraphOptionsWidget.h"
 #include "DebugOptionsWidget.h"
 #include "PluginsOptionsWidget.h"
+#include "InitializationFileEditor.h"
+#include "AnalOptionsWidget.h"
 
 #include "PreferenceCategory.h"
 
@@ -21,7 +23,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
 {
     setAttribute(Qt::WA_DeleteOnClose);
     ui->setupUi(this);
-    setWindowFlag(Qt::WindowContextHelpButtonHint, false);
+    setWindowFlags(windowFlags() & (~Qt::WindowContextHelpButtonHint));
 
     QList<PreferenceCategory> prefs {
 
@@ -51,6 +53,16 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
             tr("Plugins"),
             new PluginsOptionsWidget(this),
             QIcon(":/img/icons/plugins.svg")
+        },
+        {
+            tr("Initialization Script"),
+            new InitializationFileEditor(this),
+            QIcon(":/img/icons/initialization.svg")
+        },
+        {
+            tr("Analysis"),
+            new AnalOptionsWidget(this),
+            QIcon(":/img/icons/cog_light.svg")
         }
     };
 
@@ -59,12 +71,10 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
         c.addItem(*ui->configCategories, *ui->configPanel);
     }
 
-    connect(ui->configCategories,
-            SIGNAL(currentItemChanged(QTreeWidgetItem *, QTreeWidgetItem *)),
-            this, SLOT(changePage(QTreeWidgetItem *, QTreeWidgetItem *)));
-    connect(ui->saveButtons,
-            SIGNAL(accepted()),
-            this, SLOT(close()));
+    connect(ui->configCategories, &QTreeWidget::currentItemChanged,
+            this, &PreferencesDialog::changePage);
+    connect(ui->saveButtons, &QDialogButtonBox::accepted,
+            this, &QWidget::close);
 
     QTreeWidgetItem *defitem = ui->configCategories->topLevelItem(0);
     ui->configCategories->setCurrentItem(defitem, 0);
@@ -114,6 +124,8 @@ void PreferencesDialog::chooseThemeIcons()
         { QStringLiteral("Graph"), QStringLiteral("graph.svg") },
         { QStringLiteral("Appearance"), QStringLiteral("polar.svg") },
         { QStringLiteral("Plugins"), QStringLiteral("plugins.svg") },
+        { QStringLiteral("Initialization Script"), QStringLiteral("initialization.svg") },
+        { QStringLiteral("Analysis"), QStringLiteral("cog_light.svg") },
     };
     QList<QPair<void*, QString>> supportedIconsNames;
 

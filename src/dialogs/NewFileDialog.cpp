@@ -25,7 +25,7 @@ static QColor getColorFor(int pos)
         QColor(231, 76, 60),  // Red
         QColor(243, 156, 17)  // Orange
     };
-    return colors[pos % 6];
+    return colors[pos % colors.size()];
 }
 
 static QIcon getIconFor(const QString &str, int pos)
@@ -43,7 +43,10 @@ static QIcon getIconFor(const QString &str, int pos)
     pixPaint.setBrush(getColorFor(pos));
     pixPaint.drawEllipse(1, 1, w - 2, h - 2);
     pixPaint.setPen(Qt::white);
-    pixPaint.setFont(QFont("Verdana", 24, 1));
+    QFont font = Config()->getBaseFont();
+    font.setBold(true);
+    font.setPointSize(18);
+    pixPaint.setFont(font);
     pixPaint.drawText(0, 0, w, h - 2, Qt::AlignCenter, QString(str).toUpper().mid(0, 2));
     return QIcon(pixmap);
 }
@@ -87,7 +90,8 @@ void NewFileDialog::on_loadFileButton_clicked()
 void NewFileDialog::on_selectFileButton_clicked()
 {
     QString currentDir = Config()->getRecentFolder();
-    const QString &fileName = QDir::toNativeSeparators(QFileDialog::getOpenFileName(this, tr("Select file"), currentDir));
+    const QString &fileName = QDir::toNativeSeparators(QFileDialog::getOpenFileName(this,
+                                                                                    tr("Select file"), currentDir));
 
     if (!fileName.isEmpty()) {
         ui->newFileEdit->setText(fileName);
@@ -104,8 +108,8 @@ void NewFileDialog::on_selectProjectsDirButton_clicked()
         currentDir = QDir::homePath() + currentDir.mid(1);
     }
     const QString &dir = QDir::toNativeSeparators(QFileDialog::getExistingDirectory(this,
-        tr("Select project path (dir.projects)"),
-        currentDir));
+                                                                                    tr("Select project path (dir.projects)"),
+                                                                                    currentDir));
 
     if (dir.isEmpty()) {
         return;
@@ -271,24 +275,27 @@ bool NewFileDialog::fillRecentFilesList()
     QMutableListIterator<QString> it(files);
     int i = 0;
     while (it.hasNext()) {
-        const QString &file = QDir::toNativeSeparators(it.next());
-        // Get stored files
-
-        // Remove all but the file name
-        const QString name = file.section(QDir::separator(), -1);
-
+        // Get the file name
+        const QString &fullpath = QDir::toNativeSeparators(it.next());
+        const QString homepath = QDir::homePath();
+        const QString basename = fullpath.section(QDir::separator(), -1);
+        QString filenameHome = fullpath;
+        filenameHome.replace(homepath, "~");
+        filenameHome.replace(basename, "");
+        filenameHome.chop(1); // Remove last character that will be a path separator
         // Get file info
-        QFileInfo info(file);
+        QFileInfo info(fullpath);
         if (!info.exists()) {
             it.remove();
         } else {
+            // Format the text and add the item to the file list
+            const QString text = QString("%1\n%2\nSize: %3").arg(basename, filenameHome,
+                                                                 qhelpers::formatBytecount(info.size()));
             QListWidgetItem *item = new QListWidgetItem(
-                getIconFor(name, i++),
-                file + "\nCreated: " + info.created().toString() + "\nSize: " + qhelpers::formatBytecount(
-                    info.size())
+                getIconFor(basename, i++),
+                text
             );
-            //":/img/icons/target.svg"), name );
-            item->setData(Qt::UserRole, file);
+            item->setData(Qt::UserRole, fullpath);
             ui->recentsListWidget->addItem(item);
         }
     }
@@ -314,7 +321,7 @@ bool NewFileDialog::fillProjectsList()
 
     int i = 0;
     for (const QString &project : projects) {
-        QString info = QDir::toNativeSeparators(core->cmd("Pi " + project));
+        QString info = QDir::toNativeSeparators(core->cmdRaw("Pi " + project));
 
         QListWidgetItem *item = new QListWidgetItem(getIconFor(project, i++), project + "\n" + info);
 
@@ -338,7 +345,8 @@ void NewFileDialog::fillIOPluginsList()
         if (plugin.permissions.contains('d')) {
             continue;
         }
-        for (const auto &uri : qAsConst(plugin.uris)) {
+        const auto &uris = plugin.uris;
+        for (const auto &uri : uris) {
             if (uri == "file://") {
                 continue;
             }

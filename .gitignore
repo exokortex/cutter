@@ -31,6 +31,7 @@ moc_*.h
 ui_*.h
 build*/
 cmake-build-*/
+/src-build/
 
 # QtCreator
 *.autosave
@@ -43,6 +44,10 @@ CMakeLists.txt.user
 
 # Vim
 *.swp
+*~
+
+# Git mergetool
+~.orig
 
 # CMake Files:
 src/*_automoc.cpp
@@ -65,11 +70,20 @@ __pycache__
 
 # Other
 compile_commands.json
+.ccls-cache
+docs/source/_build
 
 # vscode
 **/.vscode
+
+# Visual Studio CMake
+src/out
+.vs
 
 # cutter-deps
 /cutter-deps
 
 /breakpad
+
+# astyle backup .orig files
+*.orig

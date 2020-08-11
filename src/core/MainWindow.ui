@@ -20,8 +20,7 @@
    <string notr="true">Cutter</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">
-</string>
+   <string notr="true"/>
   </property>
   <property name="documentMode">
    <bool>true</bool>
@@ -52,19 +51,34 @@
    <widget class="QMenu" name="menuFile">
     <property name="geometry">
      <rect>
-      <x>378</x>
-      <y>100</y>
-      <width>162</width>
-      <height>260</height>
+      <x>2024</x>
+      <y>127</y>
+      <width>151</width>
+      <height>312</height>
      </rect>
     </property>
     <property name="title">
      <string>File</string>
     </property>
+    <widget class="QMenu" name="menuSetMode">
+     <property name="toolTip">
+      <string/>
+     </property>
+     <property name="title">
+      <string>Set mode</string>
+     </property>
+     <addaction name="actionWriteMode"/>
+     <addaction name="actionCacheMode"/>
+     <addaction name="actionReadOnly"/>
+    </widget>
     <addaction name="actionNew"/>
-    <addaction name="actionOpen"/>
+    <addaction name="actionMap"/>
     <addaction name="separator"/>
     <addaction name="actionImportPDB"/>
+    <addaction name="actionAnalyze"/>
+    <addaction name="separator"/>
+    <addaction name="menuSetMode"/>
+    <addaction name="actionCommitChanges"/>
     <addaction name="separator"/>
     <addaction name="actionSave"/>
     <addaction name="actionSaveAs"/>
@@ -82,6 +96,15 @@
     <property name="tabsOnTop" stdset="0">
      <bool>false</bool>
     </property>
+    <widget class="QMenu" name="menuZoom">
+     <property name="title">
+      <string>Zoom</string>
+     </property>
+     <addaction name="actionZoomIn"/>
+     <addaction name="actionZoomOut"/>
+     <addaction name="separator"/>
+     <addaction name="actionZoomReset"/>
+    </widget>
     <addaction name="actionRefresh_contents"/>
     <addaction name="separator"/>
     <addaction name="actionDefault"/>
@@ -90,6 +113,17 @@
     <addaction name="actionLock"/>
     <addaction name="actionTabs_on_Top"/>
     <addaction name="actionGrouped_dock_dragging"/>
+    <addaction name="separator"/>
+    <addaction name="menuZoom"/>
+    <addaction name="separator"/>
+    <addaction name="actionManageLayouts"/>
+    <addaction name="actionSaveLayout"/>
+    <widget class="QMenu" name="menuLayouts">
+     <property name="title">
+      <string>Layouts</string>
+     </property>
+    </widget>
+    <addaction name="menuLayouts"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
@@ -97,14 +131,15 @@
     </property>
     <addaction name="actionAbout"/>
     <addaction name="actionIssue"/>
+    <addaction name="actionDocumentation"/>
    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
      <string>Edit</string>
     </property>
     <addaction name="actionSearch"/>
-    <addaction name="actionUndoSeek"/>
-    <addaction name="actionRedoSeek"/>
+    <addaction name="actionBackward"/>
+    <addaction name="actionForward"/>
     <addaction name="separator"/>
     <addaction name="actionPreferences"/>
    </widget>
@@ -112,14 +147,6 @@
     <property name="title">
      <string>Windows</string>
     </property>
-    <widget class="QMenu" name="menuAddExtraWidget">
-     <property name="title">
-      <string>Add extra...</string>
-     </property>
-     <addaction name="actionExtraDisassembly"/>
-     <addaction name="actionExtraGraph"/>
-     <addaction name="actionExtraHexdump"/>
-    </widget>
     <widget class="QMenu" name="menuPlugins">
      <property name="title">
       <string>Plugins</string>
@@ -129,53 +156,20 @@
      <property name="title">
       <string>Info...</string>
      </property>
-     <addaction name="actionClasses"/>
-     <addaction name="actionEntrypoints"/>
-     <addaction name="actionExports"/>
-     <addaction name="actionFlags"/>
-     <addaction name="actionHeaders"/>
-     <addaction name="actionImports"/>
-     <addaction name="actionRelocs"/>
-     <addaction name="actionResources"/>
-     <addaction name="actionSDBBrowser"/>
-     <addaction name="actionSections"/>
-     <addaction name="actionSegments"/>
-     <addaction name="actionSymbols"/>
-     <addaction name="actionVTables"/>
-     <addaction name="actionZignatures"/>
     </widget>
     <widget class="QMenu" name="menuAddDebugWidgets">
      <property name="title">
       <string>Debug...</string>
      </property>
-     <addaction name="actionBacktrace"/>
-     <addaction name="actionBreakpoint"/>
-     <addaction name="actionMemoryMap"/>
-     <addaction name="actionRegisters"/>
-     <addaction name="actionRegisterRefs"/>
-     <addaction name="actionStack"/>
     </widget>
-    <addaction name="actionDashboard"/>
-    <addaction name="separator"/>
-    <addaction name="actionDisassembly"/>
-    <addaction name="actionGraph"/>
-    <addaction name="actionFunctions"/>
-    <addaction name="actionHexdump"/>
-    <addaction name="actionPseudocode"/>
-    <addaction name="actionOverview"/>
-    <addaction name="separator"/>
-    <addaction name="actionSearch"/>
-    <addaction name="actionStrings"/>
-    <addaction name="actionTypes"/>
+    <addaction name="actionExtraDisassembly"/>
+    <addaction name="actionExtraGraph"/>
+    <addaction name="actionExtraHexdump"/>
     <addaction name="separator"/>
     <addaction name="menuAddInfoWidgets"/>
     <addaction name="menuAddDebugWidgets"/>
-    <addaction name="separator"/>
-    <addaction name="actionComments"/>
-    <addaction name="actionConsole"/>
-    <addaction name="separator"/>
-    <addaction name="menuAddExtraWidget"/>
     <addaction name="menuPlugins"/>
+    <addaction name="separator"/>
    </widget>
    <widget class="QMenu" name="menuDebug">
     <property name="title">
@@ -237,10 +231,7 @@
   </widget>
   <action name="actionDefault">
    <property name="text">
-    <string>Reset Layout</string>
-   </property>
-   <property name="toolTip">
-    <string>Reset layout</string>
+    <string>Reset to default layout</string>
    </property>
   </action>
   <action name="actionZen">
@@ -263,7 +254,7 @@
   </action>
   <action name="actionNew">
    <property name="text">
-    <string>New</string>
+    <string>New Window</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+N</string>
@@ -300,12 +291,12 @@
     <string>Documentation</string>
    </property>
   </action>
-  <action name="actionOpen">
+  <action name="actionMap">
    <property name="text">
-    <string>Open</string>
+    <string>Map File</string>
    </property>
    <property name="shortcut">
-    <string>Ctrl+O</string>
+    <string>Ctrl+M</string>
    </property>
   </action>
   <action name="actionSave">
@@ -314,16 +305,6 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+S</string>
-   </property>
-  </action>
-  <action name="actionUndoSeek">
-   <property name="text">
-    <string>Undo Seek</string>
-   </property>
-  </action>
-  <action name="actionRedoSeek">
-   <property name="text">
-    <string>Redo Seek</string>
    </property>
   </action>
   <action name="actionCut">
@@ -377,11 +358,11 @@
   </action>
   <action name="actionBackward">
    <property name="icon">
-    <iconset resource="resources.qrc">
+    <iconset>
      <normaloff>:/img/icons/arrow_left.svg</normaloff>:/img/icons/arrow_left.svg</iconset>
    </property>
    <property name="text">
-    <string>Back</string>
+    <string>Undo Seek</string>
    </property>
    <property name="toolTip">
     <string>Go back</string>
@@ -389,11 +370,11 @@
   </action>
   <action name="actionForward">
    <property name="icon">
-    <iconset resource="resources.qrc">
+    <iconset>
      <normaloff>:/img/icons/arrow_right.svg</normaloff>:/img/icons/arrow_right.svg</iconset>
    </property>
    <property name="text">
-    <string>Forward</string>
+    <string>Redo Seek</string>
    </property>
   </action>
   <action name="actionLock">
@@ -418,7 +399,7 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset resource="resources.qrc">
+    <iconset>
      <normaloff>:/unlock</normaloff>:/unlock</iconset>
    </property>
    <property name="text">
@@ -428,111 +409,12 @@
     <string>Lock/Unlock</string>
    </property>
   </action>
-  <action name="actionStrings">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Strings</string>
-   </property>
-   <property name="toolTip">
-    <string>Show/Hide Strings panel</string>
-   </property>
-  </action>
-  <action name="actionSections">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Sections</string>
-   </property>
-   <property name="toolTip">
-    <string>Show/Hide Sections panel</string>
-   </property>
-  </action>
-  <action name="actionSegments">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Segments</string>
-   </property>
-   <property name="toolTip">
-    <string>Show/Hide Segments panel</string>
-   </property>
-  </action>
-  <action name="actionFunctions">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Functions</string>
-   </property>
-   <property name="toolTip">
-    <string>Show/Hide Functions panel</string>
-   </property>
-  </action>
-  <action name="actionImports">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Imports</string>
-   </property>
-   <property name="toolTip">
-    <string>Show/Hide Imports panel</string>
-   </property>
-  </action>
-  <action name="actionSymbols">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Symbols</string>
-   </property>
-   <property name="toolTip">
-    <string>Show/Hide Symbols panel</string>
-   </property>
-  </action>
-  <action name="actionRelocs">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Relocs</string>
-   </property>
-   <property name="toolTip">
-    <string>Show/Hide Relocs panel</string>
-   </property>
-  </action>
-  <action name="actionFlags">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Flags</string>
-   </property>
-   <property name="toolTip">
-    <string>Show/Hide Flags panel</string>
-   </property>
-  </action>
-  <action name="actionMem">
-   <property name="checkable">
-    <bool>false</bool>
-   </property>
-   <property name="text">
-    <string>Memory</string>
-   </property>
-   <property name="toolTip">
-    <string>Show/Hide Memory panel</string>
-   </property>
-  </action>
   <action name="actionTheme">
    <property name="checkable">
     <bool>false</bool>
    </property>
    <property name="icon">
-    <iconset resource="resources.qrc">
+    <iconset>
      <normaloff>:/img/icons/themes.svg</normaloff>:/img/icons/themes.svg</iconset>
    </property>
    <property name="text">
@@ -547,7 +429,7 @@
   </action>
   <action name="actionTabs">
    <property name="icon">
-    <iconset resource="resources.qrc">
+    <iconset>
      <normaloff>:/img/icons/tabs.svg</normaloff>:/img/icons/tabs.svg</iconset>
    </property>
    <property name="text">
@@ -559,22 +441,11 @@
   </action>
   <action name="actionRefresh_Panels">
    <property name="icon">
-    <iconset resource="resources.qrc">
+    <iconset>
      <normaloff>:/img/icons/spin.svg</normaloff>:/img/icons/spin.svg</iconset>
    </property>
    <property name="text">
     <string>Refresh</string>
-   </property>
-  </action>
-  <action name="actionComments">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Comments</string>
-   </property>
-   <property name="toolTip">
-    <string>Show/Hide comments</string>
    </property>
   </action>
   <action name="actionTabs_on_Top">
@@ -715,7 +586,7 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset resource="resources.qrc">
+    <iconset>
      <normaloff>:/img/icons/cloud.svg</normaloff>:/img/icons/cloud.svg</iconset>
    </property>
    <property name="text">
@@ -795,7 +666,7 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset resource="resources.qrc">
+    <iconset>
      <normaloff>:/img/icons/down.svg</normaloff>:/img/icons/down.svg</iconset>
    </property>
    <property name="text">
@@ -805,28 +676,9 @@
     <string>Show/Hide bottom pannel</string>
    </property>
   </action>
-  <action name="actionSDBBrowser">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>SDB Browser</string>
-   </property>
-  </action>
   <action name="actionRun_Script">
    <property name="text">
-    <string>Run Script</string>
-   </property>
-  </action>
-  <action name="actionDashboard">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Dashboard</string>
-   </property>
-   <property name="toolTip">
-    <string>Show/Hide Dashboard panel</string>
+    <string>Run radare2 script</string>
    </property>
   </action>
   <action name="actionReset_settings">
@@ -872,20 +724,12 @@
     <string>Show ESIL rather than assembly</string>
    </property>
   </action>
-  <action name="actionDisplay_Pseudocode">
+  <action name="actionDisplay_Decompiler">
    <property name="checkable">
     <bool>true</bool>
    </property>
    <property name="text">
     <string>Show pseudocode rather than assembly</string>
-   </property>
-  </action>
-  <action name="actionEntrypoints">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Entry Points</string>
    </property>
   </action>
   <action name="actionDisplay_Offsets">
@@ -909,113 +753,12 @@
     <string>Save As...</string>
    </property>
   </action>
-  <action name="actionTmp">
-   <property name="text">
-    <string>Tmp</string>
-   </property>
-  </action>
-  <action name="actionDisassembly">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Disassembly</string>
-   </property>
-  </action>
   <action name="actionGraph">
    <property name="checkable">
     <bool>true</bool>
    </property>
    <property name="text">
     <string>Graph</string>
-   </property>
-  </action>
-  <action name="actionOverview">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Graph Overview</string>
-   </property>
-  </action>
-  <action name="actionPseudocode">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Pseudocode</string>
-   </property>
-  </action>
-  <action name="actionHexdump">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Hexdump</string>
-   </property>
-  </action>
-  <action name="actionConsole">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Console</string>
-   </property>
-  </action>
-  <action name="actionStack">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Stack</string>
-   </property>
-  </action>
-  <action name="actionRegisters">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Registers</string>
-   </property>
-  </action>
-  <action name="actionBacktrace">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Backtrace</string>
-   </property>
-  </action>
-  <action name="actionMemoryMap">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Memory map</string>
-   </property>
-  </action>
-  <action name="actionBreakpoint">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Breakpoints</string>
-   </property>
-  </action>
-  <action name="actionRegisterRefs">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Register References</string>
-   </property>
-  </action>
-  <action name="actionClasses">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Classes</string>
    </property>
   </action>
   <action name="actionImportPDB">
@@ -1025,70 +768,7 @@
   </action>
   <action name="actionAnalyze">
    <property name="text">
-    <string>Analyze</string>
-   </property>
-  </action>
-  <action name="actionResources">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Resources</string>
-   </property>
-  </action>
-  <action name="actionVTables">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>VTables</string>
-   </property>
-   <property name="toolTip">
-    <string>Show/Hide VTables panel</string>
-   </property>
-  </action>
-  <action name="actionTypes">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Types</string>
-   </property>
-   <property name="toolTip">
-    <string>Show/Hide Types panel</string>
-   </property>
-  </action>
-  <action name="actionSearch">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Search</string>
-   </property>
-   <property name="toolTip">
-    <string>Show/Hide Search panel</string>
-   </property>
-  </action>
-  <action name="actionHeaders">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Headers</string>
-   </property>
-   <property name="toolTip">
-    <string>Show/Hide Headers panel</string>
-   </property>
-  </action>
-  <action name="actionZignatures">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Zignatures</string>
-   </property>
-   <property name="toolTip">
-    <string>Show/Hide Zignatures panel</string>
+    <string>Analyze Program</string>
    </property>
   </action>
   <action name="actionExport_as_code">
@@ -1098,12 +778,99 @@
   </action>
   <action name="actionExtraHexdump">
    <property name="text">
-    <string>Hexdump view</string>
+    <string>Add Hexdump</string>
    </property>
   </action>
   <action name="actionExtraDisassembly">
    <property name="text">
-    <string>Disassembly view</string>
+    <string>Add Disassembly</string>
+   </property>
+  </action>
+  <action name="actionExtraGraph">
+   <property name="text">
+    <string>Add Graph</string>
+   </property>
+  </action>
+  <action name="actionGrouped_dock_dragging">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Grouped dock dragging</string>
+   </property>
+  </action>
+  <action name="actionZoomIn">
+   <property name="text">
+    <string>Zoom In</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl++</string>
+   </property>
+   <property name="shortcutContext">
+    <enum>Qt::ApplicationShortcut</enum>
+   </property>
+  </action>
+  <action name="actionZoomOut">
+   <property name="text">
+    <string>Zoom Out</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+-</string>
+   </property>
+   <property name="shortcutContext">
+    <enum>Qt::ApplicationShortcut</enum>
+   </property>
+  </action>
+  <action name="actionZoomReset">
+   <property name="text">
+    <string>Reset</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+=</string>
+   </property>
+   <property name="shortcutContext">
+    <enum>Qt::ApplicationShortcut</enum>
+   </property>
+  </action>
+  <action name="actionCommitChanges">
+   <property name="text">
+    <string>Commit changes</string>
+   </property>
+  </action>
+  <action name="actionWriteMode">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Write mode</string>
+   </property>
+   <property name="toolTip">
+    <string>Open the file in write mode. Every change to the file will change the original file on disk.</string>
+   </property>
+  </action>
+  <action name="actionCacheMode">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Cache mode</string>
+   </property>
+   <property name="toolTip">
+    <string>Enable cache mode. Changes to the file would not be applied to disk unless you specifically commit them. This is a safer option.</string>
+   </property>
+  </action>
+  <action name="actionReadOnly">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Read-Only mode</string>
    </property>
   </action>
   <action name="actionRe_Decompile">
@@ -1131,20 +898,14 @@
              <string>Calculate States</string>
          </property>
      </action>
-  <action name="actionExtraGraph">
+  <action name="actionSaveLayout">
    <property name="text">
-    <string>Graph view</string>
+    <string>Save layout</string>
    </property>
   </action>
-  <action name="actionGrouped_dock_dragging">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="checked">
-    <bool>true</bool>
-   </property>
+  <action name="actionManageLayouts">
    <property name="text">
-    <string>Grouped dock dragging</string>
+    <string>Manage layouts</string>
    </property>
   </action>
  </widget>

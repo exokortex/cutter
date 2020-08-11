@@ -8,17 +8,24 @@
 
 #include <QJsonArray>
 
-XrefsDialog::XrefsDialog(QWidget *parent) :
+XrefsDialog::XrefsDialog(MainWindow *main, QWidget *parent, bool hideXrefFrom) :
     QDialog(parent),
     addr(0),
-    func_name(QString::null),
+    toModel(this),
+    fromModel(this),
     ui(new Ui::XrefsDialog)
 {
     ui->setupUi(this);
     setWindowFlags(windowFlags() & (~Qt::WindowContextHelpButtonHint));
 
+    ui->toTreeWidget->setMainWindow(main);
+    ui->fromTreeWidget->setMainWindow(main);
+
+    ui->toTreeWidget->setModel(&toModel);
+    ui->fromTreeWidget->setModel(&fromModel);
+
     // Modify the splitter's location to show more Disassembly instead of empty space. Not possible via Designer
-    ui->splitter->setSizes(QList<int>() << 100 << 200);
+    ui->splitter->setSizes(QList<int>() << 300 << 400);
 
     // Increase asm text edit margin
     QTextDocument *asm_docu = ui->previewTextEdit->document();
@@ -28,66 +35,30 @@ XrefsDialog::XrefsDialog(QWidget *parent) :
     setupPreviewFont();
 
     // Highlight current line
-    connect(ui->previewTextEdit, SIGNAL(cursorPositionChanged()), this, SLOT(highlightCurrentLine()));
-    connect(Config(), SIGNAL(fontsUpdated()), this, SLOT(setupPreviewFont()));
-    connect(Config(), SIGNAL(colorsUpdated()), this, SLOT(setupPreviewColors()));
+    connect(ui->previewTextEdit, &QPlainTextEdit::cursorPositionChanged, this, &XrefsDialog::highlightCurrentLine);
+    connect(Config(), &Configuration::fontsUpdated, this, &XrefsDialog::setupPreviewFont);
+    connect(Config(), &Configuration::colorsUpdated, this, &XrefsDialog::setupPreviewColors);
+
+    connect(ui->toTreeWidget->selectionModel(), &QItemSelectionModel::selectionChanged,
+            this, &XrefsDialog::onToTreeWidgetItemSelectionChanged);
+    connect(ui->fromTreeWidget->selectionModel(), &QItemSelectionModel::selectionChanged,
+            this, &XrefsDialog::onFromTreeWidgetItemSelectionChanged);
+
+    // Don't create recursive xref dialogs
+    auto toContextMenu = ui->toTreeWidget->getItemContextMenu();
+    connect(toContextMenu, &AddressableItemContextMenu::xrefsTriggered, this, &QWidget::close);
+    auto fromContextMenu = ui->fromTreeWidget->getItemContextMenu();
+    connect(fromContextMenu, &AddressableItemContextMenu::xrefsTriggered, this, &QWidget::close);
+
+    connect(ui->toTreeWidget, &QAbstractItemView::doubleClicked, this, &QWidget::close);
+    connect(ui->fromTreeWidget, &QAbstractItemView::doubleClicked, this, &QWidget::close);
+
+    if (hideXrefFrom) {
+        hideXrefFromSection();
+    }
 }
 
 XrefsDialog::~XrefsDialog() { }
-
-void XrefsDialog::fillRefs(QList<XrefDescription> refs, QList<XrefDescription> xrefs)
-{
-    // Fill refs
-    ui->fromTreeWidget->clear();
-    for (const auto &xref : refs) {
-        auto *tempItem = new QTreeWidgetItem();
-        tempItem->setText(0, xref.to_str);
-        tempItem->setText(1, Core()->disassembleSingleInstruction(xref.to));
-        tempItem->setText(2, xrefTypeString(xref.type));
-        tempItem->setData(0, Qt::UserRole, QVariant::fromValue(xref));
-        ui->fromTreeWidget->insertTopLevelItem(0, tempItem);
-    }
-
-    // Adjust columns to content
-    qhelpers::adjustColumns(ui->fromTreeWidget, 0);
-
-    // Fill Xrefs
-    ui->toTreeWidget->clear();
-    for (const auto &xref : xrefs) {
-        auto *tempItem = new QTreeWidgetItem();
-        tempItem->setText(0, xref.from_str);
-        tempItem->setText(1, Core()->disassembleSingleInstruction(xref.from));
-        tempItem->setText(2, xrefTypeString(xref.type));
-        tempItem->setData(0, Qt::UserRole, QVariant::fromValue(xref));
-        ui->toTreeWidget->insertTopLevelItem(0, tempItem);
-    }
-
-    // Adjust columns to content
-    qhelpers::adjustColumns(ui->toTreeWidget, 0);
-
-    // try to select first item from refs or xrefs
-    if (!qhelpers::selectFirstItem(ui->toTreeWidget)) {
-        qhelpers::selectFirstItem(ui->fromTreeWidget);
-    }
-}
-
-void XrefsDialog::on_fromTreeWidget_itemDoubleClicked(QTreeWidgetItem *item, int column)
-{
-    Q_UNUSED(column);
-
-    XrefDescription xref = item->data(0, Qt::UserRole).value<XrefDescription>();
-    Core()->seek(xref.to);
-    this->close();
-}
-
-void XrefsDialog::on_toTreeWidget_itemDoubleClicked(QTreeWidgetItem *item, int column)
-{
-    Q_UNUSED(column);
-
-    XrefDescription xref = item->data(0, Qt::UserRole).value<XrefDescription>();
-    Core()->seek(xref.from);
-    this->close();
-}
 
 QString XrefsDialog::normalizeAddr(const QString &addr) const
 {
@@ -101,7 +72,7 @@ QString XrefsDialog::normalizeAddr(const QString &addr) const
 
 void XrefsDialog::setupPreviewFont()
 {
-    ui->previewTextEdit->setFont(Config()->getFont());
+    ui->previewTextEdit->setFont(Config()->getBaseFont());
 }
 
 void XrefsDialog::setupPreviewColors()
@@ -128,26 +99,24 @@ void XrefsDialog::highlightCurrentLine()
     }
 }
 
-void XrefsDialog::on_fromTreeWidget_itemSelectionChanged()
+void XrefsDialog::onFromTreeWidgetItemSelectionChanged()
 {
-    if (ui->fromTreeWidget->selectedItems().isEmpty()) {
+    auto index = ui->fromTreeWidget->currentIndex();
+    if (!ui->fromTreeWidget->selectionModel()->hasSelection() || !index.isValid()) {
         return;
     }
     ui->toTreeWidget->clearSelection();
-    QTreeWidgetItem *item = ui->fromTreeWidget->currentItem();
-    XrefDescription xref = item->data(0, Qt::UserRole).value<XrefDescription>();
-    updatePreview(xref.to);
+    updatePreview(fromModel.address(index));
 }
 
-void XrefsDialog::on_toTreeWidget_itemSelectionChanged()
+void XrefsDialog::onToTreeWidgetItemSelectionChanged()
 {
-    if (ui->toTreeWidget->selectedItems().isEmpty()) {
+    auto index = ui->toTreeWidget->currentIndex();
+    if (!ui->toTreeWidget->selectionModel()->hasSelection() || !index.isValid()) {
         return;
     }
     ui->fromTreeWidget->clearSelection();
-    QTreeWidgetItem *item = ui->toTreeWidget->currentItem();
-    XrefDescription xref = item->data(0, Qt::UserRole).value<XrefDescription>();
-    updatePreview(xref.from);
+    updatePreview(toModel.address(index));
 }
 
 void XrefsDialog::updatePreview(RVA addr)
@@ -155,7 +124,10 @@ void XrefsDialog::updatePreview(RVA addr)
     TempConfig tempConfig;
     tempConfig.set("scr.html", true);
     tempConfig.set("scr.color", COLOR_MODE_16M);
+    tempConfig.set("asm.lines", false);
+    tempConfig.set("asm.bytes", false);
 
+    // Use cmd because cmRaw cannot handle the output properly. Why?
     QString disas = Core()->cmd("pd--20 @ " + QString::number(addr));
     ui->previewTextEdit->document()->setHtml(disas);
 
@@ -166,42 +138,164 @@ void XrefsDialog::updatePreview(RVA addr)
 
 void XrefsDialog::updateLabels(QString name)
 {
-    ui->label_xTo->setText(tr("X-Refs to %1:").arg(name));
-    ui->label_xFrom->setText(tr("X-Refs from %1:").arg(name));
+    ui->label_xTo->setText(tr("X-Refs to %1 (%2 results):").arg(name).arg(toModel.rowCount()));
+    ui->label_xFrom->setText(tr("X-Refs from %1 (%2 results):").arg(name).arg(fromModel.rowCount()));
+}
+
+void XrefsDialog::updateLabelsForVariables(QString name)
+{
+    ui->label_xTo->setText(tr("Writes to %1").arg(name));
+    ui->label_xFrom->setText(tr("Reads from %1").arg(name));
+}
+
+void XrefsDialog::hideXrefFromSection()
+{
+    ui->label_xFrom->hide();
+    ui->fromTreeWidget->hide();
 }
 
 void XrefsDialog::fillRefsForAddress(RVA addr, QString name, bool whole_function)
 {
-    TempConfig tempConfig;
-    tempConfig.set("scr.html", false);
-    tempConfig.set("scr.color", COLOR_MODE_DISABLED);
-
     setWindowTitle(tr("X-Refs for %1").arg(name));
+
+    toModel.readForOffset(addr, true, whole_function);
+    fromModel.readForOffset(addr, false, whole_function);
+
     updateLabels(name);
 
-    // Get Refs and Xrefs
-    QList<XrefDescription> refs = Core()->getXRefs(addr, false, whole_function);
-    QList<XrefDescription> xrefs = Core()->getXRefs(addr, true, whole_function);
+    // Adjust columns to content
+    qhelpers::adjustColumns(ui->fromTreeWidget, fromModel.columnCount(), 0);
+    qhelpers::adjustColumns(ui->toTreeWidget, toModel.columnCount(), 0);
 
-    fillRefs(refs, xrefs);
+    // Automatically select the first line
+    if (!qhelpers::selectFirstItem(ui->toTreeWidget)) {
+        qhelpers::selectFirstItem(ui->fromTreeWidget);
+    }
 }
 
-QString XrefsDialog::xrefTypeString(const QString &type)
+void XrefsDialog::fillRefsForVariable(QString nameOfVariable, RVA offset)
 {
-    switch (type.toStdString()[0]) {
-    case R_ANAL_REF_TYPE_CALL:
-        return QString("Call");
-    case R_ANAL_REF_TYPE_CODE:
-        return QString("Code");
-    case R_ANAL_REF_TYPE_DATA:
-        return QString("Data");
-    case R_ANAL_REF_TYPE_NULL:
-        return QString();
-    case R_ANAL_REF_TYPE_STRING:
-        return QString("String");
-    default:
-        break;
+    setWindowTitle(tr("X-Refs for %1").arg(nameOfVariable));
+    updateLabelsForVariables(nameOfVariable);
+
+    // Initialize Model
+    toModel.readForVariable(nameOfVariable, true, offset);
+    fromModel.readForVariable(nameOfVariable, false, offset);
+    // Hide irrelevant column 1: which shows type
+    ui->fromTreeWidget->hideColumn(XrefModel::Columns::TYPE);
+    ui->toTreeWidget->hideColumn(XrefModel::Columns::TYPE);
+    // Adjust columns to content
+    qhelpers::adjustColumns(ui->fromTreeWidget, fromModel.columnCount(), 0);
+    qhelpers::adjustColumns(ui->toTreeWidget, toModel.columnCount(), 0);
+
+    // Automatically select the first line
+    if (!qhelpers::selectFirstItem(ui->toTreeWidget)) {
+        qhelpers::selectFirstItem(ui->fromTreeWidget);
+    }
+}
+
+QString XrefModel::xrefTypeString(const QString &type)
+{
+    if (type == "CODE") {
+        return QStringLiteral("Code");
+    } else if (type == "CALL") {
+        return QStringLiteral("Call");
+    } else if (type == "DATA") {
+        return QStringLiteral("Data");
+    } else if (type == "STRING") {
+        return QStringLiteral("String");
     }
     return type;
 }
 
+
+XrefModel::XrefModel(QObject *parent)
+    : AddressableItemModel(parent)
+{
+}
+
+void XrefModel::readForOffset(RVA offset, bool to, bool whole_function)
+{
+    beginResetModel();
+    this->to = to;
+    xrefs = Core()->getXRefs(offset, to, whole_function);
+    endResetModel();
+}
+
+void XrefModel::readForVariable(QString nameOfVariable, bool write, RVA offset)
+{
+    beginResetModel();
+    this->to = write;
+    xrefs = Core()->getXRefsForVariable(nameOfVariable, write, offset);
+    endResetModel();
+}
+
+int XrefModel::rowCount(const QModelIndex &parent) const
+{
+    Q_UNUSED(parent)
+    return xrefs.size();
+}
+
+int XrefModel::columnCount(const QModelIndex &parent) const
+{
+    Q_UNUSED(parent)
+    return Columns::COUNT;
+}
+
+QVariant XrefModel::data(const QModelIndex &index, int role) const
+{
+    if (!index.isValid() || index.row() >= xrefs.count()) {
+        return QVariant();
+    }
+
+    const XrefDescription &xref = xrefs.at(index.row());
+
+    switch (role) {
+    case Qt::DisplayRole:
+        switch (index.column()) {
+        case OFFSET:
+            return to ? xref.from_str : xref.to_str;
+        case TYPE:
+            return xrefTypeString(xref.type);
+        case CODE:
+            if (to || xref.type != "DATA") {
+                return Core()->disassembleSingleInstruction(xref.from);
+            } else {
+                return QString();
+            }
+        }
+        return QVariant();
+    case FlagDescriptionRole:
+        return QVariant::fromValue(xref);
+    default:
+        break;
+    }
+    return QVariant();
+}
+
+QVariant XrefModel::headerData(int section, Qt::Orientation orientation, int role) const
+{
+    Q_UNUSED(orientation)
+
+    switch (role) {
+    case Qt::DisplayRole:
+        switch (section) {
+        case OFFSET:
+            return tr("Address");
+        case TYPE:
+            return tr("Type");
+        case CODE:
+            return tr("Code");
+        default:
+            return QVariant();
+        }
+    default:
+        return QVariant();
+    }
+}
+
+RVA XrefModel::address(const QModelIndex &index) const
+{
+    const auto &xref = xrefs.at(index.row());
+    return to ? xref.from : xref.to;
+}
