@@ -169,6 +169,7 @@ private slots:
     void on_actionIssue_triggered();
     void documentationClicked();
     void addExtraGraph();
+    void addExtraPPGraph();
     void addExtraHexdump();
     void addExtraDisassembly();
 

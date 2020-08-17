@@ -244,8 +244,8 @@ bool AnnotationsProxyModel::lessThan(const QModelIndex &left, const QModelIndex 
     return false;
 }
 
-AnnotationsWidget::AnnotationsWidget(MainWindow *main, QAction *action) :
-    CutterDockWidget(main, action),
+AnnotationsWidget::AnnotationsWidget(MainWindow *main) :
+    CutterDockWidget(main),
     ui(new Ui::AnnotationsWidget),
     main(main)
 {

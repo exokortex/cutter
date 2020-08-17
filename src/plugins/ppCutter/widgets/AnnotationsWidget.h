@@ -68,7 +68,7 @@ class AnnotationsWidget : public CutterDockWidget
     Q_OBJECT
 
 public:
-    explicit AnnotationsWidget(MainWindow *main, QAction *action = nullptr);
+    explicit AnnotationsWidget(MainWindow *main);
     ~AnnotationsWidget();
 
 protected:

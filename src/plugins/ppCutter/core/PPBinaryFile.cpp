@@ -113,11 +113,19 @@ PPBinaryFile::PPBinaryFile(std::string inputFile)
 
 void PPBinaryFile::createIndex()
 {
+  if (!objDis || !state || !stateCalc) {
+    std::cout << "PP: Architecture of the elf file is not supported" << std::endl;
+    return;
+  }
   AnnotationsHelper::prepareAnnotations(*state, annotations);
 }
 
 void PPBinaryFile::disassemble()
 {
+  if (!objDis || !state || !stateCalc) {
+    std::cout << "PP: Architecture of the elf file is not supported" << std::endl;
+    return;
+  }
   AnnotationsHelper::prepareAnnotations(*state, annotations);
 
   int num_rounds = 0;

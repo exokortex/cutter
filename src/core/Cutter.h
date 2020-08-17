@@ -282,20 +282,6 @@ public:
     RVA prevOpAddr(RVA startAddr, int count);
     RVA nextOpAddr(RVA startAddr, int count);
 
-    /* Disassembly/Graph/Hexdump/Pseudocode view priority */
-    enum class MemoryWidgetType { Disassembly, PPGraph, Graph, Hexdump, Pseudocode };
-    MemoryWidgetType getMemoryWidgetPriority() const
-    {
-        return memoryWidgetPriority;
-    }
-    void setMemoryWidgetPriority(MemoryWidgetType type)
-    {
-        memoryWidgetPriority = type;
-    }
-    void triggerRaisePrioritizedMemoryWidget()
-    {
-        emit raisePrioritizedMemoryWidget(memoryWidgetPriority);
-    }
 
     /* Math functions */
     ut64 math(const QString &expr);

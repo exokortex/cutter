@@ -164,6 +164,7 @@
     </widget>
     <addaction name="actionExtraDisassembly"/>
     <addaction name="actionExtraGraph"/>
+    <addaction name="actionExtraPPGraph"/>
     <addaction name="actionExtraHexdump"/>
     <addaction name="separator"/>
     <addaction name="menuAddInfoWidgets"/>
@@ -789,6 +790,11 @@
   <action name="actionExtraGraph">
    <property name="text">
     <string>Add Graph</string>
+   </property>
+  </action>
+  <action name="actionExtraPPGraph">
+   <property name="text">
+    <string>Add PPGraph</string>
    </property>
   </action>
   <action name="actionGrouped_dock_dragging">

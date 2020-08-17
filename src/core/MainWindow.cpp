@@ -150,6 +150,7 @@ void MainWindow::initUI()
     addressableContextMenuExtensions = new QMenu(tr("Plugins"), this);
 
     connect(ui->actionExtraGraph, &QAction::triggered, this, &MainWindow::addExtraGraph);
+    connect(ui->actionExtraPPGraph, &QAction::triggered, this, &MainWindow::addExtraPPGraph);
     connect(ui->actionExtraDisassembly, &QAction::triggered, this, &MainWindow::addExtraDisassembly);
     connect(ui->actionExtraHexdump, &QAction::triggered, this, &MainWindow::addExtraHexdump);
     connect(ui->actionCommitChanges, &QAction::triggered, this, [this]() {
@@ -358,6 +359,7 @@ void MainWindow::initDocks()
     searchDock = new SearchWidget(this);
     commentsDock = new CommentsWidget(this);
     stringsDock = new StringsWidget(this);
+    ppGraphDock = new PPGraphWidget(this);
 
     QList<CutterDockWidget *> debugDocks = {
         stackDock = new StackWidget(this),
@@ -388,9 +390,8 @@ void MainWindow::initDocks()
         r2GraphDock = new R2GraphWidget(this),
         callGraphDock = new CallGraphWidget(this, false),
         globalCallGraphDock = new CallGraphWidget(this, true),
-
-        ppAnnotationsDock = new AnnotationsWidget(this, ui->actionComments),
-        annotationsEditorDock = new AnnotationsEditorDockWidget(this, ui->actionComments),
+        ppAnnotationsDock = new AnnotationsWidget(this),
+        annotationsEditorDock = new AnnotationsEditorDockWidget(this),
     };
 
     auto makeActionList = [this](QList<CutterDockWidget *> docks) {
@@ -456,6 +457,12 @@ void MainWindow::updateTasksIndicator()
 void MainWindow::addExtraGraph()
 {
     auto *extraDock = new GraphWidget(this);
+    addExtraWidget(extraDock);
+}
+
+void MainWindow::addExtraPPGraph()
+{
+    auto *extraDock = new PPGraphWidget(this);
     addExtraWidget(extraDock);
 }
 

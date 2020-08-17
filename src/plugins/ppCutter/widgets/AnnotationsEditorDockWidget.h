@@ -13,7 +13,7 @@ class AnnotationsEditorDockWidget : public CutterDockWidget
   Q_OBJECT
 
   public:
-      explicit AnnotationsEditorDockWidget(MainWindow *main, QAction *action = nullptr);
+      explicit AnnotationsEditorDockWidget(MainWindow *main);
       ~AnnotationsEditorDockWidget();
 
   public slots:

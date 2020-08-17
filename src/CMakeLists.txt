@@ -1,6 +1,10 @@
+project(PPCutter)
+
 cmake_minimum_required(VERSION 3.5)
 
-SET(DEFAULT_CXX_FLAGS_GCC "-std=c++1y -Wall -Wextra -pedantic -fno-rtti")
+SET(DEFAULT_CXX_FLAGS_GCC "-std=c++1y -Wall -Wextra -pedantic -fno-rtti -O0 -g")
+set(Backward_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../pp/external/backward-cpp" CACHE STRING "")
+find_package(Backward)
 
 if(POLICY CMP0074)
     cmake_policy(SET CMP0074 NEW)
@@ -242,7 +246,7 @@ endif()
 # ppCutter additions
 SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fno-rtti" )
 find_package(pp REQUIRED)
-target_link_libraries(Cutter pp::pp)
+target_link_libraries(Cutter PRIVATE pp::pp)
 
 if(TARGET KF5::SyntaxHighlighting)
     target_link_libraries(Cutter PRIVATE KF5::SyntaxHighlighting)
@@ -284,3 +288,5 @@ if(UNIX AND NOT APPLE)
         DESTINATION "share/applications"
         COMPONENT Devel)
 endif()
+
+target_link_libraries(Cutter PRIVATE PRIVATE Backward::Backward)

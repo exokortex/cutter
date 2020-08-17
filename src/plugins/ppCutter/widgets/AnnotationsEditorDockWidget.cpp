@@ -3,8 +3,8 @@
 #include "AnnotationsEditorWidget.h"
 #include "plugins/ppCutter/core/PPCutterCore.h"
 
-AnnotationsEditorDockWidget::AnnotationsEditorDockWidget(MainWindow *main, QAction *action) :
-    CutterDockWidget(main, action),
+AnnotationsEditorDockWidget::AnnotationsEditorDockWidget(MainWindow *main) :
+    CutterDockWidget(main),
     seekable(new CutterSeekable(this))
 {
     this->setObjectName("annotationEditor");
