@@ -75,7 +75,7 @@ std::vector<QString> PPGraphView::instructionColors = {
 };
 
 PPGraphView::PPGraphView(QWidget *parent, CutterSeekable *seekable, MainWindow *mainWindow,
-                          QList<QAction *> additionalMenuAction)
+                          QList<QAction *> additionalMenuActions)
     : CutterGraphView(parent),
       blockMenu(new DisassemblyContextMenu(this, mainWindow)),
       contextMenu(new QMenu(this)),
@@ -94,12 +94,9 @@ PPGraphView::PPGraphView(QWidget *parent, CutterSeekable *seekable, MainWindow *
     connect(Core(), SIGNAL(varsChanged()), this, SLOT(refreshView()));
     connect(Core(), SIGNAL(instructionChanged(RVA)), this, SLOT(refreshView()));
     connect(Core(), SIGNAL(functionsChanged()), this, SLOT(refreshView()));
-    connect(Core(), SIGNAL(graphOptionsChanged()), this, SLOT(refreshView()));
     connect(Core(), SIGNAL(asmOptionsChanged()), this, SLOT(refreshView()));
     connect(Core(), SIGNAL(refreshCodeViews()), this, SLOT(refreshView()));
 
-    connect(Config(), SIGNAL(colorsUpdated()), this, SLOT(colorsUpdatedSlot()));
-    connect(Config(), SIGNAL(fontsUpdated()), this, SLOT(fontsUpdatedSlot()));
     connectSeekChanged(false);
 
     // ESC for previous
@@ -130,7 +127,7 @@ PPGraphView::PPGraphView(QWidget *parent, CutterSeekable *seekable, MainWindow *
     contextMenu->addAction(&actionExportGraph);
     contextMenu->addMenu(layoutMenu);
     contextMenu->addSeparator();
-    contextMenu->addActions(additionalMenuAction);
+    contextMenu->addActions(additionalMenuActions);
 
 
     QAction *highlightBB = new QAction(this);
@@ -209,16 +206,6 @@ PPGraphView::~PPGraphView()
     }
 }
 
-// void PPGraphView::toggleSync()
-// {
-//     seekable->toggleSynchronization();
-//     if (seekable->isSynchronized()) {
-//         parentWidget()->setWindowTitle(windowTitle);
-//     } else {
-//         parentWidget()->setWindowTitle(windowTitle + CutterSeekable::tr(" (unsynced)"));
-//     }
-// }
-
 void PPGraphView::refreshView()
 {
     CutterGraphView::refreshView();
@@ -228,63 +215,32 @@ void PPGraphView::refreshView()
 
 void PPGraphView::loadCurrentGraph()
 {
-    printf("loadCurrentGraph aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.................................\n");
     TempConfig tempConfig;
-    tempConfig.set("scr.html", true)
-    .set("scr.color", COLOR_MODE_16M)
-    .set("asm.bbline", false)
+    tempConfig.set("scr.color", COLOR_MODE_16M)
+    .set("asm.bb.line", false)
     .set("asm.lines", false)
     .set("asm.lines.fcn", false);
-//    QJsonDocument functionsDoc = Core()->cmdj("agJ " + RAddressString(seekable->getOffset()));
-//    QJsonArray functions = functionsDoc.array();
 
     disassembly_blocks.clear();
     blocks.clear();
 
     if (!PPCore()->isReady())
         return;
-    printf("loadCurrentGraph ready\n");
-
-//    bool emptyGraph = functions.isEmpty();
-//    if (emptyGraph) {
-//        // If there's no function to print, just move to disassembly and add a message
-//        if (Core()->getMemoryWidgetPriority() == CutterCore::MemoryWidgetType::PPGraph) {
-//            Core()->setMemoryWidgetPriority(CutterCore::MemoryWidgetType::Disassembly);
-//        }
-//        if (!emptyText) {
-//            QVBoxLayout *layout = new QVBoxLayout(this);
-//            emptyText = new QLabel(this);
-//            emptyText->setText(tr("No function detected. Cannot display graph."));
-//            emptyText->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Maximum);
-//            layout->addWidget(emptyText);
-//            layout->setAlignment(emptyText, Qt::AlignHCenter);
-//        }
-//        emptyText->setVisible(true);
-//    } else if (emptyText) {
-//        emptyText->setVisible(false);
-//    }
 
     const PPBinaryFile& file = PPCore()->getFile();
     ::Function *ppFunction = file.getFunctionAt(seekable->getOffset());
 
     if (!ppFunction)
         return;
-    printf("loadCurrentGraph ppFunction\n");
 
     Analysis anal;
     anal.ready = true;
 
-//    QJsonValue funcRef = functions.first();
-//    QJsonObject func = funcRef.toObject();
     Function f;
     f.ready = true;
     f.entry = file.getEntrypointAt(seekable->getOffset()).address;
 
-  //ppFunction->getEntryPoints().at(0).address;//func["offset"].toVariant().toULongLong();
-
-
     windowTitle = tr("PP-Graph");
-//    QString funcName = func["name"].toString().trimmed();
     if (ppFunction == NULL) {
         windowTitle += " (Empty)";
     } else {
@@ -294,11 +250,8 @@ void PPGraphView::loadCurrentGraph()
     emit nameChanged(windowTitle);
 
     if (!ppFunction) {
-        printf("no function.................................\n");
         return;
     }
-
-//    RVA entry = func["offset"].toVariant().toULongLong();
 
     setEntry(f.entry);
 
@@ -357,7 +310,9 @@ void PPGraphView::loadCurrentGraph()
             // Skip last byte, otherwise it will overlap with next instruction
             i.size = size - 1;
 
-            QString color = instructionColors[di.type];
+            QString textColor = palette().text().color().name();
+            QString color = (di.type == 1) ? textColor : instructionColors[di.type];
+
             bool annotated = false;
             if (f.getState().annotations_by_address.count(di.address))
                 annotated = f.getState().annotations_by_address.at(di.address).size() != 0;
@@ -388,8 +343,7 @@ void PPGraphView::loadCurrentGraph()
                 qCPE = "<font color='#ff7878'> ; = " + PPCore()->addrToString(cpe.value) + "</font>";
             }
 
-
-            QString disas = QString("<font color='#000000'>%1%2&nbsp;%8</font>&nbsp;<font color='%4'>%6&nbsp;&nbsp;%3%5%9")
+            QString disas = QString("<font color='%10'>%1%2&nbsp;%8</font>&nbsp;<font color='%4'>%6&nbsp;&nbsp;%3%5%9")
                     .arg(di.address, 8, 16, QChar('0'))
                     .arg(annotated ? "*" : "&nbsp;")
                     .arg(asmQString)
@@ -397,7 +351,8 @@ void PPGraphView::loadCurrentGraph()
                     .arg(comment)
                     .arg(states.replace(" ", "&nbsp;"))
                     .arg(qbytes)
-                    .arg(qCPE);
+                    .arg(qCPE)
+                    .arg(textColor);
 
             QTextDocument textDoc;
             textDoc.setHtml(disas);
@@ -422,8 +377,9 @@ void PPGraphView::loadCurrentGraph()
         addBlock(gb);
     }
 
-    /*for (QJsonValueRef blockRef : func["blocks"].toArray()) {
-        QJsonObject block = blockRef.toObject();
+    /*
+    for (const QJsonValueRef &value : func["blocks"].toArray()) {
+        QJsonObject block = value.toObject();
         RVA block_entry = block["offset"].toVariant().toULongLong();
         RVA block_size = block["size"].toVariant().toULongLong();
         RVA block_fail = block["fail"].toVariant().toULongLong();
@@ -700,14 +656,6 @@ void PPGraphView::drawBlock(QPainter &p, GraphView::GraphBlock &block, bool inte
     int y = block.y + getTextOffset(0).y();
     qreal lineHeightRender = charHeight;
     for (auto &line : db.header_text.lines) {
-        qreal lineYRender = y;
-        lineYRender *= getViewScale();
-        // Check if line does NOT intersects with view area
-        if (0 > lineYRender + lineHeightRender
-                || render_height < lineYRender) {
-            y += charHeight;
-            continue;
-        }
 
         RichTextPainter::paintRichText<qreal>(&p, x, y, block.width, charHeight, 0, line,
                                        mFontMetrics.get());
@@ -726,14 +674,6 @@ void PPGraphView::drawBlock(QPainter &p, GraphView::GraphBlock &block, bool inte
             }
         }
         for (auto &line : instr.text.lines) {
-            qreal lineYRender = y;
-            lineYRender *= getViewScale();
-            if (0 > lineYRender + lineHeightRender
-                    || render_height < lineYRender) {
-                y += charHeight;
-                continue;
-            }
-
             int rectSize = qRound(charWidth);
             if (rectSize % 2) {
                 rectSize++;
@@ -776,6 +716,7 @@ GraphView::EdgeConfiguration PPGraphView::edgeConfiguration(GraphView::GraphBloc
     }
     return ec;
 }
+
 
 RVA PPGraphView::getAddrForMouseEvent(GraphBlock &block, QPoint *point)
 {
@@ -873,33 +814,6 @@ void PPGraphView::showInstruction(GraphView::GraphBlock &block, RVA addr)
     showRectangle(QRect(rect.x(), rect.y(), rect.width(), rect.height()), true);
 }
 
-// Public Slots
-
-//void PPGraphView::colorsUpdatedSlot()
-//{
-//    disassemblyBackgroundColor = ConfigColor("gui.alt_background");
-//    disassemblySelectedBackgroundColor = ConfigColor("gui.disass_selected");
-//    mDisabledBreakpointColor = disassemblyBackgroundColor;
-//    graphNodeColor = ConfigColor("gui.border");
-//    backgroundColor = ConfigColor("gui.background");
-//    disassemblySelectionColor = ConfigColor("lineHighlight");
-//    PCSelectionColor = ConfigColor("highlightPC");
-//
-//    jmpColor = ConfigColor("graph.trufae");
-//    brtrueColor = ConfigColor("graph.true");
-//    brfalseColor = ConfigColor("graph.false");
-//
-//    mCommentColor = ConfigColor("comment");
-//    initFont();
-//    refreshView();
-//}
-//
-//void PPGraphView::fontsUpdatedSlot()
-//{
-//    initFont();
-//    refreshView();
-//}
-
 PPGraphView::DisassemblyBlock *PPGraphView::blockForAddress(RVA addr)
 {
     for (auto &blockIt : disassembly_blocks) {
@@ -950,6 +864,7 @@ void PPGraphView::onSeekChanged(RVA addr)
         showInstruction(blocks[db->entry], addr);
     }
 }
+
 
 void PPGraphView::takeTrue()
 {
