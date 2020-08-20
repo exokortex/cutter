@@ -41,7 +41,7 @@ PPBinaryFile::PPBinaryFile(std::string inputFile)
   uint64_t k1 = 0x8765432100000000;
   int rounds = 12;
 
-  auto elf = llvm::make_unique<ELFIO::elfio>();
+  auto elf = std::make_unique<ELFIO::elfio>();
   if (!elf->load(inputFile))
   {
     std::cout << "PP: File not found" << std::endl;
@@ -63,20 +63,20 @@ PPBinaryFile::PPBinaryFile(std::string inputFile)
       LLVMInitializeARMTargetMC();
       LLVMInitializeARMDisassembler();
 
-      objDis = llvm::make_unique<ObjectDisassembler>(
-          llvm::make_unique<Architecture::Thumb::Info>());
-      state = llvm::make_unique<DisassemblerState>(objDis->getInfo());
+      objDis = std::make_unique<ObjectDisassembler>(
+          std::make_unique<Architecture::Thumb::Info>());
+      state = std::make_unique<DisassemblerState>(objDis->getInfo());
 
       std::unique_ptr<StateUpdateFunction> updateFunc;
       if (false) // (cli.m0_)
         updateFunc =
-            llvm::make_unique<SumStateUpdateFunction<false, true>>(*state);
+            std::make_unique<SumStateUpdateFunction<false, true>>(*state);
       else
         updateFunc =
-            llvm::make_unique<CrcStateUpdateFunction<Crc32c<32>, true, true>>(
+            std::make_unique<CrcStateUpdateFunction<Crc32c<32>, true, true>>(
                 *state);
 
-      stateCalc = llvm::make_unique<PureSwUpdateStateCalculator>(
+      stateCalc = std::make_unique<PureSwUpdateStateCalculator>(
           *state, std::move(updateFunc));
       stateCalc->definePreState(objDis->getInfo().sanitize(elf->get_entry()),
                                 CryptoState{4});
@@ -92,12 +92,12 @@ PPBinaryFile::PPBinaryFile(std::string inputFile)
       LLVMInitializeRISCVDisassembler();
 
       bool rv32 = elf->get_class() == ELFCLASS32;
-      objDis = llvm::make_unique<ObjectDisassembler>(
-          llvm::make_unique<Architecture::Riscv::Info>(rv32));
+      objDis = std::make_unique<ObjectDisassembler>(
+          std::make_unique<Architecture::Riscv::Info>(rv32));
 
-      state = llvm::make_unique<DisassemblerState>(objDis->getInfo());
-      stateCalc = llvm::make_unique<ApeStateCalculator>(
-          *state, llvm::make_unique<PrinceApeStateUpdateFunction>(
+      state = std::make_unique<DisassemblerState>(objDis->getInfo());
+      stateCalc = std::make_unique<ApeStateCalculator>(
+          *state, std::make_unique<PrinceApeStateUpdateFunction>(
                       *state, k0, k1, rounds));
     }
 #endif // RISCV_TARGET_ENABLED
